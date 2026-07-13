@@ -56,9 +56,18 @@ type PinchSession = {
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const asset = (path: string) => `${basePath}${path}`;
 const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
+const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
+  ? path.replace("/wardrobe/cutouts/", "/wardrobe/clean/")
+  : path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
 const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
+const defaultPlacement = (category: Garment["category"]) => {
+  if (category === "Bottoms") return { x: 50, y: 66, scale: 0.88 };
+  if (category === "Tops") return { x: 50, y: 31, scale: 0.48 };
+  if (category === "Tailoring") return { x: 50, y: 34, scale: 0.6 };
+  return { x: 50, y: 33, scale: 0.6 };
+};
 
 const viewCopy: Record<View, { title: string; note: string }> = {
   wardrobe: { title: "Your clothes,\nfinally visible.", note: "A playful visual index of everything you own—cut out, ready to combine and impossible to forget." },
@@ -67,9 +76,9 @@ const viewCopy: Record<View, { title: string; note: string }> = {
 };
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66, scale: 0.84, rotation: 0, z: 1001 },
-  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 37, scale: 0.6, rotation: 0, z: 2001 },
-  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 35, scale: 0.76, rotation: 0, z: 3001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66, scale: 0.88, rotation: 0, z: 1001 },
+  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31, scale: 0.48, rotation: 0, z: 2001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 33, scale: 0.6, rotation: 0, z: 3001 },
 ];
 
 export default function Home() {
@@ -85,6 +94,8 @@ export default function Home() {
   const [canvasPieces, setCanvasPieces] = useState(initialCanvas);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
@@ -162,22 +173,22 @@ export default function Home() {
     const garment = garmentById.get(garmentId);
     if (!garment) return;
     const instanceId = crypto.randomUUID();
-    const isBottom = garment.category === "Bottoms";
-    const offset = (canvasPieces.length % 5) * 2;
+    const placement = defaultPlacement(garment.category);
     setCanvasPieces((items) => {
       const base = layerBase(garment.category);
       const top = Math.max(base, ...items.filter((item) => {
         const itemGarment = garmentById.get(item.garmentId);
         return itemGarment && layerBase(itemGarment.category) === base;
       }).map((item) => item.z)) + 1;
+      const hasInnerTop = items.some((item) => garmentById.get(item.garmentId)?.category === "Tops");
       return [...items, {
         instanceId,
         garmentId,
-        variant: garment.openImage ? "open" : "closed",
-        x: clamp(50 + offset - 4, 12, 88),
-        y: isBottom ? 66 : 36 + offset,
-        scale: isBottom ? 0.84 : 0.72,
-        rotation: (canvasPieces.length % 3 - 1) * 3,
+        variant: garment.openImage && hasInnerTop ? "open" : "closed",
+        x: placement.x,
+        y: placement.y,
+        scale: placement.scale,
+        rotation: 0,
         z: top,
       }];
     });
@@ -313,7 +324,7 @@ export default function Home() {
 
   function scaleSelected(delta: number) {
     if (!selectedPiece) return;
-    updateSelected({ scale: clamp(selectedPiece.scale + delta, 0.28, 1.35) });
+    updateSelected({ scale: clamp(selectedPiece.scale + delta, 0.24, 1.15) });
   }
 
   function rotateSelected(delta: number) {
@@ -343,15 +354,21 @@ export default function Home() {
 
   function shuffleLook() {
     const bottoms = garments.filter((item) => item.category === "Bottoms");
-    const tops = garments.filter((item) => item.category !== "Bottoms");
+    const tops = garments.filter((item) => item.category === "Tops");
+    const outerLayers = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
     const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
     const top = tops[Math.floor(Math.random() * tops.length)];
+    const outer = outerLayers[Math.floor(Math.random() * outerLayers.length)];
+    const bottomPlacement = defaultPlacement(bottom.category);
+    const topPlacement = defaultPlacement(top.category);
+    const outerPlacement = defaultPlacement(outer.category);
     const next: CanvasPiece[] = [
-      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", x: 50, y: 66, scale: 0.84, rotation: 0, z: layerBase(bottom.category) + 1 },
-      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: top.openImage ? "open" : "closed", x: 50, y: 35, scale: 0.74, rotation: 0, z: layerBase(top.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(bottom.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(top.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: outer.id, variant: outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(outer.category) + 1 },
     ];
     setCanvasPieces(next);
-    setSelectedId(next[1].instanceId);
+    setSelectedId(next[2].instanceId);
     setSaved(false);
   }
 
@@ -434,13 +451,14 @@ export default function Home() {
           <div className="studio-layout">
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
-                <p className="look-date">DRAG / PINCH / TWIST</p>
+                <p className="look-date">LOOK 001 / DRAG · PINCH · TWIST</p>
                 <span className="canvas-hint">HOLD = OPEN / CLOSED</span>
                 {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => addToCanvas(garments[0].id)}>YOUR CANVAS IS EMPTY<br /><span>ADD A CUTOUT ＋</span></button>}
                 {canvasPieces.map((piece) => {
                   const garment = garmentById.get(piece.garmentId);
                   if (!garment) return null;
                   const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
+                  const canvasImage = cleanCanvasImage(pieceImage);
                   return (
                     <div
                       className={`canvas-piece ${selectedId === piece.instanceId ? "selected" : ""}`}
@@ -456,15 +474,15 @@ export default function Home() {
                         transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       }}
                     >
-                      <img src={imageSrc(pieceImage)} alt={garment.name} draggable={false} />
+                      <img src={imageSrc(canvasImage)} alt={garment.name} draggable={false} />
                     </div>
                   );
                 })}
                 <span className="look-caption">DRESS<br />BY FEEL</span>
               </div>
-              <div className="canvas-tools" aria-label="Selected cutout controls">
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.08)}><span>−</span>SIZE</button>
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.08)}><span>＋</span>SIZE</button>
+              <div className={`canvas-tools ${toolsOpen ? "panel-open" : "panel-closed"} ${libraryOpen ? "library-visible" : ""}`} aria-label="Selected cutout controls">
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)}><span>−</span>SIZE</button>
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)}><span>＋</span>SIZE</button>
                 <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)}><span>↺</span>TURN</button>
                 <button disabled={!selectedPiece} onClick={() => rotateSelected(8)}><span>↻</span>TURN</button>
                 <button disabled={!selectedPiece} onClick={() => sendSelected("front")}><span>↑</span>FRONT</button>
@@ -472,7 +490,15 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="look-controls">
+            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}>
+              {libraryOpen ? "HIDE PIECES" : "PIECES"}
+            </button>
+            <button className={`floating-panel-toggle tools-panel-toggle ${toolsOpen ? "active" : ""}`} onClick={() => setToolsOpen((open) => !open)} aria-expanded={toolsOpen}>
+              {toolsOpen ? "HIDE TOOLS" : "TOOLS"}
+            </button>
+
+            <div className={`look-controls ${libraryOpen ? "panel-open" : "panel-closed"}`}>
+              <div className="floating-panel-header"><span>WARDROBE / {String(trayGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Hide pieces panel">×</button></div>
               <div className="selected-readout">
                 <p>SELECTED CUTOUT</p>
                 <h3>{selectedGarment?.name ?? "Tap a piece"}</h3>
