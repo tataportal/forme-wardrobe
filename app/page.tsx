@@ -47,17 +47,20 @@ type PinchSession = {
   pointerIds: [number, number];
   startDistance: number;
   startScale: number;
+  startAngle: number;
+  startRotation: number;
 };
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const asset = (path: string) => `${basePath}${path}`;
 const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
 
 const viewCopy: Record<View, { title: string; note: string }> = {
   wardrobe: { title: "Your clothes,\nfinally visible.", note: "A playful visual index of everything you own—cut out, ready to combine and impossible to forget." },
   upload: { title: "From camera roll\nto clean cut.", note: "Upload one clear photo. We rebuild the shape, preserve the details and turn it into a movable wardrobe cutout." },
-  studio: { title: "Move it until\nit feels right.", note: "Tap to select, pinch to resize and drag anywhere. Tap the same piece again to remove it." },
+  studio: { title: "Move it until\nit feels right.", note: "Drag with one finger. Pinch and twist with two fingers to resize and rotate. Tap the same piece again to remove it." },
 };
 
 const initialCanvas: CanvasPiece[] = [
@@ -197,6 +200,8 @@ export default function Home() {
         pointerIds: [otherId, event.pointerId],
         startDistance: Math.hypot(event.clientX - otherTrack.x, event.clientY - otherTrack.y),
         startScale: piece.scale,
+        startAngle: Math.atan2(event.clientY - otherTrack.y, event.clientX - otherTrack.x),
+        startRotation: piece.rotation,
       };
       dragSession.current = null;
     } else if (!pinchSession.current) {
@@ -233,7 +238,9 @@ export default function Home() {
       event.preventDefault();
       const distance = Math.hypot(first.x - second.x, first.y - second.y);
       const scale = clamp(pinch.startScale * (distance / pinch.startDistance), 0.28, 1.35);
-      setCanvasPieces((items) => items.map((item) => item.instanceId === pinch.instanceId ? { ...item, scale } : item));
+      const angle = Math.atan2(second.y - first.y, second.x - first.x);
+      const rotation = pinch.startRotation + normalizeDegrees((angle - pinch.startAngle) * (180 / Math.PI));
+      setCanvasPieces((items) => items.map((item) => item.instanceId === pinch.instanceId ? { ...item, scale, rotation } : item));
       setSaved(false);
       return;
     }
@@ -312,7 +319,7 @@ export default function Home() {
   }
 
   return (
-    <main className="site-shell">
+    <main className={`site-shell view-${view}`}>
       <header className="topbar">
         <button className="wordmark" onClick={() => setView("wardrobe")} aria-label="Go to wardrobe">FORME<span>®</span></button>
         <p className="issue">WARDROBE SYSTEM<br />ISSUE NO. 02</p>
@@ -390,8 +397,8 @@ export default function Home() {
           <div className="studio-layout">
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
-                <p className="look-date">DRAG / PINCH / ROTATE</p>
-                <span className="canvas-hint">TAP AGAIN = REMOVE</span>
+                <p className="look-date">DRAG / PINCH / TWIST</p>
+                <span className="canvas-hint">2 FINGERS = SCALE + ROTATE</span>
                 {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => addToCanvas(garments[0].id)}>YOUR CANVAS IS EMPTY<br /><span>ADD A CUTOUT ＋</span></button>}
                 {canvasPieces.map((piece) => {
                   const garment = garmentById.get(piece.garmentId);
