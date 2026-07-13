@@ -14,6 +14,7 @@ type View = "wardrobe" | "upload" | "studio";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
+  variant: "closed" | "open";
   x: number;
   y: number;
   scale: number;
@@ -40,6 +41,7 @@ type PointerTrack = {
   y: number;
   moved: boolean;
   wasSelected: boolean;
+  startedAt: number;
 };
 
 type PinchSession = {
@@ -56,16 +58,18 @@ const asset = (path: string) => `${basePath}${path}`;
 const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
+const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
 
 const viewCopy: Record<View, { title: string; note: string }> = {
   wardrobe: { title: "Your clothes,\nfinally visible.", note: "A playful visual index of everything you own—cut out, ready to combine and impossible to forget." },
   upload: { title: "From camera roll\nto clean cut.", note: "Upload one clear photo. We rebuild the shape, preserve the details and turn it into a movable wardrobe cutout." },
-  studio: { title: "Move it until\nit feels right.", note: "Drag with one finger. Pinch and twist with two fingers to resize and rotate. Tap the same piece again to remove it." },
+  studio: { title: "Move it until\nit feels right.", note: "Drag with one finger. Pinch and twist to resize and rotate. Hold supported outerwear to open or close it; tap again to remove." },
 };
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", x: 50, y: 66, scale: 0.84, rotation: 0, z: 1 },
-  { instanceId: "initial-jacket", garmentId: "archive-032", x: 50, y: 35, scale: 0.76, rotation: 0, z: 2 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66, scale: 0.84, rotation: 0, z: 1001 },
+  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 37, scale: 0.6, rotation: 0, z: 2001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 35, scale: 0.76, rotation: 0, z: 3001 },
 ];
 
 export default function Home() {
@@ -135,7 +139,14 @@ export default function Home() {
 
   function bringToFront(instanceId: string) {
     setCanvasPieces((items) => {
-      const top = Math.max(0, ...items.map((item) => item.z)) + 1;
+      const piece = items.find((item) => item.instanceId === instanceId);
+      const garment = piece ? garmentById.get(piece.garmentId) : undefined;
+      if (!piece || !garment) return items;
+      const base = layerBase(garment.category);
+      const top = Math.max(base, ...items.filter((item) => {
+        const itemGarment = garmentById.get(item.garmentId);
+        return itemGarment && layerBase(itemGarment.category) === base;
+      }).map((item) => item.z)) + 1;
       return items.map((item) => item.instanceId === instanceId ? { ...item, z: top } : item);
     });
   }
@@ -151,18 +162,25 @@ export default function Home() {
     const garment = garmentById.get(garmentId);
     if (!garment) return;
     const instanceId = crypto.randomUUID();
-    const top = Math.max(0, ...canvasPieces.map((item) => item.z)) + 1;
     const isBottom = garment.category === "Bottoms";
     const offset = (canvasPieces.length % 5) * 2;
-    setCanvasPieces((items) => [...items, {
-      instanceId,
-      garmentId,
-      x: clamp(50 + offset - 4, 12, 88),
-      y: isBottom ? 66 : 36 + offset,
-      scale: isBottom ? 0.84 : 0.72,
-      rotation: (canvasPieces.length % 3 - 1) * 3,
-      z: top,
-    }]);
+    setCanvasPieces((items) => {
+      const base = layerBase(garment.category);
+      const top = Math.max(base, ...items.filter((item) => {
+        const itemGarment = garmentById.get(item.garmentId);
+        return itemGarment && layerBase(itemGarment.category) === base;
+      }).map((item) => item.z)) + 1;
+      return [...items, {
+        instanceId,
+        garmentId,
+        variant: garment.openImage ? "open" : "closed",
+        x: clamp(50 + offset - 4, 12, 88),
+        y: isBottom ? 66 : 36 + offset,
+        scale: isBottom ? 0.84 : 0.72,
+        rotation: (canvasPieces.length % 3 - 1) * 3,
+        z: top,
+      }];
+    });
     setSelectedId(instanceId);
     setSaved(false);
   }
@@ -187,6 +205,7 @@ export default function Home() {
       y: event.clientY,
       moved: false,
       wasSelected: selectedId === instanceId,
+      startedAt: event.timeStamp,
     };
     const otherPointer = Array.from(pointerTracks.current.entries()).find(([, pointer]) => pointer.instanceId === instanceId);
     pointerTracks.current.set(event.pointerId, track);
@@ -267,9 +286,23 @@ export default function Home() {
     if (dragSession.current?.pointerId === event.pointerId) dragSession.current = null;
     pointerTracks.current.delete(event.pointerId);
 
-    if (!cancelled && !wasPinching && track && !track.moved && track.wasSelected) {
-      removePiece(track.instanceId);
+    if (!cancelled && !wasPinching && track && !track.moved) {
+      const held = event.timeStamp - track.startedAt >= 500;
+      const piece = canvasPieces.find((item) => item.instanceId === track.instanceId);
+      const garment = piece ? garmentById.get(piece.garmentId) : undefined;
+      if (held && garment?.openImage) {
+        toggleVariant(track.instanceId);
+      } else if (track.wasSelected) {
+        removePiece(track.instanceId);
+      }
     }
+  }
+
+  function toggleVariant(instanceId: string) {
+    setCanvasPieces((items) => items.map((item) => item.instanceId === instanceId
+      ? { ...item, variant: item.variant === "open" ? "closed" : "open" }
+      : item));
+    setSaved(false);
   }
 
   function updateSelected(patch: Partial<CanvasPiece>) {
@@ -289,9 +322,13 @@ export default function Home() {
   }
 
   function sendSelected(direction: "front" | "back") {
-    if (!selectedPiece) return;
-    const levels = canvasPieces.map((item) => item.z);
-    updateSelected({ z: direction === "front" ? Math.max(...levels) + 1 : Math.min(...levels) - 1 });
+    if (!selectedPiece || !selectedGarment) return;
+    const base = layerBase(selectedGarment.category);
+    const levels = canvasPieces.filter((item) => {
+      const garment = garmentById.get(item.garmentId);
+      return garment && layerBase(garment.category) === base;
+    }).map((item) => item.z);
+    updateSelected({ z: direction === "front" ? Math.max(base, ...levels) + 1 : Math.max(base, Math.min(...levels) - 1) });
   }
 
   function removePiece(instanceId: string) {
@@ -310,8 +347,8 @@ export default function Home() {
     const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
     const top = tops[Math.floor(Math.random() * tops.length)];
     const next: CanvasPiece[] = [
-      { instanceId: crypto.randomUUID(), garmentId: bottom.id, x: 50, y: 66, scale: 0.84, rotation: 0, z: 1 },
-      { instanceId: crypto.randomUUID(), garmentId: top.id, x: 50, y: 35, scale: 0.74, rotation: 0, z: 2 },
+      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", x: 50, y: 66, scale: 0.84, rotation: 0, z: layerBase(bottom.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: top.openImage ? "open" : "closed", x: 50, y: 35, scale: 0.74, rotation: 0, z: layerBase(top.category) + 1 },
     ];
     setCanvasPieces(next);
     setSelectedId(next[1].instanceId);
@@ -398,11 +435,12 @@ export default function Home() {
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
                 <p className="look-date">DRAG / PINCH / TWIST</p>
-                <span className="canvas-hint">2 FINGERS = SCALE + ROTATE</span>
+                <span className="canvas-hint">HOLD = OPEN / CLOSED</span>
                 {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => addToCanvas(garments[0].id)}>YOUR CANVAS IS EMPTY<br /><span>ADD A CUTOUT ＋</span></button>}
                 {canvasPieces.map((piece) => {
                   const garment = garmentById.get(piece.garmentId);
                   if (!garment) return null;
+                  const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
                   return (
                     <div
                       className={`canvas-piece ${selectedId === piece.instanceId ? "selected" : ""}`}
@@ -418,7 +456,7 @@ export default function Home() {
                         transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       }}
                     >
-                      <img src={imageSrc(garment.image)} alt={garment.name} draggable={false} />
+                      <img src={imageSrc(pieceImage)} alt={garment.name} draggable={false} />
                     </div>
                   );
                 })}

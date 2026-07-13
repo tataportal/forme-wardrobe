@@ -4,21 +4,23 @@ export type Garment = {
   category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring";
   color: string;
   image: string;
+  openImage?: string;
   status: "ghosted" | "original";
   favorite?: boolean;
 };
 
-type ArchiveEntry = Omit<Garment, "id" | "image" | "status"> & {
+type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status"> & {
   file: string;
+  openFile?: string;
 };
 
 const archive: ArchiveEntry[] = [
   { file: "001_DSC01768.webp", name: "Daisy Coach Jacket", category: "Outerwear", color: "Black", favorite: true },
-  { file: "002_DSC01771.webp", name: "WFP Bomber", category: "Outerwear", color: "Black" },
+  { file: "002_DSC01771.webp", openFile: "002_DSC01771-open.webp", name: "WFP Bomber", category: "Outerwear", color: "Black" },
   { file: "003_DSC01773.webp", name: "Navy Peacoat", category: "Tailoring", color: "Navy" },
   { file: "004_DSC01775.webp", name: "Leather Hooded Shirt", category: "Outerwear", color: "Black" },
   { file: "005_DSC01777.webp", name: "Utility Field Jacket", category: "Outerwear", color: "Black" },
-  { file: "006_DSC01779.webp", name: "Leather Blazer", category: "Tailoring", color: "Brown" },
+  { file: "006_DSC01779.webp", openFile: "006_DSC01779-open.webp", name: "Leather Blazer", category: "Tailoring", color: "Brown" },
   { file: "007_DSC01781.webp", name: "Asymmetric Trench", category: "Outerwear", color: "Black" },
   { file: "008_DSC01783.webp", name: "Padded Collar Jacket", category: "Outerwear", color: "Black", favorite: true },
   { file: "009_DSC01785.webp", name: "Belted Short Coat", category: "Tailoring", color: "Black" },
@@ -35,7 +37,7 @@ const archive: ArchiveEntry[] = [
   { file: "020_DSC01806.webp", name: "Long Black Trench", category: "Outerwear", color: "Black" },
   { file: "021_DSC01808.webp", name: "Lightweight Shell", category: "Outerwear", color: "Black" },
   { file: "022_DSC01810.webp", name: "Tiger Fleece", category: "Outerwear", color: "Orange" },
-  { file: "023_DSC01814.webp", name: "Graphic Varsity Jacket", category: "Outerwear", color: "Black / Green" },
+  { file: "023_DSC01814.webp", openFile: "023_DSC01814-open.webp", name: "Graphic Varsity Jacket", category: "Outerwear", color: "Black / Green" },
   { file: "024_DSC01816.webp", name: "Essentials Crewneck", category: "Tops", color: "Black", favorite: true },
   { file: "025_DSC01819.webp", name: "Fur-Trim Leather Bomber", category: "Outerwear", color: "Black" },
   { file: "026_DSC01822.webp", name: "Tan Coach Jacket", category: "Outerwear", color: "Tan" },
@@ -52,13 +54,13 @@ const archive: ArchiveEntry[] = [
   { file: "037_DSC01850.webp", name: "Transparent Rain Shell", category: "Outerwear", color: "Red / Blue" },
   { file: "038_DSC01857.webp", name: "Cape Coat", category: "Outerwear", color: "Black" },
   { file: "039_DSC01859.webp", name: "Ivory Collarless Jacket", category: "Tops", color: "Ivory" },
-  { file: "040_DSC01861.webp", name: "Light Denim Jacket", category: "Outerwear", color: "Denim" },
+  { file: "040_DSC01861.webp", openFile: "040_DSC01861-open.webp", name: "Light Denim Jacket", category: "Outerwear", color: "Denim" },
   { file: "041_DSC01863.webp", name: "Draped Wool Poncho", category: "Outerwear", color: "Black" },
   { file: "042_DSC01867.webp", name: "Frog-Closure Jacket", category: "Outerwear", color: "Greige" },
   { file: "043_DSC01871.webp", name: "Contrast-Piped Shirt", category: "Tops", color: "Black" },
   { file: "044_DSC01873.webp", name: "Draped Black Shirt", category: "Tops", color: "Black" },
   { file: "045_DSC01875.webp", name: "Human Made Jacket", category: "Outerwear", color: "Cream", favorite: true },
-  { file: "046_DSC01878.webp", name: "MA-1 Bomber", category: "Outerwear", color: "Black" },
+  { file: "046_DSC01878.webp", openFile: "046_DSC01878-open.webp", name: "MA-1 Bomber", category: "Outerwear", color: "Black" },
   { file: "047_DSC01880.webp", name: "Toggle Jacket", category: "Outerwear", color: "Cream" },
   { file: "048_DSC01882.webp", name: "White Track Shell", category: "Outerwear", color: "White" },
   { file: "049_DSC01884.webp", name: "Ivory Technical Shell", category: "Outerwear", color: "Ivory" },
@@ -77,10 +79,11 @@ const basics: Garment[] = [
 ];
 
 export const starterGarments: Garment[] = [
-  ...archive.map((item, index) => ({
+  ...archive.map(({ file, openFile, ...item }, index) => ({
     ...item,
     id: `archive-${String(index + 1).padStart(3, "0")}`,
-    image: `/wardrobe/cutouts/${item.file}`,
+    image: `/wardrobe/cutouts/${file}`,
+    openImage: openFile ? `/wardrobe/cutouts/${openFile}` : undefined,
     status: "ghosted" as const,
   })),
   ...basics,
