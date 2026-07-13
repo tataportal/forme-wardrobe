@@ -63,10 +63,10 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
 const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
 const defaultPlacement = (category: Garment["category"]) => {
-  if (category === "Bottoms") return { x: 50, y: 66, scale: 0.88 };
-  if (category === "Tops") return { x: 50, y: 31, scale: 0.48 };
-  if (category === "Tailoring") return { x: 50, y: 34, scale: 0.6 };
-  return { x: 50, y: 33, scale: 0.6 };
+  if (category === "Bottoms") return { x: 50, y: 66.5, scale: 0.8 };
+  if (category === "Tops") return { x: 50, y: 32, scale: 0.53 };
+  if (category === "Tailoring") return { x: 50, y: 33, scale: 0.62 };
+  return { x: 50, y: 32.5, scale: 0.64 };
 };
 
 const viewCopy: Record<View, { title: string; note: string }> = {
@@ -76,9 +76,9 @@ const viewCopy: Record<View, { title: string; note: string }> = {
 };
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66, scale: 0.88, rotation: 0, z: 1001 },
-  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31, scale: 0.48, rotation: 0, z: 2001 },
-  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 33, scale: 0.6, rotation: 0, z: 3001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.8, rotation: 0, z: 1001 },
+  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 32, scale: 0.53, rotation: 0, z: 2001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.64, rotation: 0, z: 3001 },
 ];
 
 export default function Home() {
@@ -94,8 +94,7 @@ export default function Home() {
   const [canvasPieces, setCanvasPieces] = useState(initialCanvas);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(true);
-  const [toolsOpen, setToolsOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
@@ -480,21 +479,10 @@ export default function Home() {
                 })}
                 <span className="look-caption">DRESS<br />BY FEEL</span>
               </div>
-              <div className={`canvas-tools ${toolsOpen ? "panel-open" : "panel-closed"} ${libraryOpen ? "library-visible" : ""}`} aria-label="Selected cutout controls">
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)}><span>−</span>SIZE</button>
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)}><span>＋</span>SIZE</button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)}><span>↺</span>TURN</button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(8)}><span>↻</span>TURN</button>
-                <button disabled={!selectedPiece} onClick={() => sendSelected("front")}><span>↑</span>FRONT</button>
-                <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool"><span>×</span>REMOVE</button>
-              </div>
             </div>
 
             <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}>
-              {libraryOpen ? "HIDE PIECES" : "PIECES"}
-            </button>
-            <button className={`floating-panel-toggle tools-panel-toggle ${toolsOpen ? "active" : ""}`} onClick={() => setToolsOpen((open) => !open)} aria-expanded={toolsOpen}>
-              {toolsOpen ? "HIDE TOOLS" : "TOOLS"}
+              <span>WARDROBE</span><b>{libraryOpen ? "×" : "＋"}</b>
             </button>
 
             <div className={`look-controls ${libraryOpen ? "panel-open" : "panel-closed"}`}>
@@ -504,6 +492,14 @@ export default function Home() {
                 <h3>{selectedGarment?.name ?? "Tap a piece"}</h3>
                 <small>{selectedGarment ? `${selectedGarment.category} · ${selectedGarment.color}` : "Choose something on the canvas"}</small>
                 {selectedPiece && <button onClick={() => sendSelected("back")}>SEND TO BACK ↓</button>}
+              </div>
+              <div className="canvas-tools" aria-label="Selected cutout controls">
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)} aria-label="Make selected piece smaller"><span>−</span><em>SIZE</em></button>
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)} aria-label="Make selected piece larger"><span>＋</span><em>SIZE</em></button>
+                <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)} aria-label="Rotate selected piece left"><span>↺</span><em>TURN</em></button>
+                <button disabled={!selectedPiece} onClick={() => rotateSelected(8)} aria-label="Rotate selected piece right"><span>↻</span><em>TURN</em></button>
+                <button disabled={!selectedPiece} onClick={() => sendSelected("front")} aria-label="Bring selected piece to front"><span>↑</span><em>FRONT</em></button>
+                <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool" aria-label="Remove selected piece"><span>×</span><em>REMOVE</em></button>
               </div>
 
               <div className="tray-heading"><h3>STICKER TRAY</h3><p>TAP TO ADD</p></div>
