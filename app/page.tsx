@@ -10,7 +10,8 @@ import {
 } from "react";
 import { classifyGarment, Garment, starterGarments } from "./garments";
 
-type View = "wardrobe" | "upload" | "studio";
+type View = "wardrobe" | "studio";
+type WardrobePanel = "pieces" | "upload";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
@@ -75,13 +76,130 @@ const emptyFilters: WardrobeFilters = {
 };
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
-  { key: "category", label: "Layer" },
+  { key: "category", label: "Tipo" },
   { key: "colorFamily", label: "Color" },
-  { key: "tone", label: "Tone" },
+  { key: "tone", label: "Tono" },
   { key: "material", label: "Material" },
-  { key: "finish", label: "Finish" },
-  { key: "silhouette", label: "Fit" },
+  { key: "finish", label: "Acabado" },
+  { key: "silhouette", label: "Corte" },
 ];
+
+const valueTranslations: Record<string, string> = {
+  All: "Todos",
+  Outerwear: "Abrigos",
+  Tops: "Prendas superiores",
+  Bottoms: "Pantalones",
+  Tailoring: "Sastrería",
+  Black: "Negro",
+  Blue: "Azul",
+  Brown: "Marrón",
+  Green: "Verde",
+  Grey: "Gris",
+  White: "Blanco",
+  Other: "Otro",
+  "Red / orange": "Rojo / naranja",
+  "Black / Green": "Negro / verde",
+  "Brown / Black": "Marrón / negro",
+  Cream: "Crema",
+  "Dark brown": "Marrón oscuro",
+  "Denim blue": "Azul denim",
+  Ivory: "Marfil",
+  "Light blue": "Celeste",
+  Navy: "Azul marino",
+  "Optic white": "Blanco óptico",
+  Orange: "Naranja",
+  "Pitch black": "Negro intenso",
+  "Red / Blue": "Rojo / azul",
+  Sage: "Verde salvia",
+  Stone: "Piedra",
+  "Tan / camel": "Tostado / camel",
+  "Washed black": "Negro lavado",
+  Custom: "Personalizado",
+  Unclassified: "Sin clasificar",
+  Cotton: "Algodón",
+  Fleece: "Polar",
+  Knit: "Punto",
+  Leather: "Cuero",
+  Shearling: "Borrego",
+  "Technical nylon": "Nylon técnico",
+  "Transparent shell": "Material transparente",
+  "Wool blend": "Mezcla de lana",
+  Glossy: "Brillante",
+  "Low sheen": "Semimate",
+  Matte: "Mate",
+  Textured: "Texturizado",
+  Transparent: "Transparente",
+  Cropped: "Corto",
+  Draped: "Drapeado",
+  Longline: "Largo",
+  Oversized: "Oversize",
+  Regular: "Regular",
+  Relaxed: "Relajado",
+};
+
+const garmentNameTranslations: Record<string, string> = {
+  "Daisy Coach Jacket": "Chaqueta coach Daisy",
+  "WFP Bomber": "Bomber WFP",
+  "Navy Peacoat": "Abrigo cruzado azul marino",
+  "Leather Hooded Shirt": "Sobrecamisa de cuero con capucha",
+  "Utility Field Jacket": "Chaqueta utilitaria",
+  "Leather Blazer": "Blazer de cuero",
+  "Asymmetric Trench": "Trench asimétrico",
+  "Padded Collar Jacket": "Chaqueta de cuello acolchado",
+  "Belted Short Coat": "Abrigo corto con cinturón",
+  "Leather Bomber": "Bomber de cuero",
+  "Single-Breasted Blazer": "Blazer de un botón",
+  "Track Shell": "Chaqueta técnica deportiva",
+  "Leather Sports Bomber": "Bomber deportiva de cuero",
+  "Drawcord Bomber": "Bomber con cordones",
+  "Graphic Tailored Blazer": "Blazer gráfico sastre",
+  "Camel Wrap Coat": "Abrigo envolvente camel",
+  "Funnel-Neck Cape": "Capa de cuello alto",
+  "Leather Hooded Bomber": "Bomber de cuero con capucha",
+  "Leather Zip Blouson": "Blusón de cuero",
+  "Long Black Trench": "Trench negro largo",
+  "Lightweight Shell": "Chaqueta técnica ligera",
+  "Tiger Fleece": "Polar de tigre",
+  "Graphic Varsity Jacket": "Varsity gráfica",
+  "Essentials Crewneck": "Sudadera Essentials",
+  "Fur-Trim Leather Bomber": "Bomber de cuero con pelo",
+  "Tan Coach Jacket": "Chaqueta coach tostada",
+  "Hooded Field Parka": "Parka de campo con capucha",
+  "Open-Knit Sweater": "Jersey de punto abierto",
+  "Sage Puffer": "Puffer verde salvia",
+  "Kimono Blazer": "Blazer kimono",
+  "Embroidered Cape Coat": "Abrigo capa bordado",
+  "Greige Technical Shell": "Chaqueta técnica greige",
+  "Brown Shearling Coat": "Abrigo de borrego marrón",
+  "Floral Fleece": "Polar floral",
+  "Embroidered Coach Jacket": "Chaqueta coach bordada",
+  "Technical Long Parka": "Parka técnica larga",
+  "Transparent Rain Shell": "Impermeable transparente",
+  "Cape Coat": "Abrigo capa",
+  "Ivory Collarless Jacket": "Chaqueta marfil sin cuello",
+  "Light Denim Jacket": "Chaqueta denim clara",
+  "Draped Wool Poncho": "Poncho de lana drapeado",
+  "Frog-Closure Jacket": "Chaqueta de cierres chinos",
+  "Contrast-Piped Shirt": "Camisa con vivos en contraste",
+  "Draped Black Shirt": "Camisa negra drapeada",
+  "Human Made Jacket": "Chaqueta Human Made",
+  "MA-1 Bomber": "Bomber MA-1",
+  "Toggle Jacket": "Chaqueta con alamares",
+  "White Track Shell": "Chaqueta deportiva blanca",
+  "Ivory Technical Shell": "Chaqueta técnica marfil",
+  "Cropped Double Blazer": "Blazer cruzado corto",
+  "Classic Straight Jeans": "Jeans rectos clásicos",
+  "Washed Black Jeans": "Jeans negros lavados",
+  "Wide-Leg Trousers": "Pantalón de pierna ancha",
+  "Pleated Chinos": "Chinos con pinzas",
+  "Basic White Tee": "Camiseta blanca básica",
+  "Oversized Black Tee": "Camiseta negra oversize",
+  "Blue Long-Sleeve Shirt": "Camisa azul de manga larga",
+  "Black Short-Sleeve Shirt": "Camisa negra de manga corta",
+};
+
+const translateValue = (value: string) => valueTranslations[value] ?? value;
+const translateGarmentName = (name: string) => garmentNameTranslations[name] ?? name;
 
 const matchFilters = (garment: Garment, filters: WardrobeFilters) => filterLabels.every(({ key }) => filters[key] === "All" || garment[key] === filters[key]);
 
@@ -94,19 +212,19 @@ function AttributeFilters({ value, options, compact = false, onChange, onReset }
 }) {
   const activeCount = Object.values(value).filter((item) => item !== "All").length;
   return (
-    <div className={`attribute-filters ${compact ? "compact" : ""}`} aria-label="Filter garments by attributes">
+    <div className={`attribute-filters ${compact ? "compact" : ""}`} aria-label="Filtrar prendas">
       {filterLabels.map(({ key, label }) => {
         const values = key === "tone" && value.colorFamily !== "All" ? options.tonesByColor[value.colorFamily] ?? [] : options[key];
         return (
           <label key={key}>{label}
             <select value={value[key]} onChange={(event) => onChange(key, event.target.value)}>
-              <option value="All">All</option>
-              {values.map((item) => <option value={item} key={item}>{item}</option>)}
+              <option value="All">Todos</option>
+              {values.map((item) => <option value={item} key={item}>{translateValue(item)}</option>)}
             </select>
           </label>
         );
       })}
-      <button type="button" className="reset-filters" disabled={activeCount === 0} onClick={onReset}>RESET {activeCount > 0 ? `(${activeCount})` : ""}</button>
+      <button type="button" className="reset-filters" disabled={activeCount === 0} onClick={onReset}>LIMPIAR {activeCount > 0 ? `(${activeCount})` : ""}</button>
     </div>
   );
 }
@@ -146,12 +264,6 @@ const defaultPlacement = (garment: Garment) => {
   return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
 };
 
-const viewCopy: Record<View, { title: string; note: string }> = {
-  wardrobe: { title: "Your clothes,\nfinally visible.", note: "A playful visual index of everything you own—cut out, ready to combine and impossible to forget." },
-  upload: { title: "From camera roll\nto clean cut.", note: "Upload one clear photo. We rebuild the shape, preserve the details and turn it into a movable wardrobe cutout." },
-  studio: { title: "Move it until\nit feels right.", note: "Drag with one finger. Pinch and twist to resize and rotate. Hold supported outerwear to open or close it; tap again to remove." },
-};
-
 const initialCanvas: CanvasPiece[] = [
   { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.73, rotation: 0, z: 1001 },
   { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
@@ -160,9 +272,10 @@ const initialCanvas: CanvasPiece[] = [
 
 export default function Home() {
   const [view, setView] = useState<View>("wardrobe");
+  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("pieces");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [garments, setGarments] = useState(starterGarments);
   const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
-  const [studioFilters, setStudioFilters] = useState<WardrobeFilters>(emptyFilters);
   const [preview, setPreview] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
@@ -196,22 +309,28 @@ export default function Home() {
     };
   }, [garments]);
   const visible = garments.filter((item) => matchFilters(item, archiveFilters));
-  const trayGarments = garments.filter((item) => matchFilters(item, studioFilters));
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
-
-  const eyebrow = view === "wardrobe"
-    ? `Private archive / ${String(garments.length).padStart(2, "0")} pieces`
-    : view === "upload"
-      ? "Ghost studio / New intake"
-      : `Look study / ${String(canvasPieces.length).padStart(2, "0")} movable cutouts`;
+  const favoriteCount = garments.filter((item) => item.favorite).length;
+  const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
   }
 
-  function updateStudioFilter(key: FilterKey, next: string) {
-    setStudioFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  function openWardrobe(panel: WardrobePanel = "pieces") {
+    setView("wardrobe");
+    setWardrobePanel(panel);
+    setLibraryOpen(false);
+  }
+
+  function resetUpload() {
+    if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
+    setPreview("");
+    setFile(null);
+    setName("");
+    setCategory("Outerwear");
+    setStage("idle");
   }
 
   function acceptFile(next: File | undefined) {
@@ -243,7 +362,7 @@ export default function Home() {
     setStage("ghosting");
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const id = crypto.randomUUID();
-    const custom = { name: name || "Untitled piece", category, color: "Custom" };
+    const custom = { name: name || "Prenda sin nombre", category, color: "Custom" };
     setGarments((items) => [{ id, ...custom, ...classifyGarment(custom), image, status: "ghosted" }, ...items]);
     setStage("ready");
   }
@@ -474,84 +593,90 @@ export default function Home() {
   return (
     <main className={`site-shell view-${view}`}>
       <header className="topbar">
-        <button className="wordmark" onClick={() => setView("wardrobe")} aria-label="Go to wardrobe">FORME<span>®</span></button>
-        <p className="issue">WARDROBE SYSTEM<br />ISSUE NO. 02</p>
-        <button className="avatar" aria-label="Open profile">TA</button>
+        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Ir al armario">FORME<span>®</span></button>
+        <nav className="zone-nav" aria-label="Secciones principales">
+          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
+          <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
+        </nav>
+        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil">TA</button>
       </header>
-
-      <section className="hero">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h1>{viewCopy[view].title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1>
-        </div>
-        <p className="hero-note">{viewCopy[view].note}</p>
-      </section>
-
-      <nav className="desktop-nav" aria-label="Main navigation">
-        {(["wardrobe", "upload", "studio"] as View[]).map((item, index) => (
-          <button key={item} className={view === item ? "active" : ""} onClick={() => setView(item)}>
-            <span>0{index + 1}</span>{item === "wardrobe" ? "Wardrobe" : item === "upload" ? "Ghost a piece" : "Cutout studio"}
-          </button>
-        ))}
-      </nav>
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
-          <div className="section-line">
-            <h2>THE ARCHIVE</h2><p>{String(visible.length).padStart(2, "0")} ITEMS</p>
-          </div>
-          <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
-          <div className="garment-grid">
-            {visible.map((item, index) => (
-              <article className="garment-card" key={item.id}>
-                <div className="image-wrap">
-                  <img src={imageSrc(item.image)} alt={item.name} loading="lazy" />
-                  <span className="item-number">{String(index + 1).padStart(2, "0")}</span>
-                  <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => setGarments((items) => items.map((g) => g.id === item.id ? { ...g, favorite: !g.favorite } : g))} aria-label={`Favorite ${item.name}`}>♥</button>
-                  <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>ADD TO CANVAS <span>＋</span></button>
-                </div>
-                <div className="card-meta"><div><h3>{item.name}</h3><p>{item.category} · {item.tone}</p><p>{item.material} · {item.finish}</p></div><span className="ghost-badge">{item.silhouette}</span></div>
-              </article>
-            ))}
-            {visible.length === 0 && <div className="filter-empty">NO PIECES MATCH<br /><button onClick={() => setArchiveFilters(emptyFilters)}>RESET FILTERS</button></div>}
-          </div>
-          <button className="wide-action" onClick={() => setView("upload")}><span>ADD TO THE ARCHIVE</span><b>＋</b></button>
-        </section>
-      )}
+          <section className="wardrobe-profile">
+            <div className="profile-identity">
+              <span className="profile-avatar">TA</span>
+              <div><p>MI ARMARIO</p><h1>Tata</h1><span>@tataportal</span></div>
+            </div>
+            <div className="profile-stats">
+              <p><strong>{garments.length}</strong><span>Prendas</span></p>
+              <p><strong>{favoriteCount}</strong><span>Favoritas</span></p>
+            </div>
+            <nav className="wardrobe-tabs" aria-label="Mi armario">
+              <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>
+              <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>
+            </nav>
+          </section>
 
-      {view === "upload" && (
-        <section className="content upload-view">
-          <div className="section-line"><h2>NEW GARMENT</h2><p>JPG · PNG · HEIC</p></div>
-          <div className="upload-layout">
-            <div className={`dropzone ${preview ? "has-preview" : ""}`} onClick={() => fileInput.current?.click()} onDragOver={(event: DragEvent) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); acceptFile(event.dataTransfer.files[0]); }}>
-              <input ref={fileInput} type="file" accept="image/*" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFile(event.target.files?.[0])} hidden />
-              {preview ? <img src={preview} alt="Selected garment preview" /> : <><span className="upload-mark">＋</span><h3>DROP YOUR GARMENT</h3><p>Front-facing works best.<br />Hangers and messy backgrounds are okay.</p><button type="button">CHOOSE A PHOTO</button></>}
-              {preview && <button className="replace-photo" type="button">REPLACE PHOTO</button>}
-            </div>
-            <div className="intake-panel">
-              <label>PIECE NAME<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Black technical jacket" /></label>
-              <label>CATEGORY<select value={category} onChange={(event) => setCategory(event.target.value as Garment["category"])}><option>Outerwear</option><option>Tops</option><option>Bottoms</option><option>Tailoring</option></select></label>
-              <div className="process-list">
-                <div className={stage !== "idle" ? "done" : "active"}><span>01</span><p><b>Original received</b><small>We inspect shape, material and details.</small></p></div>
-                <div className={stage === "ghosting" || stage === "ready" ? "done" : ""}><span>02</span><p><b>Ghost mannequin</b><small>Hanger and background are removed.</small></p></div>
-                <div className={stage === "ready" ? "done" : ""}><span>03</span><p><b>Cutout ready</b><small>A clean border makes it movable.</small></p></div>
+          {wardrobePanel === "pieces" ? (
+            <section className="pieces-section">
+              <div className="catalog-toolbar">
+                <div><p>COLECCIÓN</p><h2>Mis prendas</h2></div>
+                <div><span>{visible.length} de {garments.length}</span><button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button></div>
               </div>
-              {stage === "ready" ? <button className="primary-action ready" onClick={() => setView("wardrobe")}>VIEW IN WARDROBE <span>→</span></button> : <button className="primary-action" disabled={!file || stage === "uploading" || stage === "ghosting"} onClick={ghostGarment}>{stage === "uploading" ? "UPLOADING…" : stage === "ghosting" ? "CUTTING OUT YOUR PIECE…" : "MAKE THIS CUTOUT"}<span>→</span></button>}
-              <p className="privacy-note">Your originals remain private. We preserve logos, stitching, hardware and the real silhouette.</p>
-            </div>
-          </div>
+              <div className="wardrobe-catalog">
+                <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
+                  <div className="filter-sidebar-header"><strong>Filtros</strong><button onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></div>
+                  <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
+                </aside>
+                <div className="catalog-results">
+                  <div className="garment-grid">
+                    {visible.map((item) => (
+                      <article className="garment-card" key={item.id}>
+                        <div className="image-wrap">
+                          <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
+                          <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => setGarments((items) => items.map((g) => g.id === item.id ? { ...g, favorite: !g.favorite } : g))} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
+                          <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>AÑADIR AL CANVAS <span>＋</span></button>
+                        </div>
+                        <div className="card-meta"><div><h3>{translateGarmentName(item.name)}</h3><p>{translateValue(item.category)} · {translateValue(item.tone)}</p></div></div>
+                      </article>
+                    ))}
+                    {visible.length === 0 && <div className="filter-empty">NO HAY PRENDAS<button onClick={() => setArchiveFilters(emptyFilters)}>LIMPIAR FILTROS</button></div>}
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className="upload-view">
+              <div className="upload-heading"><p>NUEVA PRENDA</p><h2>Añadir al armario</h2></div>
+              <div className="upload-layout">
+                <label className={`dropzone ${preview ? "has-preview" : ""}`} onDragOver={(event: DragEvent) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); acceptFile(event.dataTransfer.files[0]); }}>
+                  <input ref={fileInput} type="file" accept="image/*" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFile(event.target.files?.[0])} hidden />
+                  {preview ? <img src={preview} alt="Vista previa de la prenda" /> : <><span className="upload-mark">＋</span><h3>Selecciona una foto</h3></>}
+                  {preview && <span className="replace-photo">CAMBIAR</span>}
+                </label>
+                <div className="intake-panel">
+                  <label>NOMBRE<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Chaqueta negra" /></label>
+                  <label>TIPO<select value={category} onChange={(event) => setCategory(event.target.value as Garment["category"])}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option></select></label>
+                  {stage === "ready"
+                    ? <button className="primary-action ready" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER EN MI ARMARIO <span>→</span></button>
+                    : <button className="primary-action" disabled={!file || stage === "uploading" || stage === "ghosting"} onClick={ghostGarment}>{stage === "uploading" ? "CARGANDO…" : stage === "ghosting" ? "PREPARANDO…" : "CREAR RECORTE"}<span>→</span></button>}
+                </div>
+              </div>
+            </section>
+          )}
         </section>
       )}
 
       {view === "studio" && (
         <section className="content studio-view">
-          <div className="section-line"><h2>LOOK 001</h2><p>{canvasPieces.length} MOVABLE LAYERS</p></div>
+          <div className="section-line"><h2>CANVAS</h2><p>{canvasPieces.length} PRENDAS</p></div>
           <div className="studio-layout">
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
-                <p className="look-date">LOOK 001 / DRAG · PINCH · TWIST</p>
-                <span className="canvas-hint">HOLD = OPEN / CLOSED</span>
-                {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => addToCanvas(garments[0].id)}>YOUR CANVAS IS EMPTY<br /><span>ADD A CUTOUT ＋</span></button>}
+                <p className="look-date">CONJUNTO 001 / ARRASTRA · PELLIZCA · GIRA</p>
+                <span className="canvas-hint">MANTÉN = ABRIR / CERRAR</span>
+                {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
                 {canvasPieces.map((piece) => {
                   const garment = garmentById.get(piece.garmentId);
                   if (!garment) return null;
@@ -572,60 +697,56 @@ export default function Home() {
                         transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       }}
                     >
-                      <img src={imageSrc(canvasImage)} alt={garment.name} draggable={false} />
+                      <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
                     </div>
                   );
                 })}
-                <span className="look-caption">DRESS<br />BY FEEL</span>
               </div>
             </div>
 
-            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}>
-              <span>WARDROBE</span><b>{libraryOpen ? "×" : "＋"}</b>
+            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen} aria-label="Abrir armario">
+              <span>ARMARIO</span><b>{libraryOpen ? "×" : "＋"}</b>
             </button>
 
             <div className={`look-controls ${libraryOpen ? "panel-open" : "panel-closed"}`}>
-              <div className="floating-panel-header"><span>WARDROBE / {String(trayGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Hide pieces panel">×</button></div>
+              <div className="floating-panel-header"><span>ARMARIO / {String(garments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
               <div className="selected-readout">
-                <p>SELECTED CUTOUT</p>
-                <h3>{selectedGarment?.name ?? "Tap a piece"}</h3>
-                <small>{selectedGarment ? `${selectedGarment.tone} · ${selectedGarment.material} · ${selectedGarment.finish}` : "Choose something on the canvas"}</small>
-                {selectedPiece && <button onClick={() => sendSelected("back")}>SEND TO BACK ↓</button>}
+                <p>PRENDA SELECCIONADA</p>
+                <h3>{selectedGarment ? translateGarmentName(selectedGarment.name) : "Toca una prenda"}</h3>
+                <small>{selectedGarment ? translateValue(selectedGarment.category) : "Selecciona una prenda del canvas"}</small>
+                {selectedPiece && <button onClick={() => sendSelected("back")}>ENVIAR ATRÁS ↓</button>}
               </div>
-              <div className="canvas-tools" aria-label="Selected cutout controls">
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)} aria-label="Make selected piece smaller"><span>−</span><em>SIZE</em></button>
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)} aria-label="Make selected piece larger"><span>＋</span><em>SIZE</em></button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)} aria-label="Rotate selected piece left"><span>↺</span><em>TURN</em></button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(8)} aria-label="Rotate selected piece right"><span>↻</span><em>TURN</em></button>
-                <button disabled={!selectedPiece} onClick={() => sendSelected("front")} aria-label="Bring selected piece to front"><span>↑</span><em>FRONT</em></button>
-                <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool" aria-label="Remove selected piece"><span>×</span><em>REMOVE</em></button>
+              <div className="canvas-tools" aria-label="Controles de la prenda seleccionada">
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)} aria-label="Reducir prenda"><span>−</span><em>TAMAÑO</em></button>
+                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)} aria-label="Aumentar prenda"><span>＋</span><em>TAMAÑO</em></button>
+                <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)} aria-label="Girar a la izquierda"><span>↺</span><em>GIRAR</em></button>
+                <button disabled={!selectedPiece} onClick={() => rotateSelected(8)} aria-label="Girar a la derecha"><span>↻</span><em>GIRAR</em></button>
+                <button disabled={!selectedPiece} onClick={() => sendSelected("front")} aria-label="Traer al frente"><span>↑</span><em>FRENTE</em></button>
+                <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
               </div>
 
-              <div className="tray-heading"><h3>STICKER TRAY</h3><p>TAP TO ADD</p></div>
-              <AttributeFilters compact value={studioFilters} options={filterOptions} onChange={updateStudioFilter} onReset={() => setStudioFilters(emptyFilters)} />
+              <div className="tray-heading"><h3>PRENDAS</h3><p>TOCA PARA AÑADIR</p></div>
               <div className="sticker-tray">
-                {trayGarments.map((item) => (
-                  <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Add ${item.name} to canvas`}>
+                {garments.map((item) => (
+                  <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
                     <img src={imageSrc(item.image)} alt="" loading="lazy" />
-                    <span>{item.name}</span>
+                    <span>{translateGarmentName(item.name)}</span>
                   </button>
                 ))}
-                {trayGarments.length === 0 && <div className="filter-empty compact-empty">NO MATCHES<button onClick={() => setStudioFilters(emptyFilters)}>RESET</button></div>}
               </div>
 
               <div className="studio-actions">
-                <button className="shuffle" onClick={shuffleLook}>MAKE A RANDOM LOOK <span>↻</span></button>
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSaved(false); }}>CLEAR CANVAS</button>
+                <button className="shuffle" onClick={shuffleLook}>CONJUNTO ALEATORIO <span>↻</span></button>
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSaved(false); }}>VACIAR</button>
               </div>
-              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0} onClick={() => setSaved(true)}>{saved ? "LOOK SAVED" : "SAVE THIS LOOK"}<span>{saved ? "✓" : "＋"}</span></button>
+              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0} onClick={() => setSaved(true)}>{saved ? "CONJUNTO GUARDADO" : "GUARDAR CONJUNTO"}<span>{saved ? "✓" : "＋"}</span></button>
             </div>
           </div>
         </section>
       )}
 
-      <nav className="mobile-nav" aria-label="Mobile navigation">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => setView("wardrobe")}><span>▦</span>Wardrobe</button>
-        <button className={view === "upload" ? "active" : ""} onClick={() => setView("upload")}><span>＋</span>Add</button>
+      <nav className="mobile-nav" aria-label="Secciones principales">
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}><span>▦</span>Armario</button>
         <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}><span>◫</span>Canvas</button>
       </nav>
     </main>
