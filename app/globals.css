@@ -37,6 +37,9 @@ button { color:inherit; }
 .wardrobe-tabs { display:flex; gap:22px; overflow-x:auto; }
 .wardrobe-tabs button { border:0; border-bottom:2px solid transparent; background:transparent; padding:12px 0 11px; white-space:nowrap; color:var(--muted); font-size:9px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .wardrobe-tabs button.active { border-color:var(--ink); color:var(--ink); }
+.app-message { margin:14px 0 0; padding:10px 12px; border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:9px; line-height:1.4; }
+.app-message.error { border-color:rgba(232,59,37,.45); color:var(--signal); }
+.app-message button { border:0; background:transparent; font:18px/1 Georgia,serif; cursor:pointer; }
 
 .pieces-section,.upload-view { padding-top:24px; }
 .catalog-toolbar { min-height:62px; display:flex; align-items:flex-end; justify-content:space-between; gap:18px; padding-bottom:14px; border-bottom:1px solid var(--line); }
@@ -68,6 +71,8 @@ button { color:inherit; }
 .garment-card:hover .card-detail-open span,.card-detail-open:focus-visible span { opacity:1; transform:translateY(0); }
 .heart { position:absolute; z-index:3; top:8px; right:8px; width:30px; height:30px; border:0; border-radius:50%; background:rgba(248,247,242,.88); color:#aaa; cursor:pointer; }
 .heart.active { color:var(--signal); }
+.processing-badge { position:absolute; z-index:4; left:8px; bottom:8px; padding:7px 8px; background:var(--ink); color:var(--paper); font-size:6px; letter-spacing:.1em; }
+.processing-badge.failed { background:var(--signal); }
 .card-studio-add { position:absolute; z-index:3; left:8px; right:8px; bottom:8px; min-height:34px; padding:8px 10px; border:1px solid var(--ink); background:rgba(248,247,242,.94); display:flex; align-items:center; justify-content:space-between; font-size:7px; letter-spacing:.11em; cursor:pointer; transform:translateY(calc(100% + 12px)); transition:transform .24s ease; }
 .garment-card:hover .card-studio-add,.card-studio-add:focus-visible { transform:translateY(0); }
 .card-meta { width:100%; padding:9px 0 0; border:0; background:transparent; display:flex; align-items:flex-start; justify-content:space-between; gap:8px; text-align:left; cursor:pointer; }
@@ -94,6 +99,8 @@ button { color:inherit; }
 .primary-action { width:100%; padding:16px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); display:flex; align-items:center; justify-content:space-between; font-size:9px; letter-spacing:.13em; cursor:pointer; }
 .primary-action:disabled { opacity:.3; cursor:default; }
 .primary-action.ready { background:var(--signal); border-color:var(--signal); }
+.upload-status { margin:0 0 16px; padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.45; }
+.upload-status.error { color:var(--signal); }
 
 .garment-editor-backdrop { position:fixed; inset:0; z-index:120; background:rgba(17,17,15,.28); backdrop-filter:blur(7px); }
 .garment-editor { width:100%; height:100dvh; background:var(--panel); display:flex; flex-direction:column; overflow:hidden; }
@@ -128,10 +135,12 @@ button { color:inherit; }
 .tag-input-row input { min-width:0; padding:10px 0; border:0; border-bottom:1px solid var(--ink); border-radius:0; outline:0; background:transparent; font:15px/1 Georgia,serif; }
 .tag-input-row button { padding:0 10px; border:1px solid var(--ink); background:transparent; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .tag-input-row button:disabled { opacity:.25; cursor:default; }
-.garment-editor-actions { position:fixed; left:0; right:0; bottom:0; z-index:2; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--ink); background:rgba(248,247,242,.96); display:grid; grid-template-columns:auto 1fr; gap:8px; backdrop-filter:blur(12px); }
+.garment-editor-actions { position:fixed; left:0; right:0; bottom:0; z-index:2; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--ink); background:rgba(248,247,242,.96); display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; backdrop-filter:blur(12px); }
 .garment-editor-actions button { min-height:44px; padding:0 13px; border:1px solid var(--ink); background:transparent; font-size:8px; letter-spacing:.11em; cursor:pointer; }
 .garment-editor-actions button:last-child { background:var(--ink); color:var(--paper); }
 .garment-editor-actions button.saved { background:var(--signal); border-color:var(--signal); }
+.garment-editor-actions .delete-garment { margin-right:auto; border-color:var(--signal); color:var(--signal); }
+.garment-save-error { flex-basis:100%; order:-1; color:var(--signal); font-size:9px; line-height:1.35; }
 
 .section-line { min-height:50px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
 .section-line h2,.section-line p { margin:0; font-size:8px; letter-spacing:.14em; }
@@ -166,6 +175,8 @@ button { color:inherit; }
 .shuffle,.clear-look { padding:11px; border:1px solid var(--ink); background:transparent; display:flex; align-items:center; justify-content:space-between; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .clear-look { color:var(--signal); }
 .studio-actions + .primary-action { flex:0 0 auto; margin-top:7px; padding:12px; font-size:8px; }
+.panel-error { flex:0 0 auto; margin-top:7px; color:var(--signal); font-size:8px; line-height:1.35; }
+.panel-error + .primary-action { margin-top:7px; }
 
 .mobile-nav { position:fixed; z-index:90; left:0; right:0; bottom:0; height:72px; padding-bottom:env(safe-area-inset-bottom); border-top:1px solid var(--ink); background:rgba(242,240,233,.97); display:grid; grid-template-columns:repeat(2,1fr); }
 .mobile-nav button { border:0; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:8px; text-transform:uppercase; cursor:pointer; }

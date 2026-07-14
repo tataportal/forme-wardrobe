@@ -73,6 +73,16 @@ type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "colorFamily" | "
 };
 
 type StoredGarmentEdit = Omit<GarmentDraft, "id">;
+type ApiGarment = Omit<GarmentDraft, "id"> & {
+  id: string;
+  favorite?: boolean;
+  deleted?: boolean;
+  status: Garment["status"];
+  image?: string;
+  originalImage?: string;
+  openImage?: string;
+};
+type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null };
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
@@ -84,6 +94,8 @@ const emptyFilters: WardrobeFilters = {
 };
 
 const garmentEditsStorageKey = "forme-garment-edits-v1";
+const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
+const currentOutfitId = "current-look";
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -247,6 +259,43 @@ const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
   : path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toLocaleUpperCase() || "ME";
+const apiPayload = (garment: Garment | GarmentDraft) => ({
+  name: garment.name.trim() || "Prenda sin nombre",
+  brand: garment.brand ?? "",
+  category: garment.category,
+  colorFamily: garment.colorFamily,
+  tone: garment.tone,
+  material: garment.material,
+  finish: garment.finish,
+  silhouette: garment.silhouette,
+  favorite: "favorite" in garment ? Boolean(garment.favorite) : false,
+  tags: garment.tags ?? [],
+});
+
+function mergeApiGarments(current: Garment[], updates: ApiGarment[]): Garment[] {
+  const hidden = new Set(updates.filter((item) => item.deleted).map((item) => item.id));
+  const byId = new Map(current.filter((item) => !hidden.has(item.id)).map((item) => [item.id, item]));
+  for (const item of updates) {
+    if (item.deleted) continue;
+    const existing = byId.get(item.id);
+    const image = item.image || item.originalImage || existing?.image;
+    if (!image) continue;
+    byId.set(item.id, {
+      ...(existing ?? {}),
+      ...item,
+      id: item.id,
+      image,
+      color: item.tone,
+      status: item.status,
+    } as Garment);
+  }
+  const orderedIds = [
+    ...updates.filter((item) => !item.deleted && !starterGarments.some((starter) => starter.id === item.id)).map((item) => item.id),
+    ...current.map((item) => item.id),
+  ];
+  return [...new Set(orderedIds)].map((id) => byId.get(id)).filter((item): item is Garment => Boolean(item));
+}
 const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
 const defaultPlacement = (garment: Garment) => {
   if (garment.category === "Bottoms") {
@@ -290,7 +339,10 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Garment["category"]>("Outerwear");
-  const [stage, setStage] = useState<"idle" | "uploading" | "ghosting" | "ready">("idle");
+  const [stage, setStage] = useState<"idle" | "uploading" | "ghosting" | "ready" | "waiting" | "failed">("idle");
+  const [uploadError, setUploadError] = useState("");
+  const [wardrobeError, setWardrobeError] = useState("");
+  const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
   const [canvasPieces, setCanvasPieces] = useState(initialCanvas);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
@@ -298,6 +350,8 @@ export default function Home() {
   const [garmentDraft, setGarmentDraft] = useState<GarmentDraft | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [garmentSaved, setGarmentSaved] = useState(false);
+  const [garmentSaveError, setGarmentSaveError] = useState("");
+  const [savingOutfit, setSavingOutfit] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
@@ -332,6 +386,40 @@ export default function Home() {
     : [];
 
   useEffect(() => {
+    if (!isStaticDemo) {
+      let active = true;
+      Promise.all([
+        fetch("/api/wardrobe", { cache: "no-store" }),
+        fetch("/api/outfits", { cache: "no-store" }),
+        fetch("/api/session", { cache: "no-store" }),
+      ])
+        .then(async ([wardrobeResponse, outfitsResponse, sessionResponse]) => {
+          if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
+          const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
+          const outfits = outfitsResponse.ok
+            ? await outfitsResponse.json() as { outfits: Array<{ id: string; items: CanvasPiece[] }> }
+            : { outfits: [] };
+          const session = sessionResponse.ok
+            ? await sessionResponse.json() as { user: WardrobeProfile }
+            : null;
+          return { wardrobe, outfits, session };
+        })
+        .then(({ wardrobe, outfits, session }) => {
+          if (!active) return;
+          setGarments((items) => mergeApiGarments(items, wardrobe.garments));
+          if (session?.user) setProfile(session.user);
+          const savedLook = outfits.outfits.find((outfit) => outfit.id === currentOutfitId);
+          if (savedLook?.items.length) {
+            setCanvasPieces(savedLook.items);
+            setSaved(true);
+          }
+          setWardrobeError("");
+        })
+        .catch((error: unknown) => {
+          if (active) setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
+        });
+      return () => { active = false; };
+    }
     try {
       const stored = localStorage.getItem(garmentEditsStorageKey);
       if (!stored) return;
@@ -373,11 +461,13 @@ export default function Home() {
     });
     setTagInput("");
     setGarmentSaved(false);
+    setGarmentSaveError("");
   }
 
   function updateGarmentDraft<Key extends keyof GarmentDraft>(key: Key, next: GarmentDraft[Key]) {
     setGarmentDraft((current) => current ? { ...current, [key]: next } : current);
     setGarmentSaved(false);
+    setGarmentSaveError("");
   }
 
   function addDraftTag() {
@@ -395,19 +485,73 @@ export default function Home() {
     addDraftTag();
   }
 
-  function saveGarmentDraft() {
+  async function saveGarmentDraft() {
     if (!garmentDraft) return;
     const { id, ...edit } = garmentDraft;
+    const normalized = { ...edit, name: edit.name.trim() || "Prenda sin nombre" };
     setGarments((items) => items.map((item) => item.id === id
-      ? { ...item, ...edit, name: edit.name.trim() || "Prenda sin nombre", color: edit.tone }
+      ? { ...item, ...normalized, color: edit.tone }
       : item));
-    try {
-      const stored = JSON.parse(localStorage.getItem(garmentEditsStorageKey) ?? "{}") as Record<string, StoredGarmentEdit>;
-      localStorage.setItem(garmentEditsStorageKey, JSON.stringify({ ...stored, [id]: { ...edit, name: edit.name.trim() || "Prenda sin nombre" } }));
-    } catch {
-      // The edit still works for the current session if storage is unavailable.
+    setGarmentSaveError("");
+    if (isStaticDemo) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(garmentEditsStorageKey) ?? "{}") as Record<string, StoredGarmentEdit>;
+        localStorage.setItem(garmentEditsStorageKey, JSON.stringify({ ...stored, [id]: normalized }));
+      } catch {
+        // The edit still works for the current session if storage is unavailable.
+      }
+      setGarmentSaved(true);
+      return;
     }
-    setGarmentSaved(true);
+    try {
+      const current = garments.find((item) => item.id === id);
+      const response = await fetch(`/api/garments/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...normalized, favorite: current?.favorite ?? false }),
+      });
+      const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
+      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudieron guardar los cambios.");
+      setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+      setGarmentSaved(true);
+    } catch (error) {
+      setGarmentSaveError(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
+    }
+  }
+
+  async function toggleFavorite(item: Garment) {
+    const next = { ...item, favorite: !item.favorite };
+    setGarments((items) => items.map((garment) => garment.id === item.id ? next : garment));
+    if (isStaticDemo) return;
+    try {
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(apiPayload(next)),
+      });
+      if (!response.ok) throw new Error();
+    } catch {
+      setGarments((items) => items.map((garment) => garment.id === item.id ? item : garment));
+      setWardrobeError("No se pudo actualizar Favoritas.");
+    }
+  }
+
+  async function deleteGarment(item: Garment) {
+    setGarments((items) => items.filter((garment) => garment.id !== item.id));
+    setCanvasPieces((items) => items.filter((piece) => piece.garmentId !== item.id));
+    setGarmentDraft(null);
+    if (isStaticDemo) return;
+    try {
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(apiPayload(item)),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar la prenda.");
+    } catch (error) {
+      setGarments((items) => [item, ...items]);
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo eliminar la prenda.");
+    }
   }
 
   function openWardrobe(panel: WardrobePanel = "pieces") {
@@ -423,6 +567,7 @@ export default function Home() {
     setName("");
     setCategory("Outerwear");
     setStage("idle");
+    setUploadError("");
   }
 
   function acceptFile(next: File | undefined) {
@@ -432,31 +577,64 @@ export default function Home() {
     setPreview(URL.createObjectURL(next));
     setName(next.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
     setStage("idle");
+    setUploadError("");
   }
 
   async function ghostGarment() {
     if (!file || !preview) return;
+    setUploadError("");
     setStage("uploading");
-    let image = preview;
+    const custom = { name: name || "Prenda sin nombre", category, color: "Custom" };
+    const attributes = classifyGarment(custom);
+    if (isStaticDemo) {
+      await new Promise((resolve) => setTimeout(resolve, 650));
+      setStage("ghosting");
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      const id = crypto.randomUUID();
+      setGarments((items) => [{ id, ...custom, ...attributes, image: preview, status: "ghosted" }, ...items]);
+      setStage("ready");
+      return;
+    }
+
     try {
-      if (process.env.NEXT_PUBLIC_STATIC_DEMO === "1") throw new Error("Static demo");
       const body = new FormData();
       body.append("file", file);
+      body.append("name", custom.name);
+      body.append("category", category);
+      body.append("colorFamily", attributes.colorFamily);
+      body.append("tone", attributes.tone);
+      body.append("material", attributes.material);
+      body.append("finish", attributes.finish);
+      body.append("silhouette", attributes.silhouette);
       const response = await fetch("/api/upload", { method: "POST", body });
-      if (response.ok) {
-        const result = (await response.json()) as { url?: string };
-        if (result.url) image = result.url;
+      const result = await response.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string }; error?: string } | null;
+      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo cargar la prenda.");
+      setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+      if (result.job?.status === "waiting_for_key") {
+        setStage("waiting");
+        setUploadError("La prenda se guardó. Falta conectar la clave de procesamiento para crear el recorte.");
+        return;
       }
-    } catch {
-      // The local preview remains usable when hosted storage is unavailable.
+      setStage("ghosting");
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const statusResponse = await fetch(`/api/garments/${encodeURIComponent(result.garment.id)}/status`, { cache: "no-store" });
+        const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string; error?: string }; error?: string } | null;
+        if (!statusResponse.ok || !statusResult?.garment) throw new Error(statusResult?.error || "No se pudo revisar el recorte.");
+        setGarments((items) => mergeApiGarments(items, [statusResult.garment as ApiGarment]));
+        if (statusResult.garment.status === "ready") {
+          setStage("ready");
+          return;
+        }
+        if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
+          throw new Error(statusResult.job?.error || "El recorte falló. Puedes volver a intentarlo desde la ficha.");
+        }
+      }
+      throw new Error("El recorte sigue procesándose. Aparecerá en tu armario cuando termine.");
+    } catch (error) {
+      setStage("failed");
+      setUploadError(error instanceof Error ? error.message : "No se pudo preparar la prenda.");
     }
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    setStage("ghosting");
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    const id = crypto.randomUUID();
-    const custom = { name: name || "Prenda sin nombre", category, color: "Custom" };
-    setGarments((items) => [{ id, ...custom, ...classifyGarment(custom), image, status: "ghosted" }, ...items]);
-    setStage("ready");
   }
 
   function bringToFront(instanceId: string) {
@@ -682,6 +860,53 @@ export default function Home() {
     setSaved(false);
   }
 
+  async function saveCurrentOutfit() {
+    if (canvasPieces.length === 0) return;
+    if (isStaticDemo) {
+      setSaved(true);
+      return;
+    }
+    setSavingOutfit(true);
+    setWardrobeError("");
+    try {
+      const response = await fetch(`/api/outfits/${currentOutfitId}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Conjunto actual", items: canvasPieces }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
+      setSaved(true);
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
+    } finally {
+      setSavingOutfit(false);
+    }
+  }
+
+  async function retryProcessing(item: Garment) {
+    setGarmentSaveError("");
+    setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "queued" } : garment));
+    try {
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}/retry`, { method: "POST" });
+      const result = await response.json().catch(() => null) as { job?: { status?: string }; error?: string } | null;
+      if (!response.ok) throw new Error(result?.error || "No se pudo reiniciar el procesamiento.");
+      if (result?.job?.status === "waiting_for_key") throw new Error("Falta conectar la clave de procesamiento.");
+      setGarmentDraft(null);
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const statusResponse = await fetch(`/api/garments/${encodeURIComponent(item.id)}/status`, { cache: "no-store" });
+        const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { error?: string; status?: string } } | null;
+        if (!statusResponse.ok || !statusResult?.garment) throw new Error("No se pudo revisar el recorte.");
+        setGarments((items) => mergeApiGarments(items, [statusResult.garment as ApiGarment]));
+        if (statusResult.garment.status === "ready") return;
+        if (statusResult.garment.status === "failed") throw new Error(statusResult.job?.error || "El recorte volvió a fallar.");
+      }
+    } catch (error) {
+      setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "failed" } : garment));
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo reiniciar el procesamiento.");
+    }
+  }
+
   return (
     <main className={`site-shell view-${view}`}>
       <header className="topbar">
@@ -690,15 +915,15 @@ export default function Home() {
           <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
           <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
         </nav>
-        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil">TA</button>
+        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil">{initials(profile.name)}</button>
       </header>
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
           <section className="wardrobe-profile">
             <div className="profile-identity">
-              <span className="profile-avatar">TA</span>
-              <div><p>MI ARMARIO</p><h1>Tata</h1><span>@tataportal</span></div>
+              <span className="profile-avatar">{initials(profile.name)}</span>
+              <div><p>MI ARMARIO</p><h1>{profile.name}</h1><span>{profile.handle}</span></div>
             </div>
             <div className="profile-stats">
               <p><strong>{garments.length}</strong><span>Prendas</span></p>
@@ -709,6 +934,7 @@ export default function Home() {
               <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>
             </nav>
           </section>
+          {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
           {wardrobePanel === "pieces" ? (
             <section className="pieces-section">
@@ -727,8 +953,10 @@ export default function Home() {
                       <article className="garment-card" key={item.id}>
                         <div className="image-wrap">
                           <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
+                          {(item.status === "queued" || item.status === "processing" || item.status === "uploaded") && <span className="processing-badge">PREPARANDO RECORTE</span>}
+                          {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
                           <button className="card-detail-open" onClick={() => openGarmentEditor(item)} aria-label={`Abrir ficha de ${translateGarmentName(item.name)}`}><span>VER FICHA ↗</span></button>
-                          <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => setGarments((items) => items.map((g) => g.id === item.id ? { ...g, favorite: !g.favorite } : g))} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
+                          <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => toggleFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
                           <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>AÑADIR AL CANVAS <span>＋</span></button>
                         </div>
                         <button className="card-meta" onClick={() => openGarmentEditor(item)} aria-label={`Editar ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
@@ -751,9 +979,12 @@ export default function Home() {
                 <div className="intake-panel">
                   <label>NOMBRE<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Chaqueta negra" /></label>
                   <label>TIPO<select value={category} onChange={(event) => setCategory(event.target.value as Garment["category"])}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option></select></label>
+                  {uploadError && <p className={`upload-status ${stage === "failed" ? "error" : ""}`}>{uploadError}</p>}
                   {stage === "ready"
                     ? <button className="primary-action ready" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER EN MI ARMARIO <span>→</span></button>
-                    : <button className="primary-action" disabled={!file || stage === "uploading" || stage === "ghosting"} onClick={ghostGarment}>{stage === "uploading" ? "CARGANDO…" : stage === "ghosting" ? "PREPARANDO…" : "CREAR RECORTE"}<span>→</span></button>}
+                    : stage === "waiting"
+                      ? <button className="primary-action" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER PRENDA GUARDADA <span>→</span></button>
+                      : <button className="primary-action" disabled={!file || stage === "uploading" || stage === "ghosting"} onClick={ghostGarment}>{stage === "uploading" ? "CARGANDO…" : stage === "ghosting" ? "PREPARANDO…" : stage === "failed" ? "VOLVER A INTENTAR" : "CREAR RECORTE"}<span>→</span></button>}
                 </div>
               </div>
             </section>
@@ -832,7 +1063,8 @@ export default function Home() {
                 <button className="shuffle" onClick={shuffleLook}>CONJUNTO ALEATORIO <span>↻</span></button>
                 <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSaved(false); }}>VACIAR</button>
               </div>
-              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0} onClick={() => setSaved(true)}>{saved ? "CONJUNTO GUARDADO" : "GUARDAR CONJUNTO"}<span>{saved ? "✓" : "＋"}</span></button>
+              {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
+              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit} onClick={saveCurrentOutfit}>{saved ? "CONJUNTO GUARDADO" : savingOutfit ? "GUARDANDO…" : "GUARDAR CONJUNTO"}<span>{saved ? "✓" : "＋"}</span></button>
             </div>
           </div>
         </section>
@@ -859,7 +1091,7 @@ export default function Home() {
                 <div className="garment-editor-intro">
                   <p>INFORMACIÓN</p>
                   <h2 id="garment-editor-title">{garmentDraft.name || "Prenda sin nombre"}</h2>
-                  <span>Corrige la ficha cuando quieras. Los cambios se guardan en este dispositivo.</span>
+                  <span>Corrige la ficha cuando quieras. Los cambios se guardan {isStaticDemo ? "en este dispositivo" : "en tu cuenta"}.</span>
                 </div>
                 <div className="garment-editor-fields">
                   <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
@@ -879,6 +1111,9 @@ export default function Home() {
                 </div>
 
                 <div className="garment-editor-actions">
+                  <button type="button" className="delete-garment" onClick={() => deleteGarment(editingGarment)}>ELIMINAR</button>
+                  {(editingGarment.status === "failed" || editingGarment.status === "uploaded") && !isStaticDemo && <button type="button" onClick={() => retryProcessing(editingGarment)}>REPROCESAR</button>}
+                  {garmentSaveError && <span className="garment-save-error">{garmentSaveError}</span>}
                   <button type="button" onClick={() => setGarmentDraft(null)}>CANCELAR</button>
                   <button type="submit" className={garmentSaved ? "saved" : ""}>{garmentSaved ? "GUARDADO ✓" : "GUARDAR CAMBIOS"}</button>
                 </div>
