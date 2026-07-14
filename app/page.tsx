@@ -259,7 +259,6 @@ const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
   : path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toLocaleUpperCase() || "ME";
 const apiPayload = (garment: Garment | GarmentDraft) => ({
   name: garment.name.trim() || "Prenda sin nombre",
   brand: garment.brand ?? "",
@@ -384,6 +383,8 @@ export default function Home() {
   const editorTones = garmentDraft
     ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
     : [];
+  const profileImage = profile.avatarUrl || asset("/profile/tata.png");
+  const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
 
   useEffect(() => {
     if (!isStaticDemo) {
@@ -915,14 +916,14 @@ export default function Home() {
           <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
           <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
         </nav>
-        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil">{initials(profile.name)}</button>
+        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
       </header>
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
           <section className="wardrobe-profile">
             <div className="profile-identity">
-              <span className="profile-avatar">{initials(profile.name)}</span>
+              <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
               <div><p>MI ARMARIO</p><h1>{profile.name}</h1><span>{profile.handle}</span></div>
             </div>
             <div className="profile-stats">
