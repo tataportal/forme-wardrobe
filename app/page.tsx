@@ -4,6 +4,8 @@ import {
   ChangeEvent,
   DragEvent,
   PointerEvent as ReactPointerEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -65,6 +67,12 @@ type WardrobeFilters = {
 
 type FilterKey = keyof WardrobeFilters;
 type FilterOptions = Record<FilterKey, string[]> & { tonesByColor: Record<string, string[]> };
+type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "colorFamily" | "tone" | "material" | "finish" | "silhouette"> & {
+  brand: string;
+  tags: string[];
+};
+
+type StoredGarmentEdit = Omit<GarmentDraft, "id">;
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
@@ -74,6 +82,8 @@ const emptyFilters: WardrobeFilters = {
   finish: "All",
   silhouette: "All",
 };
+
+const garmentEditsStorageKey = "forme-garment-edits-v1";
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -285,6 +295,9 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [garmentDraft, setGarmentDraft] = useState<GarmentDraft | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const [garmentSaved, setGarmentSaved] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
@@ -313,9 +326,88 @@ export default function Home() {
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
   const favoriteCount = garments.filter((item) => item.favorite).length;
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
+  const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
+  const editorTones = garmentDraft
+    ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
+    : [];
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(garmentEditsStorageKey);
+      if (!stored) return;
+      const edits = JSON.parse(stored) as Record<string, StoredGarmentEdit>;
+      const frame = window.requestAnimationFrame(() => {
+        setGarments((items) => items.map((item) => edits[item.id] ? { ...item, ...edits[item.id], color: edits[item.id].tone } : item));
+      });
+      return () => window.cancelAnimationFrame(frame);
+    } catch {
+      // A malformed local edit should never block the wardrobe.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!garmentDraft) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setGarmentDraft(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [garmentDraft]);
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  }
+
+  function openGarmentEditor(item: Garment) {
+    setGarmentDraft({
+      id: item.id,
+      name: translateGarmentName(item.name),
+      brand: item.brand ?? "",
+      category: item.category,
+      colorFamily: item.colorFamily,
+      tone: item.tone,
+      material: item.material,
+      finish: item.finish,
+      silhouette: item.silhouette,
+      tags: item.tags ?? [],
+    });
+    setTagInput("");
+    setGarmentSaved(false);
+  }
+
+  function updateGarmentDraft<Key extends keyof GarmentDraft>(key: Key, next: GarmentDraft[Key]) {
+    setGarmentDraft((current) => current ? { ...current, [key]: next } : current);
+    setGarmentSaved(false);
+  }
+
+  function addDraftTag() {
+    const next = tagInput.trim().replace(/^#/, "");
+    if (!next || !garmentDraft) return;
+    if (!garmentDraft.tags.some((tag) => tag.toLocaleLowerCase() === next.toLocaleLowerCase())) {
+      updateGarmentDraft("tags", [...garmentDraft.tags, next]);
+    }
+    setTagInput("");
+  }
+
+  function handleTagKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter" && event.key !== ",") return;
+    event.preventDefault();
+    addDraftTag();
+  }
+
+  function saveGarmentDraft() {
+    if (!garmentDraft) return;
+    const { id, ...edit } = garmentDraft;
+    setGarments((items) => items.map((item) => item.id === id
+      ? { ...item, ...edit, name: edit.name.trim() || "Prenda sin nombre", color: edit.tone }
+      : item));
+    try {
+      const stored = JSON.parse(localStorage.getItem(garmentEditsStorageKey) ?? "{}") as Record<string, StoredGarmentEdit>;
+      localStorage.setItem(garmentEditsStorageKey, JSON.stringify({ ...stored, [id]: { ...edit, name: edit.name.trim() || "Prenda sin nombre" } }));
+    } catch {
+      // The edit still works for the current session if storage is unavailable.
+    }
+    setGarmentSaved(true);
   }
 
   function openWardrobe(panel: WardrobePanel = "pieces") {
@@ -635,10 +727,11 @@ export default function Home() {
                       <article className="garment-card" key={item.id}>
                         <div className="image-wrap">
                           <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
+                          <button className="card-detail-open" onClick={() => openGarmentEditor(item)} aria-label={`Abrir ficha de ${translateGarmentName(item.name)}`}><span>VER FICHA ↗</span></button>
                           <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => setGarments((items) => items.map((g) => g.id === item.id ? { ...g, favorite: !g.favorite } : g))} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
                           <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>AÑADIR AL CANVAS <span>＋</span></button>
                         </div>
-                        <div className="card-meta"><div><h3>{translateGarmentName(item.name)}</h3><p>{translateValue(item.category)} · {translateValue(item.tone)}</p></div></div>
+                        <button className="card-meta" onClick={() => openGarmentEditor(item)} aria-label={`Editar ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
                       </article>
                     ))}
                     {visible.length === 0 && <div className="filter-empty">NO HAY PRENDAS<button onClick={() => setArchiveFilters(emptyFilters)}>LIMPIAR FILTROS</button></div>}
@@ -743,6 +836,56 @@ export default function Home() {
             </div>
           </div>
         </section>
+      )}
+
+      {garmentDraft && editingGarment && (
+        <div className="garment-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setGarmentDraft(null); }}>
+          <section className="garment-editor" role="dialog" aria-modal="true" aria-labelledby="garment-editor-title">
+            <header className="garment-editor-header">
+              <span>FICHA DE PRENDA / {editingGarment.id.replace("archive-", "").toUpperCase()}</span>
+              <button type="button" onClick={() => setGarmentDraft(null)} aria-label="Cerrar ficha">×</button>
+            </header>
+            <div className="garment-editor-body">
+              <div className="garment-editor-visual">
+                <div className="garment-editor-image"><img src={imageSrc(editingGarment.image)} alt={garmentDraft.name} /></div>
+                <div className="garment-tag-preview" aria-label="Etiquetas actuales">
+                  {[garmentDraft.category, garmentDraft.tone, garmentDraft.material, garmentDraft.finish, garmentDraft.silhouette].map((tag) => <span key={tag}>{translateValue(tag)}</span>)}
+                  {garmentDraft.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+                </div>
+                <button className="editor-canvas-add" type="button" onClick={() => { addAndOpenStudio(editingGarment.id); setGarmentDraft(null); }}>AÑADIR AL CANVAS <span>＋</span></button>
+              </div>
+
+              <form className="garment-editor-form" onSubmit={(event) => { event.preventDefault(); saveGarmentDraft(); }}>
+                <div className="garment-editor-intro">
+                  <p>INFORMACIÓN</p>
+                  <h2 id="garment-editor-title">{garmentDraft.name || "Prenda sin nombre"}</h2>
+                  <span>Corrige la ficha cuando quieras. Los cambios se guardan en este dispositivo.</span>
+                </div>
+                <div className="garment-editor-fields">
+                  <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
+                  <label>MARCA<input value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} placeholder="Sin marca" /></label>
+                  <label>TIPO<select value={garmentDraft.category} onChange={(event) => updateGarmentDraft("category", event.target.value as Garment["category"])}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>COLOR<select value={garmentDraft.colorFamily} onChange={(event) => { const next = event.target.value; updateGarmentDraft("colorFamily", next); updateGarmentDraft("tone", filterOptions.tonesByColor[next]?.[0] ?? "Unclassified"); }}>{filterOptions.colorFamily.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>TONO<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>MATERIAL<select value={garmentDraft.material} onChange={(event) => updateGarmentDraft("material", event.target.value)}>{filterOptions.material.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>ACABADO<select value={garmentDraft.finish} onChange={(event) => updateGarmentDraft("finish", event.target.value)}>{filterOptions.finish.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>CORTE<select value={garmentDraft.silhouette} onChange={(event) => updateGarmentDraft("silhouette", event.target.value)}>{filterOptions.silhouette.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                </div>
+
+                <div className="custom-tag-editor">
+                  <div><span>ETIQUETAS</span><small>Agrega tu propia forma de organizarla.</small></div>
+                  {garmentDraft.tags.length > 0 && <div className="custom-tag-list">{garmentDraft.tags.map((tag) => <button type="button" key={tag} onClick={() => updateGarmentDraft("tags", garmentDraft.tags.filter((item) => item !== tag))}>#{tag}<span>×</span></button>)}</div>}
+                  <div className="tag-input-row"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={handleTagKeyDown} placeholder="viaje, noche, favorito…" /><button type="button" onClick={addDraftTag} disabled={!tagInput.trim()}>AÑADIR ＋</button></div>
+                </div>
+
+                <div className="garment-editor-actions">
+                  <button type="button" onClick={() => setGarmentDraft(null)}>CANCELAR</button>
+                  <button type="submit" className={garmentSaved ? "saved" : ""}>{garmentSaved ? "GUARDADO ✓" : "GUARDAR CAMBIOS"}</button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">

@@ -9,6 +9,8 @@ export type GarmentAttributes = {
 export type Garment = GarmentAttributes & {
   id: string;
   name: string;
+  brand?: string;
+  tags?: string[];
   category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring";
   color: string;
   image: string;
