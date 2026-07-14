@@ -13,7 +13,7 @@ import {
 import { classifyGarment, Garment, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
-type WardrobePanel = "pieces" | "upload";
+type WardrobePanel = "pieces" | "looks" | "upload";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
@@ -95,6 +95,17 @@ type UploadItem = {
   error?: string;
 };
 
+type SavedLook = {
+  id: string;
+  name: string;
+  items: CanvasPiece[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type StyleCode = "casual" | "formal";
+type StyleMoment = "day" | "night";
+
 const emptyFilters: WardrobeFilters = {
   category: "All",
   colorFamily: "All",
@@ -118,6 +129,9 @@ const uploadStatusLabels: Record<UploadStatus, string> = {
   waiting: "GUARDADA",
   failed: "REVISAR",
 };
+
+const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", formal: "Formal" };
+const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "Noche" };
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -350,6 +364,71 @@ const initialCanvas: CanvasPiece[] = [
   { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
 ];
 
+function styleScore(garment: Garment, code: StyleCode, moment: StyleMoment, role: "bottom" | "top" | "outer") {
+  const searchable = `${garment.name} ${garment.material} ${garment.tone} ${garment.tags?.join(" ") ?? ""}`.toLocaleLowerCase();
+  let score = Math.random() * 0.4;
+
+  if (role === "bottom" && garment.category === "Bottoms") score += 8;
+  if (role === "top" && garment.category === "Tops") score += 8;
+  if (role === "outer" && (garment.category === "Outerwear" || garment.category === "Tailoring")) score += 8;
+
+  if (code === "formal") {
+    if (garment.category === "Tailoring") score += 8;
+    if (/trouser|chino|shirt|blazer|coat|peacoat|draped|piped/.test(searchable)) score += 5;
+    if (/wool|leather/.test(searchable)) score += 2;
+    if (garment.silhouette === "Regular" || garment.silhouette === "Cropped") score += 1.5;
+    if (/tee|jeans|fleece|puffer|parka|track/.test(searchable)) score -= 5;
+  } else {
+    if (/jeans|tee|bomber|puffer|crewneck|sweater|fleece|coach|parka/.test(searchable)) score += 5;
+    if (["Cotton", "Denim", "Technical nylon", "Knit", "Fleece"].includes(garment.material)) score += 2;
+    if (garment.silhouette === "Relaxed" || garment.silhouette === "Oversized") score += 2;
+    if (garment.category === "Tailoring") score -= 3;
+  }
+
+  if (moment === "night") {
+    if (/black|negro|navy|dark/.test(searchable)) score += 4;
+    if (["Leather", "Glossy", "Low sheen"].includes(garment.material) || ["Glossy", "Low sheen"].includes(garment.finish)) score += 2;
+    if (/graphic|varsity|embroidered/.test(searchable)) score += 1;
+  } else {
+    if (["White", "Blue", "Brown", "Green", "Grey"].includes(garment.colorFamily)) score += 3;
+    if (garment.finish === "Matte" || garment.finish === "Textured") score += 1;
+    if (/white|ivory|cream|blue|denim|camel|sage|stone|greige/.test(searchable)) score += 2;
+  }
+
+  return score;
+}
+
+function pickStyledGarment(items: Garment[], code: StyleCode, moment: StyleMoment, role: "bottom" | "top" | "outer") {
+  const ranked = items
+    .map((garment) => ({ garment, score: styleScore(garment, code, moment, role) }))
+    .sort((a, b) => b.score - a.score);
+  const shortlist = ranked.slice(0, Math.min(4, ranked.length));
+  return shortlist[Math.floor(Math.random() * shortlist.length)]?.garment;
+}
+
+function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
+  return (
+    <div className="saved-look-preview" aria-hidden="true">
+      {look.items.map((piece) => {
+        const garment = garmentById.get(piece.garmentId);
+        if (!garment) return null;
+        const source = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
+        return <img
+          key={piece.instanceId}
+          src={imageSrc(cleanCanvasImage(source))}
+          alt=""
+          style={{
+            left: `${piece.x}%`,
+            top: `${piece.y}%`,
+            zIndex: piece.z,
+            transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
+          }}
+        />;
+      })}
+    </div>
+  );
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("pieces");
@@ -363,6 +442,11 @@ export default function Home() {
   const [wardrobeError, setWardrobeError] = useState("");
   const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
   const [canvasPieces, setCanvasPieces] = useState(initialCanvas);
+  const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
+  const [activeOutfitId, setActiveOutfitId] = useState<string | null>(currentOutfitId);
+  const [activeLookName, setActiveLookName] = useState("Conjunto actual");
+  const [styleCode, setStyleCode] = useState<StyleCode>("casual");
+  const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -424,7 +508,7 @@ export default function Home() {
           if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
           const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
           const outfits = outfitsResponse.ok
-            ? await outfitsResponse.json() as { outfits: Array<{ id: string; items: CanvasPiece[] }> }
+            ? await outfitsResponse.json() as { outfits: SavedLook[] }
             : { outfits: [] };
           const session = sessionResponse.ok
             ? await sessionResponse.json() as { user: WardrobeProfile }
@@ -435,9 +519,12 @@ export default function Home() {
           if (!active) return;
           setGarments((items) => mergeApiGarments(items, wardrobe.garments));
           if (session?.user) setProfile(session.user);
+          setSavedLooks(outfits.outfits);
           const savedLook = outfits.outfits.find((outfit) => outfit.id === currentOutfitId);
           if (savedLook?.items.length) {
             setCanvasPieces(savedLook.items);
+            setActiveOutfitId(savedLook.id);
+            setActiveLookName(savedLook.name);
             setSaved(true);
           }
           setWardrobeError("");
@@ -786,6 +873,8 @@ export default function Home() {
 
   function addAndOpenStudio(garmentId: string) {
     addToCanvas(garmentId);
+    setActiveOutfitId(null);
+    setActiveLookName("Nuevo look");
     setView("studio");
   }
 
@@ -947,6 +1036,7 @@ export default function Home() {
     const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
     const top = tops[Math.floor(Math.random() * tops.length)];
     const outer = outerLayers[Math.floor(Math.random() * outerLayers.length)];
+    if (!bottom || !top || !outer) return;
     const bottomPlacement = defaultPlacement(bottom);
     const topPlacement = defaultPlacement(top);
     const outerPlacement = defaultPlacement(outer);
@@ -957,24 +1047,90 @@ export default function Home() {
     ];
     setCanvasPieces(next);
     setSelectedId(next[2].instanceId);
+    setActiveOutfitId(null);
+    setActiveLookName("Combinación libre");
     setSaved(false);
+  }
+
+  function recommendStyle() {
+    const bottom = pickStyledGarment(garments.filter((item) => item.category === "Bottoms"), styleCode, styleMoment, "bottom");
+    const top = pickStyledGarment(garments.filter((item) => item.category === "Tops"), styleCode, styleMoment, "top");
+    const outer = pickStyledGarment(
+      garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring"),
+      styleCode,
+      styleMoment,
+      "outer",
+    );
+    if (!bottom || !top || !outer) {
+      setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
+      return;
+    }
+    const bottomPlacement = defaultPlacement(bottom);
+    const topPlacement = defaultPlacement(top);
+    const outerPlacement = defaultPlacement(outer);
+    const next: CanvasPiece[] = [
+      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(bottom.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(top.category) + 1 },
+      { instanceId: crypto.randomUUID(), garmentId: outer.id, variant: outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(outer.category) + 1 },
+    ];
+    setCanvasPieces(next);
+    setSelectedId("");
+    setActiveOutfitId(null);
+    setActiveLookName(`${styleCodeLabels[styleCode]} · ${styleMomentLabels[styleMoment]}`);
+    setSaved(false);
+    setLibraryOpen(false);
+    setWardrobeError("");
+    setView("studio");
+  }
+
+  function openSavedLook(look: SavedLook) {
+    setCanvasPieces(look.items.map((item) => ({ ...item })));
+    setSelectedId("");
+    setActiveOutfitId(look.id);
+    setActiveLookName(look.name);
+    setSaved(true);
+    setLibraryOpen(false);
+    setView("studio");
+  }
+
+  async function deleteSavedLook(lookId: string) {
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo) {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(lookId)}`, { method: "DELETE" });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar el look.");
+      }
+      setSavedLooks((looks) => looks.filter((look) => look.id !== lookId));
+      if (activeOutfitId === lookId) {
+        setActiveOutfitId(null);
+        setActiveLookName("Nuevo look");
+        setSaved(false);
+      }
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo eliminar el look.");
+    }
   }
 
   async function saveCurrentOutfit() {
     if (canvasPieces.length === 0) return;
-    if (isStaticDemo) {
-      setSaved(true);
-      return;
-    }
+    const outfitId = activeOutfitId ?? `look-${crypto.randomUUID()}`;
+    const fallbackName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
+    const lookName = activeLookName === "Nuevo look" || activeLookName === "Conjunto actual" ? fallbackName : activeLookName;
     setSavingOutfit(true);
     setWardrobeError("");
     try {
-      const response = await fetch(`/api/outfits/${currentOutfitId}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Conjunto actual", items: canvasPieces }),
-      });
-      if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
+      if (!isStaticDemo) {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: lookName, items: canvasPieces }),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
+      }
+      const nextLook: SavedLook = { id: outfitId, name: lookName, items: canvasPieces.map((item) => ({ ...item })) };
+      setSavedLooks((looks) => [nextLook, ...looks.filter((look) => look.id !== outfitId)]);
+      setActiveOutfitId(outfitId);
+      setActiveLookName(lookName);
       setSaved(true);
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
@@ -1036,9 +1192,11 @@ export default function Home() {
             <div className="profile-stats">
               <p><strong>{garments.length}</strong><span>Prendas</span></p>
               <p><strong>{favoriteCount}</strong><span>Favoritas</span></p>
+              <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
             </div>
             <nav className="wardrobe-tabs" aria-label="Mi armario">
               <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
               <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>
             </nav>
           </section>
@@ -1073,6 +1231,47 @@ export default function Home() {
                     {visible.length === 0 && <div className="filter-empty">NO HAY PRENDAS<button onClick={() => setArchiveFilters(emptyFilters)}>LIMPIAR FILTROS</button></div>}
                   </div>
                 </div>
+              </div>
+            </section>
+          ) : wardrobePanel === "looks" ? (
+            <section className="looks-view">
+              <div className="style-wheel">
+                <div className="style-wheel-copy">
+                  <p>ASISTENTE DE STYLING</p>
+                  <h2>¿Qué quieres vestir?</h2>
+                  <span>Elige dos variables. FORME combina únicamente prendas que ya están en tu armario.</span>
+                </div>
+                <div className="style-wheel-controls">
+                  <fieldset>
+                    <legend>CÓDIGO</legend>
+                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => setStyleCode(option)} key={option}>{styleCodeLabels[option]}</button>)}
+                  </fieldset>
+                  <fieldset>
+                    <legend>MOMENTO</legend>
+                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => setStyleMoment(option)} key={option}>{styleMomentLabels[option]}</button>)}
+                  </fieldset>
+                  <button className="style-spin" type="button" onClick={recommendStyle}><span>CREAR RECOMENDACIÓN</span><b>↻</b></button>
+                </div>
+              </div>
+
+              <div className="saved-looks-heading">
+                <div><p>ARCHIVO PERSONAL</p><h2>Looks guardados</h2></div>
+                <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
+              </div>
+              <div className="saved-looks-grid">
+                {savedLooks.map((look) => (
+                  <article className="saved-look-card" key={look.id}>
+                    <button className="saved-look-open" type="button" onClick={() => openSavedLook(look)} aria-label={`Abrir ${look.name} en el canvas`}>
+                      <LookPreview look={look} garmentById={garmentById} />
+                      <span>ABRIR EN CANVAS ↗</span>
+                    </button>
+                    <div className="saved-look-meta">
+                      <div><strong>{look.name}</strong><small>{look.items.length} PRENDAS</small></div>
+                      <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
+                    </div>
+                  </article>
+                ))}
+                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={recommendStyle}>CREAR EL PRIMERO ↻</button></div>}
               </div>
             </section>
           ) : (
@@ -1125,7 +1324,7 @@ export default function Home() {
           <div className="studio-layout">
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
-                <p className="look-date">CONJUNTO 001 / ARRASTRA · PELLIZCA · GIRA</p>
+                <p className="look-date">{activeLookName.toLocaleUpperCase()} / ARRASTRA · PELLIZCA · GIRA</p>
                 <span className="canvas-hint">MANTÉN = ABRIR / CERRAR</span>
                 {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
                 {canvasPieces.map((piece) => {
@@ -1188,10 +1387,10 @@ export default function Home() {
 
               <div className="studio-actions">
                 <button className="shuffle" onClick={shuffleLook}>CONJUNTO ALEATORIO <span>↻</span></button>
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSaved(false); }}>VACIAR</button>
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); }}>VACIAR</button>
               </div>
               {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
-              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit} onClick={saveCurrentOutfit}>{saved ? "CONJUNTO GUARDADO" : savingOutfit ? "GUARDANDO…" : "GUARDAR CONJUNTO"}<span>{saved ? "✓" : "＋"}</span></button>
+              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit} onClick={saveCurrentOutfit}>{saved ? "LOOK GUARDADO" : savingOutfit ? "GUARDANDO…" : activeOutfitId ? "GUARDAR CAMBIOS" : "GUARDAR LOOK"}<span>{saved ? "✓" : "＋"}</span></button>
             </div>
           </div>
         </section>

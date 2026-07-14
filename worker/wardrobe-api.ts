@@ -716,6 +716,18 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
   return json({ id: outfitId, name, items });
 }
 
+async function deleteOutfit(db: D1Database, ownerId: string, outfitId: string): Promise<Response> {
+  const existing = await db.prepare("SELECT id FROM outfits WHERE owner_id = ? AND client_id = ? LIMIT 1")
+    .bind(ownerId, outfitId)
+    .first<{ id: string }>();
+  if (!existing) return apiError("Look no encontrado.", 404);
+  await db.batch([
+    db.prepare("DELETE FROM outfit_items WHERE outfit_id = ?").bind(existing.id),
+    db.prepare("DELETE FROM outfits WHERE id = ? AND owner_id = ?").bind(existing.id, ownerId),
+  ]);
+  return new Response(null, { status: 204 });
+}
+
 export async function handleWardrobeApi(
   request: Request,
   env: WardrobeEnv,
@@ -786,9 +798,12 @@ export async function handleWardrobeApi(
     }
 
     const outfitMatch = url.pathname.match(/^\/api\/outfits\/([^/]+)$/);
-    if (outfitMatch && request.method === "PUT") {
+    if (outfitMatch && (request.method === "PUT" || request.method === "DELETE")) {
       const outfitId = safeClientId(decodeURIComponent(outfitMatch[1]));
-      return outfitId ? saveOutfit(request, db, identity.id, outfitId) : apiError("Ruta inválida.", 400);
+      if (!outfitId) return apiError("Ruta inválida.", 400);
+      return request.method === "PUT"
+        ? saveOutfit(request, db, identity.id, outfitId)
+        : deleteOutfit(db, identity.id, outfitId);
     }
     return apiError("Ruta no encontrada.", 404);
   } catch (error) {
