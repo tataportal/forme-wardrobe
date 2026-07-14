@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Garment, starterGarments } from "./garments";
+import { classifyGarment, Garment, starterGarments } from "./garments";
 
 type View = "wardrobe" | "upload" | "studio";
 type CanvasPiece = {
@@ -53,6 +53,64 @@ type PinchSession = {
   startRotation: number;
 };
 
+type WardrobeFilters = {
+  category: string;
+  colorFamily: string;
+  tone: string;
+  material: string;
+  finish: string;
+  silhouette: string;
+};
+
+type FilterKey = keyof WardrobeFilters;
+type FilterOptions = Record<FilterKey, string[]> & { tonesByColor: Record<string, string[]> };
+
+const emptyFilters: WardrobeFilters = {
+  category: "All",
+  colorFamily: "All",
+  tone: "All",
+  material: "All",
+  finish: "All",
+  silhouette: "All",
+};
+
+const filterLabels: Array<{ key: FilterKey; label: string }> = [
+  { key: "category", label: "Layer" },
+  { key: "colorFamily", label: "Color" },
+  { key: "tone", label: "Tone" },
+  { key: "material", label: "Material" },
+  { key: "finish", label: "Finish" },
+  { key: "silhouette", label: "Fit" },
+];
+
+const matchFilters = (garment: Garment, filters: WardrobeFilters) => filterLabels.every(({ key }) => filters[key] === "All" || garment[key] === filters[key]);
+
+function AttributeFilters({ value, options, compact = false, onChange, onReset }: {
+  value: WardrobeFilters;
+  options: FilterOptions;
+  compact?: boolean;
+  onChange: (key: FilterKey, next: string) => void;
+  onReset: () => void;
+}) {
+  const activeCount = Object.values(value).filter((item) => item !== "All").length;
+  return (
+    <div className={`attribute-filters ${compact ? "compact" : ""}`} aria-label="Filter garments by attributes">
+      {filterLabels.map(({ key, label }) => {
+        const values = key === "tone" && value.colorFamily !== "All" ? options.tonesByColor[value.colorFamily] ?? [] : options[key];
+        return (
+          <label key={key}>{label}
+            <select value={value[key]} onChange={(event) => onChange(key, event.target.value)}>
+              <option value="All">All</option>
+              {values.map((item) => <option value={item} key={item}>{item}</option>)}
+            </select>
+          </label>
+        );
+      })}
+      <button type="button" className="reset-filters" disabled={activeCount === 0} onClick={onReset}>RESET {activeCount > 0 ? `(${activeCount})` : ""}</button>
+    </div>
+  );
+}
+
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const asset = (path: string) => `${basePath}${path}`;
 const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
@@ -84,8 +142,8 @@ const initialCanvas: CanvasPiece[] = [
 export default function Home() {
   const [view, setView] = useState<View>("wardrobe");
   const [garments, setGarments] = useState(starterGarments);
-  const [filter, setFilter] = useState("All");
-  const [studioFilter, setStudioFilter] = useState("All");
+  const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
+  const [studioFilters, setStudioFilters] = useState<WardrobeFilters>(emptyFilters);
   const [preview, setPreview] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
@@ -102,9 +160,24 @@ export default function Home() {
   const pinchSession = useRef<PinchSession | null>(null);
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
-  const categories = useMemo(() => ["All", ...Array.from(new Set(garments.map((item) => item.category)))], [garments]);
-  const visible = filter === "All" ? garments : garments.filter((item) => item.category === filter);
-  const trayGarments = studioFilter === "All" ? garments : garments.filter((item) => item.category === studioFilter);
+  const filterOptions = useMemo<FilterOptions>(() => {
+    const unique = (key: FilterKey) => Array.from(new Set(garments.map((item) => item[key]))).sort();
+    const tonesByColor = garments.reduce<Record<string, string[]>>((result, item) => {
+      result[item.colorFamily] = Array.from(new Set([...(result[item.colorFamily] ?? []), item.tone])).sort();
+      return result;
+    }, {});
+    return {
+      category: unique("category"),
+      colorFamily: unique("colorFamily"),
+      tone: unique("tone"),
+      material: unique("material"),
+      finish: unique("finish"),
+      silhouette: unique("silhouette"),
+      tonesByColor,
+    };
+  }, [garments]);
+  const visible = garments.filter((item) => matchFilters(item, archiveFilters));
+  const trayGarments = garments.filter((item) => matchFilters(item, studioFilters));
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
 
@@ -113,6 +186,14 @@ export default function Home() {
     : view === "upload"
       ? "Ghost studio / New intake"
       : `Look study / ${String(canvasPieces.length).padStart(2, "0")} movable cutouts`;
+
+  function updateArchiveFilter(key: FilterKey, next: string) {
+    setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  }
+
+  function updateStudioFilter(key: FilterKey, next: string) {
+    setStudioFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  }
 
   function acceptFile(next: File | undefined) {
     if (!next || !next.type.startsWith("image/")) return;
@@ -143,7 +224,8 @@ export default function Home() {
     setStage("ghosting");
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const id = crypto.randomUUID();
-    setGarments((items) => [{ id, name: name || "Untitled piece", category, color: "Custom", image, status: "ghosted" }, ...items]);
+    const custom = { name: name || "Untitled piece", category, color: "Custom" };
+    setGarments((items) => [{ id, ...custom, ...classifyGarment(custom), image, status: "ghosted" }, ...items]);
     setStage("ready");
   }
 
@@ -400,9 +482,7 @@ export default function Home() {
           <div className="section-line">
             <h2>THE ARCHIVE</h2><p>{String(visible.length).padStart(2, "0")} ITEMS</p>
           </div>
-          <div className="filters" aria-label="Filter garments">
-            {categories.map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}
-          </div>
+          <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
           <div className="garment-grid">
             {visible.map((item, index) => (
               <article className="garment-card" key={item.id}>
@@ -412,9 +492,10 @@ export default function Home() {
                   <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => setGarments((items) => items.map((g) => g.id === item.id ? { ...g, favorite: !g.favorite } : g))} aria-label={`Favorite ${item.name}`}>♥</button>
                   <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>ADD TO CANVAS <span>＋</span></button>
                 </div>
-                <div className="card-meta"><div><h3>{item.name}</h3><p>{item.category} · {item.color}</p></div><span className="ghost-badge">CUTOUT</span></div>
+                <div className="card-meta"><div><h3>{item.name}</h3><p>{item.category} · {item.tone}</p><p>{item.material} · {item.finish}</p></div><span className="ghost-badge">{item.silhouette}</span></div>
               </article>
             ))}
+            {visible.length === 0 && <div className="filter-empty">NO PIECES MATCH<br /><button onClick={() => setArchiveFilters(emptyFilters)}>RESET FILTERS</button></div>}
           </div>
           <button className="wide-action" onClick={() => setView("upload")}><span>ADD TO THE ARCHIVE</span><b>＋</b></button>
         </section>
@@ -490,7 +571,7 @@ export default function Home() {
               <div className="selected-readout">
                 <p>SELECTED CUTOUT</p>
                 <h3>{selectedGarment?.name ?? "Tap a piece"}</h3>
-                <small>{selectedGarment ? `${selectedGarment.category} · ${selectedGarment.color}` : "Choose something on the canvas"}</small>
+                <small>{selectedGarment ? `${selectedGarment.tone} · ${selectedGarment.material} · ${selectedGarment.finish}` : "Choose something on the canvas"}</small>
                 {selectedPiece && <button onClick={() => sendSelected("back")}>SEND TO BACK ↓</button>}
               </div>
               <div className="canvas-tools" aria-label="Selected cutout controls">
@@ -503,9 +584,7 @@ export default function Home() {
               </div>
 
               <div className="tray-heading"><h3>STICKER TRAY</h3><p>TAP TO ADD</p></div>
-              <div className="filters studio-filters" aria-label="Filter sticker tray">
-                {categories.map((item) => <button key={item} className={studioFilter === item ? "active" : ""} onClick={() => setStudioFilter(item)}>{item}</button>)}
-              </div>
+              <AttributeFilters compact value={studioFilters} options={filterOptions} onChange={updateStudioFilter} onReset={() => setStudioFilters(emptyFilters)} />
               <div className="sticker-tray">
                 {trayGarments.map((item) => (
                   <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Add ${item.name} to canvas`}>
@@ -513,6 +592,7 @@ export default function Home() {
                     <span>{item.name}</span>
                   </button>
                 ))}
+                {trayGarments.length === 0 && <div className="filter-empty compact-empty">NO MATCHES<button onClick={() => setStudioFilters(emptyFilters)}>RESET</button></div>}
               </div>
 
               <div className="studio-actions">

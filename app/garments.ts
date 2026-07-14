@@ -1,4 +1,12 @@
-export type Garment = {
+export type GarmentAttributes = {
+  colorFamily: string;
+  tone: string;
+  material: string;
+  finish: string;
+  silhouette: string;
+};
+
+export type Garment = GarmentAttributes & {
   id: string;
   name: string;
   category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring";
@@ -9,10 +17,78 @@ export type Garment = {
   favorite?: boolean;
 };
 
-type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status"> & {
+type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status" | keyof GarmentAttributes> & {
   file: string;
   openFile?: string;
 };
+
+type BasicEntry = Omit<Garment, keyof GarmentAttributes>;
+
+const washedBlack = /Essentials|Open-Knit|Draped Black Shirt|Oversized Black Tee|Washed Black Jeans/i;
+const pitchBlack = /Peacoat|Trench|Cape|Poncho|Blazer|Wide-Leg/i;
+
+function colorAttributes(color: string, name: string): Pick<GarmentAttributes, "colorFamily" | "tone"> {
+  if (color.includes("/")) return { colorFamily: "Multicolor", tone: color };
+  if (/black/i.test(color)) {
+    const tone = washedBlack.test(name) || /washed/i.test(color) ? "Washed black" : pitchBlack.test(name) ? "Pitch black" : "Black";
+    return { colorFamily: "Black", tone };
+  }
+  if (/ivory/i.test(color)) return { colorFamily: "White", tone: "Ivory" };
+  if (/cream/i.test(color)) return { colorFamily: "White", tone: "Cream" };
+  if (/white/i.test(color)) return { colorFamily: "White", tone: "Optic white" };
+  if (/brown/i.test(color)) return { colorFamily: "Brown", tone: /shearling/i.test(name) ? "Dark brown" : "Brown" };
+  if (/camel|tan/i.test(color)) return { colorFamily: "Brown", tone: "Tan / camel" };
+  if (/navy/i.test(color)) return { colorFamily: "Blue", tone: "Navy" };
+  if (/light blue/i.test(color)) return { colorFamily: "Blue", tone: "Light blue" };
+  if (/denim|indigo/i.test(color)) return { colorFamily: "Blue", tone: "Denim blue" };
+  if (/blue/i.test(color)) return { colorFamily: "Blue", tone: /embroidered/i.test(name) ? "Navy" : "Denim blue" };
+  if (/sage/i.test(color)) return { colorFamily: "Green", tone: "Sage" };
+  if (/greige/i.test(color)) return { colorFamily: "Grey", tone: "Greige" };
+  if (/stone/i.test(color)) return { colorFamily: "Grey", tone: "Stone" };
+  if (/orange/i.test(color)) return { colorFamily: "Red / orange", tone: "Orange" };
+  return { colorFamily: "Other", tone: color || "Unclassified" };
+}
+
+function materialFor(name: string): string {
+  if (/Transparent Rain/i.test(name)) return "Transparent shell";
+  if (/Shearling/i.test(name)) return "Shearling";
+  if (/Leather/i.test(name)) return "Leather";
+  if (/Fleece/i.test(name)) return "Fleece";
+  if (/Denim|Jeans/i.test(name)) return "Denim";
+  if (/Crewneck|Sweater/i.test(name)) return "Knit";
+  if (/Tee|Shirt|Coach Jacket|Human Made|Frog-Closure|Pleated Chinos|Collarless/i.test(name)) return "Cotton";
+  if (/Peacoat|Blazer|Trench|Coat|Cape|Poncho|Wide-Leg Trousers|Toggle Jacket/i.test(name)) return "Wool blend";
+  if (/Bomber|Shell|Parka|Puffer|Padded Collar|Track|Field Jacket|Utility|Drawcord|Varsity|Blouson/i.test(name)) return "Technical nylon";
+  return "Cotton";
+}
+
+function finishFor(name: string, material: string): string {
+  if (material === "Transparent shell") return "Transparent";
+  if (/Fleece|Shearling|Open-Knit|Fur-Trim/i.test(name)) return "Textured";
+  if (/Leather Hooded Shirt|Leather Zip Blouson/i.test(name)) return "Glossy";
+  if (material === "Leather" || /WFP Bomber|Graphic Varsity|Puffer|Track Shell|Lightweight Shell/i.test(name)) return "Low sheen";
+  return "Matte";
+}
+
+function silhouetteFor(name: string): string {
+  if (/Cropped/i.test(name)) return "Cropped";
+  if (/Draped|Kimono|Wrap|Asymmetric|Belted/i.test(name)) return "Draped";
+  if (/Peacoat|Coat|Trench|Parka|Longline/i.test(name)) return "Longline";
+  if (/Oversized|Puffer|Funnel-Neck|Cape|Poncho|Wide-Leg/i.test(name)) return "Oversized";
+  if (/Bomber|Blouson|Crewneck|Sweater|Fleece|Shell|Pleated|Hooded|Varsity/i.test(name)) return "Relaxed";
+  return "Regular";
+}
+
+export function classifyGarment(item: Pick<Garment, "name" | "category" | "color">): GarmentAttributes {
+  const color = colorAttributes(item.color, item.name);
+  const material = materialFor(item.name);
+  return {
+    ...color,
+    material,
+    finish: finishFor(item.name, material),
+    silhouette: silhouetteFor(item.name),
+  };
+}
 
 const archive: ArchiveEntry[] = [
   { file: "001_DSC01768.webp", name: "Daisy Coach Jacket", category: "Outerwear", color: "Black", favorite: true },
@@ -67,7 +143,7 @@ const archive: ArchiveEntry[] = [
   { file: "050_DSC01888.webp", name: "Cropped Double Blazer", category: "Tailoring", color: "Black" },
 ];
 
-const basics: Garment[] = [
+const basics: BasicEntry[] = [
   { id: "bottom-blue-jeans", name: "Classic Straight Jeans", category: "Bottoms", color: "Indigo", image: "/wardrobe/cutouts/blue-straight-jeans.webp", status: "ghosted", favorite: true },
   { id: "bottom-black-jeans", name: "Washed Black Jeans", category: "Bottoms", color: "Washed Black", image: "/wardrobe/cutouts/washed-black-jeans.webp", status: "ghosted" },
   { id: "bottom-black-trouser", name: "Wide-Leg Trousers", category: "Bottoms", color: "Black", image: "/wardrobe/cutouts/black-wide-trousers.webp", status: "ghosted" },
@@ -81,10 +157,11 @@ const basics: Garment[] = [
 export const starterGarments: Garment[] = [
   ...archive.map(({ file, openFile, ...item }, index) => ({
     ...item,
+    ...classifyGarment(item),
     id: `archive-${String(index + 1).padStart(3, "0")}`,
     image: `/wardrobe/cutouts/${file}`,
     openImage: openFile ? `/wardrobe/cutouts/${openFile}` : undefined,
     status: "ghosted" as const,
   })),
-  ...basics,
+  ...basics.map((item) => ({ ...item, ...classifyGarment(item) })),
 ];
