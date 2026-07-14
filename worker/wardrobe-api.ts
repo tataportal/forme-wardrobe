@@ -416,10 +416,11 @@ async function uploadGarment(
 function ghostPrompt(garment: GarmentRow): string {
   const isLayerable = garment.category === "Outerwear" || garment.category === "Tailoring";
   const construction = isLayerable
-    ? `PRESENTATION OF THE OPENING
-- Unfasten only the garment's existing front closure and separate the left and right front panels by a small, natural gap so another top could be layered underneath later.
-- Keep both front panels facing the camera. Do not rotate, fold back, widen, shorten, stretch or redesign either panel.
-- Graphics, lettering, embroidery and patches that cross or sit near the closure must remain anchored to their original panel, at the same size and position. A graphic may be naturally split by the opening, but no part may be omitted or redrawn.`
+    ? `PRESENTATION DECISION — FIDELITY OVERRIDES OPENING
+- First inspect the exterior. If the garment contains graphics, lettering, embroidery, patches, logos, artwork, strong panel blocking or details near/across the front closure, preserve the source fastening state exactly. Do not open it.
+- Open the garment only when it is visually plain around the closure and opening it requires no reconstruction, remapping or invention of exterior details. If uncertain, keep the source fastening state.
+- When a safe opening is possible, unfasten only the existing front closure and create a small natural gap. Keep both panels facing the camera; do not fold back, widen, shorten, stretch or redesign them.
+- Fidelity is more important than layerability. Never sacrifice, move, split, hide or redraw an exterior detail merely to make the garment open.`
     : `PRESENTATION OF THE CONSTRUCTION
 - Keep the garment in its original wearable construction and fastening state.
 - Do not introduce an opening, closure, collar, cuff, fold or seam that is not present in the source.`;
