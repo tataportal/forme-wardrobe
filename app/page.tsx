@@ -106,6 +106,7 @@ const emptyFilters: WardrobeFilters = {
 
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
+const operationalSiteUrl = "https://forme-wardrobe.tataportal.chatgpt.site/";
 const currentOutfitId = "current-look";
 const maxBatchFiles = 12;
 const maxUploadBytes = 20 * 1024 * 1024;
@@ -406,6 +407,10 @@ export default function Home() {
     : [];
   const profileImage = profile.avatarUrl || asset("/profile/tata.png");
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
+
+  useEffect(() => {
+    if (isStaticDemo) window.location.replace(operationalSiteUrl);
+  }, []);
 
   useEffect(() => {
     if (!isStaticDemo) {
@@ -1000,6 +1005,14 @@ export default function Home() {
       setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "failed" } : garment));
       setWardrobeError(error instanceof Error ? error.message : "No se pudo reiniciar el procesamiento.");
     }
+  }
+
+  if (isStaticDemo) {
+    return <main className="static-redirect" aria-live="polite">
+      <p>ABRIENDO FORME</p>
+      <h1>Tu armario continúa en la app operativa.</h1>
+      <a href={operationalSiteUrl}>CONTINUAR →</a>
+    </main>;
   }
 
   return (

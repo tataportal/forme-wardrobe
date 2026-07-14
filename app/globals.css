@@ -13,6 +13,10 @@
 * { box-sizing:border-box; }
 html { background:var(--paper); scroll-behavior:smooth; }
 body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial,Helvetica,sans-serif; }
+.static-redirect { min-height:100dvh; padding:32px; display:grid; place-content:center; gap:14px; text-align:center; }
+.static-redirect p { margin:0; color:var(--muted); font-size:8px; letter-spacing:.18em; }
+.static-redirect h1 { max-width:520px; margin:0; font:400 clamp(34px,8vw,64px)/.96 Georgia,serif; letter-spacing:-.05em; }
+.static-redirect a { width:max-content; margin:12px auto 0; padding:12px 16px; border:1px solid var(--ink); color:inherit; font-size:9px; letter-spacing:.12em; text-decoration:none; }
 button,input,select { font:inherit; }
 button { color:inherit; }
 select,select option { color-scheme:light; }
