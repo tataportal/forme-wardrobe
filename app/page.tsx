@@ -83,6 +83,17 @@ type ApiGarment = Omit<GarmentDraft, "id"> & {
   openImage?: string;
 };
 type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null };
+type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
+type UploadItem = {
+  id: string;
+  file: File;
+  preview: string;
+  name: string;
+  category: Garment["category"];
+  status: UploadStatus;
+  garmentId?: string;
+  error?: string;
+};
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
@@ -96,6 +107,16 @@ const emptyFilters: WardrobeFilters = {
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 const currentOutfitId = "current-look";
+const maxBatchFiles = 12;
+const maxUploadBytes = 20 * 1024 * 1024;
+const uploadStatusLabels: Record<UploadStatus, string> = {
+  ready: "LISTA",
+  uploading: "SUBIENDO",
+  processing: "CREANDO RECORTE",
+  done: "TERMINADA",
+  waiting: "GUARDADA",
+  failed: "REVISAR",
+};
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -334,11 +355,9 @@ export default function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [garments, setGarments] = useState(starterGarments);
   const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
-  const [preview, setPreview] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<Garment["category"]>("Outerwear");
-  const [stage, setStage] = useState<"idle" | "uploading" | "ghosting" | "ready" | "waiting" | "failed">("idle");
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
+  const [uploadingBatch, setUploadingBatch] = useState(false);
+  const [draggingUpload, setDraggingUpload] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [wardrobeError, setWardrobeError] = useState("");
   const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
@@ -380,6 +399,8 @@ export default function Home() {
   const favoriteCount = garments.filter((item) => item.favorite).length;
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
+  const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed").length;
+  const uploadFinishedCount = uploadItems.filter((item) => item.status === "done" || item.status === "waiting" || item.status === "failed").length;
   const editorTones = garmentDraft
     ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
     : [];
@@ -562,80 +583,153 @@ export default function Home() {
   }
 
   function resetUpload() {
-    if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
-    setPreview("");
-    setFile(null);
-    setName("");
-    setCategory("Outerwear");
-    setStage("idle");
+    uploadItems.forEach((item) => {
+      if (item.preview.startsWith("blob:") && !(isStaticDemo && item.status === "done")) URL.revokeObjectURL(item.preview);
+    });
+    setUploadItems([]);
+    if (fileInput.current) fileInput.current.value = "";
     setUploadError("");
   }
 
-  function acceptFile(next: File | undefined) {
-    if (!next || !next.type.startsWith("image/")) return;
-    if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
-    setFile(next);
-    setPreview(URL.createObjectURL(next));
-    setName(next.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
-    setStage("idle");
+  function acceptFiles(source: FileList | File[] | undefined) {
+    const incoming = Array.from(source ?? []);
+    if (!incoming.length) return;
+    const existing = new Set(uploadItems.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
+    const images = incoming.filter((item) => item.type.startsWith("image/") && item.size <= maxUploadBytes && !existing.has(`${item.name}:${item.size}:${item.lastModified}`));
+    const remaining = Math.max(0, maxBatchFiles - uploadItems.length);
+    const accepted = images.slice(0, remaining).map<UploadItem>((next) => ({
+      id: crypto.randomUUID(),
+      file: next,
+      preview: URL.createObjectURL(next),
+      name: next.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+      category: "Outerwear",
+      status: "ready",
+    }));
+    setUploadItems((items) => [...items, ...accepted]);
+    if (fileInput.current) fileInput.current.value = "";
+
+    const oversized = incoming.filter((item) => item.type.startsWith("image/") && item.size > maxUploadBytes).length;
+    const invalid = incoming.filter((item) => !item.type.startsWith("image/")).length;
+    const overflow = Math.max(0, images.length - remaining);
+    const notices = [
+      oversized ? `${oversized} ${oversized === 1 ? "foto supera" : "fotos superan"} 20 MB` : "",
+      invalid ? `${invalid} ${invalid === 1 ? "archivo no es una imagen" : "archivos no son imágenes"}` : "",
+      overflow ? `el lote admite hasta ${maxBatchFiles} prendas` : "",
+    ].filter(Boolean);
+    setUploadError(notices.join(" · "));
+  }
+
+  function updateUploadItem(id: string, patch: Partial<UploadItem>) {
+    setUploadItems((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removeUploadItem(id: string) {
+    const item = uploadItems.find((candidate) => candidate.id === id);
+    if (item?.preview.startsWith("blob:")) URL.revokeObjectURL(item.preview);
+    setUploadItems((items) => items.filter((candidate) => candidate.id !== id));
     setUploadError("");
   }
 
-  async function ghostGarment() {
-    if (!file || !preview) return;
+  async function ghostGarments() {
+    const pending = uploadItems.filter((item) => item.status === "ready" || item.status === "failed");
+    if (!pending.length) return;
+    setUploadingBatch(true);
     setUploadError("");
-    setStage("uploading");
-    const custom = { name: name || "Prenda sin nombre", category, color: "Custom" };
-    const attributes = classifyGarment(custom);
+    pending.forEach((item) => updateUploadItem(item.id, { status: "uploading", error: undefined }));
+
     if (isStaticDemo) {
       await new Promise((resolve) => setTimeout(resolve, 650));
-      setStage("ghosting");
+      pending.forEach((item) => updateUploadItem(item.id, { status: "processing" }));
       await new Promise((resolve) => setTimeout(resolve, 1200));
-      const id = crypto.randomUUID();
-      setGarments((items) => [{ id, ...custom, ...attributes, image: preview, status: "ghosted" }, ...items]);
-      setStage("ready");
+      const created = pending.map<Garment>((item) => {
+        const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
+        return { id: crypto.randomUUID(), ...custom, ...classifyGarment(custom), image: item.preview, status: "ghosted" };
+      });
+      setGarments((items) => [...created, ...items]);
+      pending.forEach((item) => updateUploadItem(item.id, { status: "done" }));
+      setUploadingBatch(false);
       return;
     }
 
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("name", custom.name);
-      body.append("category", category);
-      body.append("colorFamily", attributes.colorFamily);
-      body.append("tone", attributes.tone);
-      body.append("material", attributes.material);
-      body.append("finish", attributes.finish);
-      body.append("silhouette", attributes.silhouette);
-      const response = await fetch("/api/upload", { method: "POST", body });
-      const result = await response.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string }; error?: string } | null;
-      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo cargar la prenda.");
-      setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
-      if (result.job?.status === "waiting_for_key") {
-        setStage("waiting");
-        setUploadError("La prenda se guardó. Falta conectar la clave de procesamiento para crear el recorte.");
-        return;
+    const remote = new Map<string, string>();
+    let failedCount = 0;
+    let waitingCount = 0;
+    for (const item of pending) {
+      try {
+        if (item.garmentId) {
+          const retryResponse = await fetch(`/api/garments/${encodeURIComponent(item.garmentId)}/retry`, { method: "POST" });
+          const retryResult = await retryResponse.json().catch(() => null) as { job?: { status?: string }; error?: string } | null;
+          if (!retryResponse.ok) throw new Error(retryResult?.error || "No se pudo reiniciar el recorte.");
+          if (retryResult?.job?.status === "waiting_for_key") {
+            waitingCount += 1;
+            updateUploadItem(item.id, { status: "waiting", error: "Esperando procesamiento" });
+          } else {
+            remote.set(item.id, item.garmentId);
+            updateUploadItem(item.id, { status: "processing", error: undefined });
+          }
+          continue;
+        }
+        const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
+        const attributes = classifyGarment(custom);
+        const body = new FormData();
+        body.append("file", item.file);
+        body.append("name", custom.name);
+        body.append("category", item.category);
+        body.append("colorFamily", attributes.colorFamily);
+        body.append("tone", attributes.tone);
+        body.append("material", attributes.material);
+        body.append("finish", attributes.finish);
+        body.append("silhouette", attributes.silhouette);
+        const response = await fetch("/api/upload", { method: "POST", body });
+        const result = await response.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string }; error?: string } | null;
+        if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo cargar la prenda.");
+        setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+        if (result.job?.status === "waiting_for_key") {
+          waitingCount += 1;
+          updateUploadItem(item.id, { status: "waiting", garmentId: result.garment.id, error: "Esperando procesamiento" });
+        } else {
+          remote.set(item.id, result.garment.id);
+          updateUploadItem(item.id, { status: "processing", garmentId: result.garment.id });
+        }
+      } catch (error) {
+        failedCount += 1;
+        updateUploadItem(item.id, { status: "failed", error: error instanceof Error ? error.message : "No se pudo cargar" });
       }
-      setStage("ghosting");
-      for (let attempt = 0; attempt < 90; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        const statusResponse = await fetch(`/api/garments/${encodeURIComponent(result.garment.id)}/status`, { cache: "no-store" });
-        const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string; error?: string }; error?: string } | null;
-        if (!statusResponse.ok || !statusResult?.garment) throw new Error(statusResult?.error || "No se pudo revisar el recorte.");
+    }
+
+    let timedOut = false;
+    for (let attempt = 0; attempt < 90 && remote.size > 0; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const checks = await Promise.all([...remote.entries()].map(async ([localId, garmentId]) => {
+        try {
+          const statusResponse = await fetch(`/api/garments/${encodeURIComponent(garmentId)}/status`, { cache: "no-store" });
+          const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string; error?: string }; error?: string } | null;
+          return { localId, statusResponse, statusResult };
+        } catch {
+          return { localId, statusResponse: null, statusResult: null };
+        }
+      }));
+      for (const { localId, statusResponse, statusResult } of checks) {
+        if (!statusResponse?.ok || !statusResult?.garment) continue;
         setGarments((items) => mergeApiGarments(items, [statusResult.garment as ApiGarment]));
         if (statusResult.garment.status === "ready") {
-          setStage("ready");
-          return;
-        }
-        if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
-          throw new Error(statusResult.job?.error || "El recorte falló. Puedes volver a intentarlo desde la ficha.");
+          updateUploadItem(localId, { status: "done", error: undefined });
+          remote.delete(localId);
+        } else if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
+          failedCount += 1;
+          updateUploadItem(localId, { status: "failed", error: statusResult.job?.error || "El recorte falló" });
+          remote.delete(localId);
         }
       }
-      throw new Error("El recorte sigue procesándose. Aparecerá en tu armario cuando termine.");
-    } catch (error) {
-      setStage("failed");
-      setUploadError(error instanceof Error ? error.message : "No se pudo preparar la prenda.");
     }
+    if (remote.size > 0) {
+      timedOut = true;
+      remote.forEach((_, localId) => updateUploadItem(localId, { status: "processing", error: "Continúa en segundo plano" }));
+    }
+    if (failedCount) setUploadError(`${failedCount} ${failedCount === 1 ? "prenda necesita" : "prendas necesitan"} revisión.`);
+    else if (waitingCount) setUploadError(`${waitingCount} ${waitingCount === 1 ? "prenda quedó guardada" : "prendas quedaron guardadas"}; falta activar el procesamiento.`);
+    else if (timedOut) setUploadError("Los recortes siguen procesándose y aparecerán en el armario al terminar.");
+    setUploadingBatch(false);
   }
 
   function bringToFront(instanceId: string) {
@@ -970,22 +1064,41 @@ export default function Home() {
             </section>
           ) : (
             <section className="upload-view">
-              <div className="upload-heading"><p>NUEVA PRENDA</p><h2>Añadir al armario</h2></div>
+              <div className="upload-heading"><p>NUEVAS PRENDAS</p><h2>Añadir al armario</h2></div>
               <div className="upload-layout">
-                <label className={`dropzone ${preview ? "has-preview" : ""}`} onDragOver={(event: DragEvent) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); acceptFile(event.dataTransfer.files[0]); }}>
-                  <input ref={fileInput} type="file" accept="image/*" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFile(event.target.files?.[0])} hidden />
-                  {preview ? <img src={preview} alt="Vista previa de la prenda" /> : <><span className="upload-mark">＋</span><h3>Selecciona una foto</h3></>}
-                  {preview && <span className="replace-photo">CAMBIAR</span>}
+                <label
+                  className={`dropzone bulk-dropzone ${uploadItems.length ? "has-files" : ""} ${draggingUpload ? "dragging" : ""}`}
+                  onDragEnter={(event: DragEvent) => { event.preventDefault(); setDraggingUpload(true); }}
+                  onDragOver={(event: DragEvent) => event.preventDefault()}
+                  onDragLeave={() => setDraggingUpload(false)}
+                  onDrop={(event) => { event.preventDefault(); setDraggingUpload(false); acceptFiles(event.dataTransfer.files); }}
+                >
+                  <input ref={fileInput} type="file" accept="image/*" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFiles(event.target.files ?? undefined)} hidden />
+                  {uploadItems.length > 0
+                    ? <div className="upload-preview-grid">{uploadItems.map((item) => <img src={item.preview} alt="" key={item.id} />)}</div>
+                    : <div className="dropzone-empty"><span className="upload-icon" aria-hidden="true">↑</span><h3>Arrastra tus fotos aquí</h3><p>o toca para seleccionar</p><small>HASTA {maxBatchFiles} PRENDAS · 20 MB C/U</small></div>}
+                  {uploadItems.length > 0 && !uploadingBatch && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length}/{maxBatchFiles}</span>}
                 </label>
-                <div className="intake-panel">
-                  <label>NOMBRE<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Chaqueta negra" /></label>
-                  <label>TIPO<select value={category} onChange={(event) => setCategory(event.target.value as Garment["category"])}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option></select></label>
-                  {uploadError && <p className={`upload-status ${stage === "failed" ? "error" : ""}`}>{uploadError}</p>}
-                  {stage === "ready"
+                <div className="intake-panel bulk-intake">
+                  <div className="batch-heading"><span>LOTE</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
+                  {uploadItems.length > 0
+                    ? <div className="upload-queue">{uploadItems.map((item, index) => {
+                      const editable = !uploadingBatch && (item.status === "ready" || item.status === "failed");
+                      return <article className={`upload-item status-${item.status}`} key={item.id}>
+                        <img className="upload-item-thumb" src={item.preview} alt="" />
+                        <div className="upload-item-fields">
+                          <label>NOMBRE<input disabled={!editable} value={item.name} onChange={(event) => updateUploadItem(item.id, { name: event.target.value })} placeholder={`Prenda ${index + 1}`} /></label>
+                          <label>TIPO<select disabled={!editable} value={item.category} onChange={(event) => updateUploadItem(item.id, { category: event.target.value as Garment["category"] })}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option></select></label>
+                          <span className="upload-item-state">{uploadStatusLabels[item.status]}{item.error ? ` · ${item.error}` : ""}</span>
+                        </div>
+                        {editable && <button className="remove-upload-item" type="button" onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name || `prenda ${index + 1}`}`}>×</button>}
+                      </article>;
+                    })}</div>
+                    : <div className="queue-empty"><p>Selecciona varias fotos y corrige el nombre o tipo antes de procesarlas.</p></div>}
+                  {uploadError && <p className={`upload-status ${uploadItems.some((item) => item.status === "failed") ? "error" : ""}`}>{uploadError}</p>}
+                  {uploadItems.length > 0 && uploadRetryableCount === 0 && !uploadingBatch
                     ? <button className="primary-action ready" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER EN MI ARMARIO <span>→</span></button>
-                    : stage === "waiting"
-                      ? <button className="primary-action" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER PRENDA GUARDADA <span>→</span></button>
-                      : <button className="primary-action" disabled={!file || stage === "uploading" || stage === "ghosting"} onClick={ghostGarment}>{stage === "uploading" ? "CARGANDO…" : stage === "ghosting" ? "PREPARANDO…" : stage === "failed" ? "VOLVER A INTENTAR" : "CREAR RECORTE"}<span>→</span></button>}
+                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PROCESANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadItems.some((item) => item.status === "failed") ? `REINTENTAR ${uploadRetryableCount}` : `CREAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "RECORTE" : "RECORTES"}`}<span>→</span></button>}
                 </div>
               </div>
             </section>
