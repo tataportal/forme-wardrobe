@@ -120,11 +120,30 @@ const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
 const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
-const defaultPlacement = (category: Garment["category"]) => {
-  if (category === "Bottoms") return { x: 50, y: 66.5, scale: 0.8 };
-  if (category === "Tops") return { x: 50, y: 32, scale: 0.53 };
-  if (category === "Tailoring") return { x: 50, y: 33, scale: 0.62 };
-  return { x: 50, y: 32.5, scale: 0.64 };
+const defaultPlacement = (garment: Garment) => {
+  if (garment.category === "Bottoms") {
+    const scale = garment.silhouette === "Oversized" ? 0.68 : garment.silhouette === "Relaxed" ? 0.71 : 0.73;
+    return { x: 50, y: 66.5, scale };
+  }
+  if (garment.category === "Tops") {
+    const scale = garment.silhouette === "Oversized"
+      ? 0.43
+      : garment.silhouette === "Longline"
+        ? 0.45
+        : garment.silhouette === "Relaxed"
+          ? 0.46
+          : 0.48;
+    return { x: 50, y: garment.silhouette === "Longline" ? 34 : 31.5, scale };
+  }
+  const outerPreset: Record<string, { y: number; scale: number }> = {
+    Cropped: { y: 30.5, scale: 0.56 },
+    Longline: { y: 38, scale: 0.46 },
+    Oversized: { y: 34, scale: 0.49 },
+    Draped: { y: 34.5, scale: 0.49 },
+    Relaxed: { y: 32.5, scale: 0.51 },
+    Regular: { y: 32, scale: 0.52 },
+  };
+  return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
 };
 
 const viewCopy: Record<View, { title: string; note: string }> = {
@@ -134,9 +153,9 @@ const viewCopy: Record<View, { title: string; note: string }> = {
 };
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.8, rotation: 0, z: 1001 },
-  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 32, scale: 0.53, rotation: 0, z: 2001 },
-  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.64, rotation: 0, z: 3001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.73, rotation: 0, z: 1001 },
+  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
 ];
 
 export default function Home() {
@@ -254,18 +273,17 @@ export default function Home() {
     const garment = garmentById.get(garmentId);
     if (!garment) return;
     const instanceId = crypto.randomUUID();
-    const placement = defaultPlacement(garment.category);
+    const placement = defaultPlacement(garment);
     setCanvasPieces((items) => {
       const base = layerBase(garment.category);
       const top = Math.max(base, ...items.filter((item) => {
         const itemGarment = garmentById.get(item.garmentId);
         return itemGarment && layerBase(itemGarment.category) === base;
       }).map((item) => item.z)) + 1;
-      const hasInnerTop = items.some((item) => garmentById.get(item.garmentId)?.category === "Tops");
       return [...items, {
         instanceId,
         garmentId,
-        variant: garment.openImage && hasInnerTop ? "open" : "closed",
+        variant: garment.openImage ? "open" : "closed",
         x: placement.x,
         y: placement.y,
         scale: placement.scale,
@@ -440,9 +458,9 @@ export default function Home() {
     const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
     const top = tops[Math.floor(Math.random() * tops.length)];
     const outer = outerLayers[Math.floor(Math.random() * outerLayers.length)];
-    const bottomPlacement = defaultPlacement(bottom.category);
-    const topPlacement = defaultPlacement(top.category);
-    const outerPlacement = defaultPlacement(outer.category);
+    const bottomPlacement = defaultPlacement(bottom);
+    const topPlacement = defaultPlacement(top);
+    const outerPlacement = defaultPlacement(outer);
     const next: CanvasPiece[] = [
       { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(bottom.category) + 1 },
       { instanceId: crypto.randomUUID(), garmentId: top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(top.category) + 1 },
