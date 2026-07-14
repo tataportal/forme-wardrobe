@@ -413,21 +413,48 @@ async function uploadGarment(
   return json({ garment: garmentJson(row, payload.tags), job }, 202);
 }
 
-function ghostPrompt(category: string): string {
-  const opening = category === "Outerwear" || category === "Tailoring"
-    ? "Show the outer garment naturally open at the front so a separate top can be layered underneath."
-    : "Keep the garment in its natural wearable construction.";
-  return `Create a premium ghost-mannequin fashion catalog image from the attached garment photo. ${opening}
+function ghostPrompt(garment: GarmentRow): string {
+  const isLayerable = garment.category === "Outerwear" || garment.category === "Tailoring";
+  const construction = isLayerable
+    ? `PRESENTATION OF THE OPENING
+- Unfasten only the garment's existing front closure and separate the left and right front panels by a small, natural gap so another top could be layered underneath later.
+- Keep both front panels facing the camera. Do not rotate, fold back, widen, shorten, stretch or redesign either panel.
+- Graphics, lettering, embroidery and patches that cross or sit near the closure must remain anchored to their original panel, at the same size and position. A graphic may be naturally split by the opening, but no part may be omitted or redrawn.`
+    : `PRESENTATION OF THE CONSTRUCTION
+- Keep the garment in its original wearable construction and fastening state.
+- Do not introduce an opening, closure, collar, cuff, fold or seam that is not present in the source.`;
 
-Absolute fidelity rules:
-- Preserve the exact silhouette, proportions, length, sleeve volume, collar, hood, cuffs, hem, seams, pockets, buttons, zippers, hardware, embroidery, graphics, logos and wear marks visible in the reference.
-- Do not invent, remove, simplify or relocate garment details.
-- Do not display a hanger, rail, bar, person, mannequin body, neck block, inner brand label or floating support.
-- If the garment is open, keep the inside clean and dark without exposing a neck or brand label.
-- Center the full garment with comfortable margins in a vertical 4:5 frame.
-- Use neutral white seamless studio lighting, soft controlled shadow and realistic catalog color.
-- Keep fabric texture natural and restrained; do not over-sharpen or exaggerate texture.
-- Output only one garment, front view, no styling pieces, no text, no props.`;
+  return `IMAGE EDIT — NOT A REDESIGN
+
+GOAL
+Turn the attached source photo into one premium, photorealistic ghost-mannequin catalog image. Change only the presentation: remove the environment and invisible support, correct the front-on catalog pose, and place the garment in a clean studio frame. The source garment is the absolute visual source of truth.
+
+GARMENT REFERENCE
+- Catalog category: ${garment.category}.
+- Catalog name: ${garment.name || "Garment"}. This name is metadata only; never render it as new text.
+
+${construction}
+
+MANDATORY EXTERIOR FIDELITY
+- Preserve the exact silhouette, proportions, length, shoulder width, sleeve volume, collar or hood shape, cuffs, hem and drape.
+- Preserve every seam, pocket, flap, button, snap, zipper, pull, rib, drawcord, buckle and piece of hardware in the exact position, count, scale, shape and color visible in the source.
+- Every exterior graphic is mandatory. Copy all visible prints, embroidery, appliqué, patches, logos, letters, numbers, symbols, characters and artwork exactly as seen: same content, spelling, orientation, color, scale and placement.
+- Existing text and branding printed, embroidered or patched on the outside are part of the garment. They must remain visible. Do not censor, translate, correct, replace, reinterpret, simplify, duplicate, recolor or invent them.
+- Preserve the original material boundaries and finish, including leather versus textile panels, knit ribs, sheen, wear marks and restrained natural texture.
+- If a detail is difficult to read, preserve its visible shapes and placement from the source instead of guessing or replacing it with a lookalike design.
+
+REMOVE ONLY PHOTOGRAPHY ARTIFACTS
+- Remove the hanger, hook, rail, bars, wall, switch, room, person, mannequin body, neck block and any floating support.
+- Never show an interior brand label, care label, size tag or hanger. Replace only that hidden support/label area with plain matching interior lining; do not erase or alter exterior branding.
+- Do not add a shirt, body, neck, styling piece, prop, caption, watermark or new text.
+
+CATALOG OUTPUT
+- One garment only, front view, centered with the entire garment visible and comfortable margins in an exact vertical 4:5 composition.
+- Neutral pure-white seamless background, soft even studio lighting, controlled subtle shadow and faithful source color.
+- Natural restrained texture: no aggressive sharpening, fake grain, added distressing or exaggerated gloss.
+
+FINAL CHECK BEFORE OUTPUT
+Compare the result against the source once more. If any exterior graphic, letter, number, patch, logo, hardware item or construction detail is missing or changed, restore it before returning the image.`;
 }
 
 function decodeBase64(value: string): Uint8Array {
@@ -466,9 +493,9 @@ async function processGarment(
     const form = new FormData();
     form.append("model", env.OPENAI_IMAGE_MODEL || "gpt-image-2");
     form.append("image[]", new File([sourceBytes], filename, { type: contentType }));
-    form.append("prompt", ghostPrompt(garment.category));
+    form.append("prompt", ghostPrompt(garment));
     form.append("size", "1024x1280");
-    form.append("quality", env.OPENAI_IMAGE_QUALITY || "medium");
+    form.append("quality", env.OPENAI_IMAGE_QUALITY || "high");
     form.append("output_format", "png");
 
     const response = await fetch("https://api.openai.com/v1/images/edits", {
