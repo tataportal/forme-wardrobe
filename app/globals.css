@@ -205,9 +205,10 @@ button { color:inherit; }
   .pieces-section,.upload-view { padding-top:30px; }
   .catalog-toolbar { min-height:70px; }
   .catalog-toolbar h2,.upload-heading h2 { font-size:36px; }
-  .catalog-toolbar > div:last-child button { display:none; }
-  .wardrobe-catalog { display:grid; grid-template-columns:230px minmax(0,1fr); gap:28px; padding-top:22px; align-items:start; }
-  .filter-sidebar,.filter-sidebar.open { display:block; position:sticky; top:94px; margin:0; border:0; }
+  .wardrobe-catalog { display:grid; grid-template-columns:minmax(0,1fr); gap:28px; padding-top:22px; align-items:start; }
+  .wardrobe-catalog.filters-open { grid-template-columns:230px minmax(0,1fr); }
+  .filter-sidebar { display:none; position:sticky; top:94px; margin:0; border:0; }
+  .filter-sidebar.open { display:block; }
   .filter-sidebar-header button { display:none; }
   .attribute-filters { grid-template-columns:1fr; padding:0; }
   .attribute-filters label { padding:16px 0 14px; }
@@ -259,7 +260,8 @@ button { color:inherit; }
 
 @media (min-width:1200px) {
   .topbar,.content { padding-left:52px; padding-right:52px; }
-  .wardrobe-catalog { grid-template-columns:250px minmax(0,1fr); gap:38px; }
+  .wardrobe-catalog { gap:38px; }
+  .wardrobe-catalog.filters-open { grid-template-columns:250px minmax(0,1fr); }
   .garment-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:42px 18px; }
 }
 

@@ -942,7 +942,7 @@ export default function Home() {
                 <div><p>COLECCIÓN</p><h2>Mis prendas</h2></div>
                 <div><span>{visible.length} de {garments.length}</span><button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button></div>
               </div>
-              <div className="wardrobe-catalog">
+              <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
                 <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
                   <div className="filter-sidebar-header"><strong>Filtros</strong><button onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></div>
                   <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
