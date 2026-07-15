@@ -121,6 +121,12 @@ type StylingRecommendation = {
   reason: string;
   items: CanvasPiece[];
 };
+type LookIteration = {
+  id: string;
+  title: string;
+  detail: string;
+  items: CanvasPiece[];
+};
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
@@ -744,6 +750,86 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   }));
 }
 
+const iterationProfiles = [
+  { id: "clean", title: "Limpio", outer: /collarless|coach|field|shell/, footwear: /white|sneaker/, accessory: /tote/ },
+  { id: "contrast", title: "Contraste", outer: /puffer|fleece|tan|camel|sage|denim/, footwear: /black leather/, accessory: /sunglasses/ },
+  { id: "statement", title: "Statement", outer: /graphic|embroidered|cape|poncho|transparent|varsity/, footwear: /pump|black/, accessory: /sunglasses|beanie/ },
+  { id: "tailored", title: "Pulido", outer: /blazer|coat|trench|leather/, footwear: /brown|black leather/, accessory: /tote/ },
+  { id: "relaxed", title: "Relajado", outer: /parka|puffer|coach|fleece|bomber|blouson/, footwear: /sneaker/, accessory: /cap|beanie/ },
+] as const;
+
+function buildLookIterations(garments: Garment[], current: CanvasPiece[]): LookIteration[] {
+  const byId = new Map(garments.map((item) => [item.id, item]));
+  const fixed = current.filter((piece) => {
+    const garment = byId.get(piece.garmentId);
+    return garment?.category === "Tops" || garment?.category === "Bottoms";
+  });
+  const hasTop = fixed.some((piece) => byId.get(piece.garmentId)?.category === "Tops");
+  const hasBottom = fixed.some((piece) => byId.get(piece.garmentId)?.category === "Bottoms");
+  if (!hasTop || !hasBottom) return [];
+
+  const baseColors = new Set(fixed.map((piece) => byId.get(piece.garmentId)?.colorFamily).filter(Boolean));
+  const outerwear = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
+  const footwear = garments.filter((item) => item.category === "Footwear");
+  const accessories = garments.filter((item) => item.category === "Accessories");
+  const usedOuter = new Set<string>();
+  const usedFootwear = new Set<string>();
+  const usedAccessories = new Set<string>();
+
+  return iterationProfiles.map((profile, profileIndex) => {
+    const rankedOuter = [...outerwear].sort((a, b) => {
+      const score = (garment: Garment) => {
+        const text = searchableGarment(garment);
+        let value = profile.outer.test(text) ? 20 : 0;
+        if (profile.id === "contrast" && !baseColors.has(garment.colorFamily)) value += 8;
+        if (profile.id === "statement" && ["Textured", "Glossy", "Transparent"].includes(garment.finish)) value += 6;
+        if (profile.id === "tailored" && garment.category === "Tailoring") value += 9;
+        if (profile.id === "clean" && stylingNeutralFamilies.has(garment.colorFamily)) value += 5;
+        if (profile.id === "relaxed" && ["Relaxed", "Oversized"].includes(garment.silhouette)) value += 5;
+        return value;
+      };
+      return score(b) - score(a) || a.id.localeCompare(b.id);
+    });
+    const outer = rankedOuter.find((item) => !usedOuter.has(item.id)) ?? rankedOuter[profileIndex % Math.max(rankedOuter.length, 1)];
+    if (outer) usedOuter.add(outer.id);
+
+    const rankedFootwear = [...footwear].sort((a, b) => {
+      const aMatch = profile.footwear.test(searchableGarment(a)) ? 1 : 0;
+      const bMatch = profile.footwear.test(searchableGarment(b)) ? 1 : 0;
+      return bMatch - aMatch || a.id.localeCompare(b.id);
+    });
+    const shoe = rankedFootwear.find((item) => !usedFootwear.has(item.id)) ?? rankedFootwear[profileIndex % Math.max(rankedFootwear.length, 1)];
+    if (shoe) usedFootwear.add(shoe.id);
+    const rankedAccessories = [...accessories].sort((a, b) => {
+      const aMatch = profile.accessory.test(searchableGarment(a)) ? 1 : 0;
+      const bMatch = profile.accessory.test(searchableGarment(b)) ? 1 : 0;
+      return bMatch - aMatch || a.id.localeCompare(b.id);
+    });
+    const accessory = rankedAccessories.find((item) => !usedAccessories.has(item.id)) ?? rankedAccessories[profileIndex % Math.max(rankedAccessories.length, 1)];
+    if (accessory) usedAccessories.add(accessory.id);
+
+    const additions = [outer, shoe, accessory].filter((item): item is Garment => Boolean(item));
+    const items: CanvasPiece[] = [
+      ...fixed.map((piece) => ({ ...piece, instanceId: `iterate-${profile.id}-${piece.instanceId}` })),
+      ...additions.map((garment, index) => {
+        const placement = garment.category === "Outerwear" || garment.category === "Tailoring"
+          ? recommendationOuterPlacement(garment)
+          : defaultPlacement(garment);
+        return {
+          instanceId: `iterate-${profile.id}-${garment.id}`,
+          garmentId: garment.id,
+          variant: garment.openImage ? "open" as const : "closed" as const,
+          ...placement,
+          rotation: 0,
+          z: layerBase(garment.category) + index + 1,
+        };
+      }),
+    ];
+    const detail = [outer, shoe, accessory].filter((item): item is Garment => Boolean(item)).map((item) => translateGarmentName(item.name)).join(" · ");
+    return { id: profile.id, title: profile.title, detail, items };
+  });
+}
+
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   return (
     <div className="saved-look-preview" aria-hidden="true">
@@ -791,6 +877,7 @@ export default function Home() {
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
+  const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -836,6 +923,12 @@ export default function Home() {
   });
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
+  const iterationBaseCount = canvasPieces.filter((piece) => {
+    const category = garmentById.get(piece.garmentId)?.category;
+    return category === "Tops" || category === "Bottoms";
+  }).length;
+  const canIterate = canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Tops")
+    && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
   const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed").length;
@@ -1490,12 +1583,34 @@ export default function Home() {
     setWardrobeError("");
   }
 
+  function iterateCurrentLook() {
+    const next = buildLookIterations(garments, canvasPieces);
+    if (!next.length) {
+      setWardrobeError("Añade por lo menos un top y un pantalón para crear cinco variaciones.");
+      return;
+    }
+    setLookIterations(next);
+    setLibraryOpen(false);
+    setWardrobeError("");
+  }
+
+  function openLookIteration(iteration: LookIteration) {
+    setCanvasPieces(iteration.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
+    setSelectedId("");
+    setActiveOutfitId(null);
+    setActiveLookName(iteration.title);
+    setSaved(false);
+    setLookIterations([]);
+    setWardrobeError("");
+  }
+
   function openStylingRecommendation(recommendation: StylingRecommendation) {
     setCanvasPieces(recommendation.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
     setSelectedId("");
     setActiveOutfitId(null);
     setActiveLookName(recommendation.name);
     setSaved(false);
+    setLookIterations([]);
     setLibraryOpen(false);
     setWardrobeError("");
     setView("studio");
@@ -1507,6 +1622,7 @@ export default function Home() {
     setActiveOutfitId(look.id);
     setActiveLookName(look.name);
     setSaved(true);
+    setLookIterations([]);
     setLibraryOpen(false);
     setView("studio");
   }
@@ -1814,6 +1930,19 @@ export default function Home() {
                     </div>
                   );
                 })}
+                {lookIterations.length > 0 && (
+                  <section className="iteration-drawer" aria-label="Cinco variaciones del look">
+                    <header><div><span>ITERAR LOOK</span><strong>5 variaciones · {iterationBaseCount} piezas fijas</strong></div><button type="button" onClick={() => setLookIterations([])} aria-label="Cerrar variaciones">×</button></header>
+                    <div className="iteration-list">
+                      {lookIterations.map((iteration, index) => (
+                        <button type="button" className="iteration-card" onClick={() => openLookIteration(iteration)} key={iteration.id}>
+                          <LookPreview look={{ id: iteration.id, name: iteration.title, items: iteration.items }} garmentById={garmentById} />
+                          <span>0{index + 1}</span><strong>{iteration.title}</strong><small>{iteration.detail}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </div>
             </div>
 
@@ -1858,8 +1987,9 @@ export default function Home() {
               </div>
 
               <div className="studio-actions">
+                <button className="iterate-look" onClick={iterateCurrentLook} disabled={!canIterate}>ITERAR ESTE LOOK · 5 <span>↻</span></button>
                 <button className="shuffle" onClick={() => openWardrobe("looks")}>RECOMENDACIONES <span>→</span></button>
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); }}>VACIAR</button>
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); setLookIterations([]); }}>VACIAR</button>
               </div>
               {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
               <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}>{saved ? "LOOK GUARDADO" : savingOutfit ? "GUARDANDO…" : activeOutfitId ? "GUARDAR CAMBIOS" : "GUARDAR LOOK"}<span>{saved ? "✓" : "＋"}</span></button>

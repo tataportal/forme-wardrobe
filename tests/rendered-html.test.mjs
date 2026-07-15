@@ -59,6 +59,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Contraste/);
   assert.match(page, /Statement/);
   assert.match(page, /function buildStylingRecommendations/);
+  assert.match(page, /function buildLookIterations/);
+  assert.match(page, /const iterationProfiles = \[/);
+  assert.match(page, /ITERAR ESTE LOOK · 5/);
+  assert.match(page, /function openLookIteration/);
   assert.match(page, /function recommendationOuterPlacement/);
   assert.match(page, /function recommendationTopPlacement/);
   assert.match(page, /funnel-neck cape\|cape coat\|poncho/);
@@ -74,6 +78,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
+  assert.match(css, /\.iteration-drawer/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
 });
 
