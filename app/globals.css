@@ -8,6 +8,7 @@
   --signal:#e83b25;
   --line:rgba(17,17,15,.18);
   --muted:#77746d;
+  --canvas-greige:#d9d5cc;
 }
 
 * { box-sizing:border-box; }
@@ -279,7 +280,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .section-line h2,.section-line p { margin:0; font-size:8px; letter-spacing:.14em; }
 .section-line p { color:var(--muted); }
 .studio-layout,.canvas-column { min-width:0; }
-.look-canvas { width:100%; height:100%; position:relative; overflow:hidden; isolation:isolate; touch-action:none; background-color:var(--paper); background-image:radial-gradient(rgba(17,17,15,.11) .7px,transparent .7px); background-size:18px 18px; }
+.look-canvas { width:100%; height:100%; position:relative; overflow:hidden; isolation:isolate; touch-action:none; background-color:var(--canvas-greige); background-image:radial-gradient(rgba(17,17,15,.11) .7px,transparent .7px); background-size:18px 18px; }
 .look-canvas::before { content:""; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.12),transparent 50%); pointer-events:none; }
 .look-date { position:absolute; top:15px; left:14px; z-index:1000; margin:0; font-size:7px; letter-spacing:.12em; }
 .canvas-hint { position:absolute; top:29px; left:14px; z-index:1000; color:var(--muted); font-size:6px; letter-spacing:.12em; }

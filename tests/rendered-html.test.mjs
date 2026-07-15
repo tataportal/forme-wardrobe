@@ -67,6 +67,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
+  assert.match(css, /--canvas-greige:#d9d5cc/);
 });
 
 test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
