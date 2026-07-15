@@ -345,7 +345,7 @@ function mergeApiGarments(current: Garment[], updates: ApiGarment[]): Garment[] 
 const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
 const defaultPlacement = (garment: Garment) => {
   if (garment.category === "Bottoms") {
-    const scale = garment.silhouette === "Oversized" ? 0.68 : garment.silhouette === "Relaxed" ? 0.71 : 0.73;
+    const scale = garment.silhouette === "Oversized" ? 0.55 : garment.silhouette === "Relaxed" ? 0.57 : 0.59;
     return { x: 50, y: 66.5, scale };
   }
   if (garment.category === "Tops") {
@@ -369,8 +369,13 @@ const defaultPlacement = (garment: Garment) => {
   return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
 };
 
+function normalizedCanvasPiece(piece: CanvasPiece, garment?: Garment): CanvasPiece {
+  if (garment?.category !== "Bottoms" || piece.scale < 0.66) return piece;
+  return { ...piece, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
+}
+
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.73, rotation: 0, z: 1001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
   { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
 ];
@@ -527,16 +532,17 @@ function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<
       {look.items.map((piece) => {
         const garment = garmentById.get(piece.garmentId);
         if (!garment) return null;
+        const normalizedPiece = normalizedCanvasPiece(piece, garment);
         const source = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
         return <img
           key={piece.instanceId}
           src={imageSrc(cleanCanvasImage(source))}
           alt=""
           style={{
-            left: `${piece.x}%`,
-            top: `${piece.y}%`,
-            zIndex: piece.z,
-            transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
+            left: `${normalizedPiece.x}%`,
+            top: `${normalizedPiece.y}%`,
+            zIndex: normalizedPiece.z,
+            transform: `translate(-50%, -50%) rotate(${normalizedPiece.rotation}deg) scale(${normalizedPiece.scale})`,
           }}
         />;
       })}
@@ -634,10 +640,16 @@ export default function Home() {
         })
         .then(({ wardrobe, outfits, session }) => {
           if (!active) return;
-          setGarments((items) => mergeApiGarments(items, wardrobe.garments));
+          const loadedGarments = mergeApiGarments(starterGarments, wardrobe.garments);
+          const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
+          const normalizedLooks = outfits.outfits.map((look) => ({
+            ...look,
+            items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
+          }));
+          setGarments(loadedGarments);
           if (session?.user) setProfile(session.user);
-          setSavedLooks(outfits.outfits);
-          const savedLook = outfits.outfits.find((outfit) => outfit.id === currentOutfitId);
+          setSavedLooks(normalizedLooks);
+          const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
           if (savedLook?.items.length) {
             setCanvasPieces(savedLook.items);
             setActiveOutfitId(savedLook.id);
@@ -1168,7 +1180,7 @@ export default function Home() {
   }
 
   function openSavedLook(look: SavedLook) {
-    setCanvasPieces(look.items.map((item) => ({ ...item })));
+    setCanvasPieces(look.items.map((item) => normalizedCanvasPiece({ ...item }, garmentById.get(item.garmentId))));
     setSelectedId("");
     setActiveOutfitId(look.id);
     setActiveLookName(look.name);
