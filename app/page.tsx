@@ -88,7 +88,8 @@ type ApiGarment = Omit<GarmentDraft, "id"> & {
   qaStatus?: "pending" | "passed" | "review";
   qaNotes?: string;
 };
-type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null };
+type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null; isOwner?: boolean };
+type SessionStatus = "checking" | "guest" | "authenticated";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
 type UploadItem = {
   id: string;
@@ -743,9 +744,6 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   }));
 }
 
-const entryLooks = buildDemoRecommendations("casual", "day", "daily");
-const entryGarmentById = new Map(formeBasics.map((item) => [item.id, item]));
-
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   return (
     <div className="saved-look-preview" aria-hidden="true">
@@ -771,13 +769,13 @@ function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<
 }
 
 export default function Home() {
-  const [entryOpen, setEntryOpen] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(true);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [view, setView] = useState<View>("wardrobe");
-  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("pieces");
+  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("basics");
   const [studioLibraryFilter, setStudioLibraryFilter] = useState<StudioLibraryFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [garments, setGarments] = useState(starterGarments);
+  const [garments, setGarments] = useState(formeBasics);
   const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [uploadingBatch, setUploadingBatch] = useState(false);
@@ -785,10 +783,10 @@ export default function Home() {
   const [uploadError, setUploadError] = useState("");
   const [wardrobeError, setWardrobeError] = useState("");
   const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
-  const [canvasPieces, setCanvasPieces] = useState(initialCanvas);
+  const [canvasPieces, setCanvasPieces] = useState(initialDemoCanvas);
   const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
-  const [activeOutfitId, setActiveOutfitId] = useState<string | null>(currentOutfitId);
-  const [activeLookName, setActiveLookName] = useState("Conjunto actual");
+  const [activeOutfitId, setActiveOutfitId] = useState<string | null>(null);
+  const [activeLookName, setActiveLookName] = useState("Demo FORME");
   const [styleCode, setStyleCode] = useState<StyleCode>("casual");
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
@@ -807,9 +805,6 @@ export default function Home() {
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
-  const demoModeRef = useRef(false);
-  const accountGarmentsRef = useRef<Garment[]>(starterGarments);
-  const accountLooksRef = useRef<SavedLook[]>([]);
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
   const filterOptions = useMemo<FilterOptions>(() => {
@@ -858,50 +853,67 @@ export default function Home() {
   useEffect(() => {
     if (!isStaticDemo) {
       let active = true;
-      const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
-      Promise.all([
-        batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
-        fetch("/api/outfits", { cache: "no-store" }),
-        fetch("/api/session", { cache: "no-store" }),
-      ])
-        .then(async ([wardrobeResponse, outfitsResponse, sessionResponse]) => {
-          if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
-          const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
-          const outfits = outfitsResponse.ok
-            ? await outfitsResponse.json() as { outfits: SavedLook[] }
-            : { outfits: [] };
-          const session = sessionResponse.ok
-            ? await sessionResponse.json() as { user: WardrobeProfile }
-            : null;
-          return { wardrobe, outfits, session };
-        })
-        .then(({ wardrobe, outfits, session }) => {
+      const loadAccount = async () => {
+        const sessionResponse = await fetch("/api/session", { cache: "no-store" });
+        if (sessionResponse.status === 401 || sessionResponse.status === 403) {
           if (!active) return;
-          const loadedGarments = mergeApiGarments(starterGarments, wardrobe.garments);
-          const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
-          const normalizedLooks = outfits.outfits.map((look) => ({
-            ...look,
-            items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
-          }));
-          accountGarmentsRef.current = loadedGarments;
-          accountLooksRef.current = normalizedLooks;
-          if (demoModeRef.current) return;
-          setGarments(loadedGarments);
-          void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
-          if (session?.user) setProfile(session.user);
-          setSavedLooks(normalizedLooks);
-          const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
-          if (savedLook?.items.length) {
-            setCanvasPieces(savedLook.items);
-            setActiveOutfitId(savedLook.id);
-            setActiveLookName(savedLook.name);
-            setSaved(true);
+          setDemoMode(true);
+          setSessionStatus("guest");
+          try {
+            const storedLooks = localStorage.getItem(demoLooksStorageKey);
+            setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
+          } catch {
+            setSavedLooks([]);
           }
           setWardrobeError("");
-        })
-        .catch((error: unknown) => {
-          if (active) setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
-        });
+          return;
+        }
+        if (!sessionResponse.ok) throw new Error("No se pudo revisar tu sesión.");
+        const session = await sessionResponse.json() as { user: WardrobeProfile };
+        const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
+        const [wardrobeResponse, outfitsResponse] = await Promise.all([
+          batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
+          fetch("/api/outfits", { cache: "no-store" }),
+        ]);
+        if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
+        const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
+        const outfits = outfitsResponse.ok
+          ? await outfitsResponse.json() as { outfits: SavedLook[] }
+          : { outfits: [] };
+        if (!active) return;
+        const baseGarments = session.user.isOwner ? starterGarments : formeBasics;
+        const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments);
+        const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
+        const normalizedLooks = outfits.outfits.map((look) => ({
+          ...look,
+          items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
+        }));
+        setDemoMode(false);
+        setSessionStatus("authenticated");
+        setGarments(loadedGarments);
+        setProfile(session.user);
+        setSavedLooks(normalizedLooks);
+        setWardrobePanel("pieces");
+        void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
+        const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
+        if (savedLook?.items.length) {
+          setCanvasPieces(savedLook.items);
+          setActiveOutfitId(savedLook.id);
+          setActiveLookName(savedLook.name);
+          setSaved(true);
+        } else {
+          setCanvasPieces(session.user.isOwner ? initialCanvas : initialDemoCanvas);
+          setActiveOutfitId(null);
+          setActiveLookName("Nuevo look");
+          setSaved(false);
+        }
+        setWardrobeError("");
+      };
+      void loadAccount().catch((error: unknown) => {
+        if (!active) return;
+        setSessionStatus("guest");
+        setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
+      });
       return () => { active = false; };
     }
     try {
@@ -932,42 +944,8 @@ export default function Home() {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
   }
 
-  function startDemo() {
-    demoModeRef.current = true;
-    setDemoMode(true);
-    setEntryOpen(false);
-    setGarments(formeBasics);
-    setCanvasPieces(initialDemoCanvas);
-    try {
-      const storedLooks = localStorage.getItem(demoLooksStorageKey);
-      setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
-    } catch {
-      setSavedLooks([]);
-    }
-    setSelectedId("");
-    setStudioLibraryFilter("all");
-    setActiveOutfitId(null);
-    setActiveLookName("Demo FORME");
-    setStylingRecommendations([]);
-    setWardrobeError("");
-    setView("studio");
-    setLibraryOpen(true);
-  }
-
-  function openMyCloset() {
-    demoModeRef.current = false;
-    setDemoMode(false);
-    setEntryOpen(false);
-    setGarments(accountGarmentsRef.current);
-    setSavedLooks(accountLooksRef.current);
-    setCanvasPieces(initialCanvas);
-    setSelectedId("");
-    setStudioLibraryFilter("all");
-    setActiveOutfitId(currentOutfitId);
-    setActiveLookName("Conjunto actual");
-    setWardrobePanel("pieces");
-    setView("wardrobe");
-    setLibraryOpen(false);
+  function beginGoogleSignIn() {
+    window.location.assign("/signin-with-chatgpt?return_to=%2F");
   }
 
   function openGarmentEditor(item: Garment) {
@@ -1627,37 +1605,6 @@ export default function Home() {
 
   return (
     <main className={`site-shell view-${view}`}>
-      {entryOpen && (
-        <section className="entry-gate" aria-label="Entrar a FORME">
-          <div className="entry-copy">
-            <p>FORME / ARMARIO VISUAL</p>
-            <h1>Vístete con lo que ya tienes.</h1>
-            <span>Prueba el canvas inmediatamente con una selección compartida de prendas, calzado y accesorios. No necesitas subir nada.</span>
-            <div className="entry-actions">
-              <button className="entry-primary" type="button" onClick={startDemo}>PROBAR FORME <b>→</b></button>
-              <button className="entry-secondary" type="button" onClick={openMyCloset}>ABRIR MI ARMARIO</button>
-            </div>
-            <small>DEMO LIBRE · 16 BÁSICOS FORME · GESTOS EN MOBILE</small>
-          </div>
-          <div className="entry-visual" aria-hidden="true">
-            <div className="entry-visual-heading">
-              <span>LOOKS / 001—003</span>
-              <small>MISMAS BASES · TRES DIRECCIONES</small>
-            </div>
-            <div className="entry-looks">
-              {entryLooks.map((look, index) => (
-                <article className="entry-look-card" key={look.id}>
-                  <LookPreview look={{ id: `entry-${look.id}`, name: look.name, items: look.items }} garmentById={entryGarmentById} />
-                  <div className="entry-look-meta">
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <strong>{look.title}</strong>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
       <header className="topbar">
         <button className="wordmark" onClick={() => openWardrobe(demoMode ? "basics" : "pieces")} aria-label="Ir al armario">FORME<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
@@ -1665,7 +1612,7 @@ export default function Home() {
           <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
         </nav>
         {demoMode
-          ? <button className="demo-mode-pill" onClick={() => setEntryOpen(true)}>MODO DEMO <span>×</span></button>
+          ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "REVISANDO SESIÓN" : "CONTINUAR CON GOOGLE"}</button>
           : <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
       </header>
 
@@ -1676,7 +1623,7 @@ export default function Home() {
               {demoMode
                 ? <span className="profile-avatar demo-avatar">F</span>
                 : <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>}
-              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI ARMARIO"}</p><h1>{demoMode ? "Básicos FORME" : profile.name}</h1><span>{demoMode ? "Listos para combinar" : profile.handle}</span></div>
+              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI ARMARIO"}</p><h1>{demoMode ? "Básicos FORME" : profile.name}</h1><span>{demoMode ? "Prueba ahora · inicia sesión para subir el tuyo" : profile.handle}</span></div>
             </div>
             <div className="profile-stats">
               <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
@@ -1688,7 +1635,7 @@ export default function Home() {
               <button className={wardrobePanel === "basics" || demoMode && wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("basics")}>Básicos FORME</button>
               <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
               {demoMode
-                ? <button onClick={openMyCloset}>Crear mi closet ↗</button>
+                ? <button onClick={beginGoogleSignIn}>＋ Añadir mis prendas</button>
                 : <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>}
             </nav>
           </section>

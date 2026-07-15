@@ -1220,7 +1220,14 @@ export async function handleWardrobeApi(
 
   try {
     if (url.pathname === "/api/session" && request.method === "GET") {
-      return json({ user: { id: identity.id, name: identity.displayName, handle: `@${identity.email.split("@")[0]}`, avatarUrl: identity.avatarUrl } });
+      const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
+      return json({ user: {
+        id: identity.id,
+        name: identity.displayName,
+        handle: `@${identity.email.split("@")[0]}`,
+        avatarUrl: identity.avatarUrl,
+        isOwner: Boolean(ownerEmail && identity.email === ownerEmail),
+      } });
     }
     if (url.pathname === "/api/wardrobe" && request.method === "GET") return getWardrobe(db, identity.id);
     if (url.pathname === "/api/upload" && request.method === "POST") return uploadGarment(request, env, ctx, db, identity);

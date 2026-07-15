@@ -21,10 +21,11 @@ test("server-renders the FORME wardrobe", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>FORME — Tu armario visual<\/title>/i);
-  assert.match(html, /MI ARMARIO/);
+  assert.match(html, /CLOSET DE PRUEBA/);
   assert.match(html, /Mis prendas/);
   assert.match(html, /Looks guardados/);
-  assert.match(html, /Añadir prenda/);
+  assert.match(html, /Añadir mis prendas/);
+  assert.match(html, /CONTINUAR CON GOOGLE|REVISANDO SESIÓN/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 
@@ -36,9 +37,12 @@ test("keeps saved looks and styling recommendations connected to the product", a
   ]);
 
   assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "upload"/);
-  assert.match(page, /PROBAR FORME/);
-  assert.match(page, /LOOKS \/ 001—003/);
-  assert.match(page, /entryLooks\.map/);
+  assert.match(page, /useState\(true\)/);
+  assert.match(page, /useState\(formeBasics\)/);
+  assert.match(page, /function beginGoogleSignIn/);
+  assert.match(page, /\/signin-with-chatgpt\?return_to=%2F/);
+  assert.match(page, /CONTINUAR CON GOOGLE/);
+  assert.doesNotMatch(page, /entry-gate/);
   assert.match(page, /Básicos FORME/);
   assert.match(page, /function buildDemoRecommendations/);
   assert.match(page, /footwear-white-sneakers/);
@@ -64,6 +68,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /Math\.random/);
   assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
   assert.match(worker, /async function deleteOutfit/);
+  assert.match(worker, /isOwner: Boolean\(ownerEmail && identity\.email === ownerEmail\)/);
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
