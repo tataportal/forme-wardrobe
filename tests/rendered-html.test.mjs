@@ -37,6 +37,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
 
   assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "upload"/);
   assert.match(page, /PROBAR FORME/);
+  assert.match(page, /LOOKS \/ 001—003/);
+  assert.match(page, /entryLooks\.map/);
   assert.match(page, /Básicos FORME/);
   assert.match(page, /function buildDemoRecommendations/);
   assert.match(page, /footwear-white-sneakers/);

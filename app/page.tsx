@@ -743,6 +743,9 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   }));
 }
 
+const entryLooks = buildDemoRecommendations("casual", "day", "daily");
+const entryGarmentById = new Map(formeBasics.map((item) => [item.id, item]));
+
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   return (
     <div className="saved-look-preview" aria-hidden="true">
@@ -1637,11 +1640,21 @@ export default function Home() {
             <small>DEMO LIBRE · 16 BÁSICOS FORME · GESTOS EN MOBILE</small>
           </div>
           <div className="entry-visual" aria-hidden="true">
-            <span className="entry-index">LOOK / 001</span>
-            <img className="entry-jeans" src={imageSrc("/wardrobe/clean/blue-straight-jeans.webp")} alt="" />
-            <img className="entry-tee" src={imageSrc("/wardrobe/clean/basic-white-tee.webp")} alt="" />
-            <img className="entry-shoes" src={imageSrc("/wardrobe/basics/white-sneakers.webp")} alt="" />
-            <img className="entry-glasses" src={imageSrc("/wardrobe/basics/black-sunglasses.webp")} alt="" />
+            <div className="entry-visual-heading">
+              <span>LOOKS / 001—003</span>
+              <small>MISMAS BASES · TRES DIRECCIONES</small>
+            </div>
+            <div className="entry-looks">
+              {entryLooks.map((look, index) => (
+                <article className="entry-look-card" key={look.id}>
+                  <LookPreview look={{ id: `entry-${look.id}`, name: look.name, items: look.items }} garmentById={entryGarmentById} />
+                  <div className="entry-look-meta">
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{look.title}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       )}
