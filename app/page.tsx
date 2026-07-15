@@ -498,6 +498,34 @@ const defaultPlacement = (garment: Garment) => {
   return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
 };
 
+const roundedScale = (scale: number) => Math.round(scale * 1000) / 1000;
+
+function recommendationOuterPlacement(garment: Garment) {
+  const placement = defaultPlacement(garment);
+  const searchable = searchableGarment(garment);
+
+  if (/funnel-neck cape|cape coat|poncho/.test(searchable)) {
+    return { ...placement, y: placement.y - 1, scale: roundedScale(placement.scale * 1.18) };
+  }
+  if (/puffer/.test(searchable)) {
+    return { ...placement, y: placement.y - 1, scale: roundedScale(placement.scale * 1.12) };
+  }
+  return placement;
+}
+
+function recommendationTopPlacement(top: Garment, outer: Garment) {
+  const placement = defaultPlacement(top);
+  const outerText = searchableGarment(outer);
+
+  if (/funnel-neck cape|cape coat|poncho/.test(outerText)) {
+    return { ...placement, y: placement.y + 0.75, scale: roundedScale(placement.scale * 0.88) };
+  }
+  if (/puffer/.test(outerText)) {
+    return { ...placement, y: placement.y + 0.5, scale: roundedScale(placement.scale * 0.92) };
+  }
+  return placement;
+}
+
 function normalizedCanvasPiece(piece: CanvasPiece, garment?: Garment): CanvasPiece {
   if (garment?.category !== "Bottoms" || piece.scale < 0.66) return piece;
   return { ...piece, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
@@ -646,8 +674,8 @@ function buildStylingRecommendations(garments: Garment[], code: StyleCode, momen
     usedOuter.add(choice.outer.id);
     usedCombinations.add(`${choice.bottom.id}:${choice.top.id}:${choice.outer.id}`);
     const bottomPlacement = defaultPlacement(choice.bottom);
-    const topPlacement = defaultPlacement(choice.top);
-    const outerPlacement = defaultPlacement(choice.outer);
+    const topPlacement = recommendationTopPlacement(choice.top, choice.outer);
+    const outerPlacement = recommendationOuterPlacement(choice.outer);
     const items: CanvasPiece[] = [
       { instanceId: `${strategy}-bottom`, garmentId: choice.bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(choice.bottom.category) + 1 },
       { instanceId: `${strategy}-top`, garmentId: choice.top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(choice.top.category) + 1 },

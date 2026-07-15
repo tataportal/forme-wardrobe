@@ -53,6 +53,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Contraste/);
   assert.match(page, /Statement/);
   assert.match(page, /function buildStylingRecommendations/);
+  assert.match(page, /function recommendationOuterPlacement/);
+  assert.match(page, /function recommendationTopPlacement/);
+  assert.match(page, /funnel-neck cape\|cape coat\|poncho/);
+  assert.match(page, /\/puffer\//);
   assert.match(page, /function recommendStyle\(\)/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
   assert.doesNotMatch(page, /Math\.random/);
