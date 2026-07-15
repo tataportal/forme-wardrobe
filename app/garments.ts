@@ -11,7 +11,8 @@ export type Garment = GarmentAttributes & {
   name: string;
   brand?: string;
   tags?: string[];
-  category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring";
+  category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories";
+  collection?: "personal" | "forme";
   color: string;
   image: string;
   openImage?: string;
@@ -58,6 +59,8 @@ function colorAttributes(color: string, name: string): Pick<GarmentAttributes, "
 }
 
 function materialFor(name: string): string {
+  if (/Sunglasses/i.test(name)) return "Acetate";
+  if (/Sneakers|Shoes|Pumps|Tote/i.test(name)) return "Leather";
   if (/Transparent Rain/i.test(name)) return "Transparent shell";
   if (/Shearling/i.test(name)) return "Shearling";
   if (/Leather/i.test(name)) return "Leather";
@@ -160,7 +163,21 @@ const basics: BasicEntry[] = [
   { id: "top-oversized-black-tee", name: "Oversized Black Tee", category: "Tops", color: "Black", image: "/wardrobe/cutouts/oversized-black-tee.webp", status: "ghosted" },
   { id: "top-blue-long-sleeve-shirt", name: "Blue Long-Sleeve Shirt", category: "Tops", color: "Light Blue", image: "/wardrobe/cutouts/blue-long-sleeve-shirt.webp", status: "ghosted" },
   { id: "top-black-short-sleeve-shirt", name: "Black Short-Sleeve Shirt", category: "Tops", color: "Black", image: "/wardrobe/cutouts/black-short-sleeve-shirt.webp", status: "ghosted" },
+  { id: "footwear-white-sneakers", name: "White Leather Sneakers", category: "Footwear", color: "White", image: "/wardrobe/basics/white-sneakers.webp", status: "ghosted" },
+  { id: "footwear-black-leather-shoes", name: "Black Leather Shoes", category: "Footwear", color: "Black", image: "/wardrobe/basics/black-leather-shoes.webp", status: "ghosted" },
+  { id: "footwear-brown-leather-shoes", name: "Brown Leather Shoes", category: "Footwear", color: "Brown", image: "/wardrobe/basics/brown-leather-shoes.webp", status: "ghosted" },
+  { id: "footwear-black-pumps", name: "Black Pumps", category: "Footwear", color: "Black", image: "/wardrobe/basics/black-pumps.webp", status: "ghosted" },
+  { id: "accessory-black-cap", name: "Black Cap", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-cap.webp", status: "ghosted" },
+  { id: "accessory-black-beanie", name: "Black Beanie", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-beanie.webp", status: "ghosted" },
+  { id: "accessory-black-sunglasses", name: "Black Rectangular Sunglasses", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-sunglasses.webp", status: "ghosted" },
+  { id: "accessory-black-tote", name: "Black Tote", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-tote.webp", status: "ghosted" },
 ];
+
+export const formeBasics: Garment[] = basics.map((item) => ({
+  ...item,
+  ...classifyGarment(item),
+  collection: "forme" as const,
+}));
 
 export const starterGarments: Garment[] = [
   ...archive.map(({ file, openFile, ...item }, index) => ({
@@ -170,6 +187,7 @@ export const starterGarments: Garment[] = [
     image: `/wardrobe/cutouts/${file}`,
     openImage: openFile ? `/wardrobe/cutouts/${openFile}` : undefined,
     status: "ghosted" as const,
+    collection: "personal" as const,
   })),
-  ...basics.map((item) => ({ ...item, ...classifyGarment(item) })),
+  ...formeBasics,
 ];

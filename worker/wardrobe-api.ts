@@ -91,7 +91,7 @@ type GarmentOutputVariant = "closed" | "open";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
-const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring"]);
+const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 
 const garmentColumns = `

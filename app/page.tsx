@@ -10,10 +10,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { classifyGarment, Garment, starterGarments } from "./garments";
+import { classifyGarment, formeBasics, Garment, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
-type WardrobePanel = "pieces" | "looks" | "upload";
+type WardrobePanel = "pieces" | "basics" | "looks" | "upload";
+type StudioLibraryFilter = "all" | "personal" | "forme" | "footwear" | "accessories";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
@@ -130,10 +131,11 @@ const emptyFilters: WardrobeFilters = {
 };
 
 const garmentEditsStorageKey = "forme-garment-edits-v1";
+const demoLooksStorageKey = "forme-demo-looks-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 const operationalSiteUrl = "https://forme.frensonly.club/";
 const currentOutfitId = "current-look";
-const maxBatchFiles = 12;
+const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
 const maxUploadBytes = 20 * 1024 * 1024;
 const uploadStatusLabels: Record<UploadStatus, string> = {
@@ -165,6 +167,8 @@ const valueTranslations: Record<string, string> = {
   Tops: "Prendas superiores",
   Bottoms: "Pantalones",
   Tailoring: "Sastrería",
+  Footwear: "Calzado",
+  Accessories: "Accesorios",
   Black: "Negro",
   Blue: "Azul",
   Brown: "Marrón",
@@ -195,6 +199,7 @@ const valueTranslations: Record<string, string> = {
   Fleece: "Polar",
   Knit: "Punto",
   Leather: "Cuero",
+  Acetate: "Acetato",
   Shearling: "Borrego",
   "Technical nylon": "Nylon técnico",
   "Transparent shell": "Material transparente",
@@ -271,6 +276,14 @@ const garmentNameTranslations: Record<string, string> = {
   "Oversized Black Tee": "Camiseta negra oversize",
   "Blue Long-Sleeve Shirt": "Camisa azul de manga larga",
   "Black Short-Sleeve Shirt": "Camisa negra de manga corta",
+  "White Leather Sneakers": "Zapatillas blancas",
+  "Black Leather Shoes": "Zapatos negros de cuero",
+  "Brown Leather Shoes": "Zapatos marrones de cuero",
+  "Black Pumps": "Tacones negros",
+  "Black Cap": "Gorra negra",
+  "Black Beanie": "Beanie negro",
+  "Black Rectangular Sunglasses": "Lentes negros rectangulares",
+  "Black Tote": "Tote negro",
 };
 
 const translateValue = (value: string) => valueTranslations[value] ?? value;
@@ -446,8 +459,20 @@ function mergeApiGarments(current: Garment[], updates: ApiGarment[]): Garment[] 
   ];
   return [...new Set(orderedIds)].map((id) => byId.get(id)).filter((item): item is Garment => Boolean(item));
 }
-const layerBase = (category: Garment["category"]) => category === "Bottoms" ? 1000 : category === "Tops" ? 2000 : 3000;
+const layerBase = (category: Garment["category"]) => {
+  if (category === "Bottoms") return 1000;
+  if (category === "Tops") return 2000;
+  if (category === "Outerwear" || category === "Tailoring") return 3000;
+  if (category === "Footwear") return 4000;
+  return 5000;
+};
 const defaultPlacement = (garment: Garment) => {
+  if (garment.category === "Footwear") return { x: 50, y: 87, scale: 0.34 };
+  if (garment.category === "Accessories") {
+    if (garment.id.includes("sunglasses")) return { x: 50, y: 17.5, scale: 0.14 };
+    if (garment.id.includes("tote")) return { x: 74, y: 58, scale: 0.28 };
+    return { x: 50, y: 10.5, scale: 0.22 };
+  }
   if (garment.category === "Bottoms") {
     const scale = garment.silhouette === "Oversized" ? 0.55 : garment.silhouette === "Relaxed" ? 0.57 : 0.59;
     return { x: 50, y: 66.5, scale };
@@ -482,6 +507,14 @@ const initialCanvas: CanvasPiece[] = [
   { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
   { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
+];
+
+const initialDemoCanvas: CanvasPiece[] = [
+  { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.59, rotation: 0, z: 1001 },
+  { instanceId: "demo-top", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
+  { instanceId: "demo-shoes", garmentId: "footwear-white-sneakers", variant: "closed", x: 50, y: 87, scale: 0.34, rotation: 0, z: 4001 },
+  { instanceId: "demo-glasses", garmentId: "accessory-black-sunglasses", variant: "closed", x: 50, y: 17.5, scale: 0.14, rotation: 0, z: 5001 },
+  { instanceId: "demo-tote", garmentId: "accessory-black-tote", variant: "closed", x: 74, y: 58, scale: 0.28, rotation: 0, z: 5002 },
 ];
 
 const stylingNeutralFamilies = new Set(["Black", "White", "Grey", "Brown", "Blue"]);
@@ -630,6 +663,58 @@ function buildStylingRecommendations(garments: Garment[], code: StyleCode, momen
   });
 }
 
+function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion: StyleOccasion): StylingRecommendation[] {
+  const byId = new Map(formeBasics.map((item) => [item.id, item]));
+  const dressy = code === "formal" || code === "smart" || occasion === "work" || occasion === "dinner";
+  const recipes = [
+    {
+      id: "balanced" as const,
+      title: "Seguro",
+      name: `${styleOccasionLabels[occasion]} · ${styleCodeLabels[code]} · Base limpia`,
+      reason: dressy
+        ? "La camisa azul y el pantalón negro crean una base ordenada; los zapatos marrones suavizan el contraste sin volverla rígida."
+        : "La camiseta blanca, el denim recto y las zapatillas blancas mantienen una proporción simple y fácil de repetir.",
+      ids: dressy
+        ? ["top-blue-long-sleeve-shirt", "bottom-black-trouser", "footwear-brown-leather-shoes", "accessory-black-tote"]
+        : ["top-basic-white-tee", "bottom-blue-jeans", "footwear-white-sneakers", "accessory-black-cap"],
+    },
+    {
+      id: "contrast" as const,
+      title: "Contraste",
+      name: `${styleMomentLabels[moment]} · Contraste controlado`,
+      reason: "El top negro contiene la parte superior, mientras el denim azul y el calzado oscuro separan los volúmenes con claridad.",
+      ids: ["top-black-short-sleeve-shirt", "bottom-blue-jeans", "footwear-black-leather-shoes", "accessory-black-sunglasses"],
+    },
+    {
+      id: "statement" as const,
+      title: "Statement",
+      name: `${styleCodeLabels[code]} · Monocromo`,
+      reason: "La silueta negra conecta top, pantalón y accesorios. El tacón estiliza la base y el tote mantiene el look funcional.",
+      ids: ["top-oversized-black-tee", "bottom-black-trouser", "footwear-black-pumps", "accessory-black-tote", "accessory-black-sunglasses"],
+    },
+  ];
+
+  return recipes.map((recipe) => ({
+    id: recipe.id,
+    title: recipe.title,
+    name: recipe.name,
+    reason: recipe.reason,
+    items: recipe.ids.flatMap((id, index) => {
+      const garment = byId.get(id);
+      if (!garment) return [];
+      const placement = defaultPlacement(garment);
+      return [{
+        instanceId: `demo-${recipe.id}-${id}`,
+        garmentId: id,
+        variant: "closed" as const,
+        ...placement,
+        rotation: 0,
+        z: layerBase(garment.category) + index + 1,
+      }];
+    }),
+  }));
+}
+
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   return (
     <div className="saved-look-preview" aria-hidden="true">
@@ -655,8 +740,11 @@ function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<
 }
 
 export default function Home() {
+  const [entryOpen, setEntryOpen] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const [view, setView] = useState<View>("wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("pieces");
+  const [studioLibraryFilter, setStudioLibraryFilter] = useState<StudioLibraryFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [garments, setGarments] = useState(starterGarments);
   const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
@@ -688,6 +776,9 @@ export default function Home() {
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
+  const demoModeRef = useRef(false);
+  const accountGarmentsRef = useRef<Garment[]>(starterGarments);
+  const accountLooksRef = useRef<SavedLook[]>([]);
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
   const filterOptions = useMemo<FilterOptions>(() => {
@@ -706,10 +797,19 @@ export default function Home() {
       tonesByColor,
     };
   }, [garments]);
-  const visible = garments.filter((item) => matchFilters(item, archiveFilters));
+  const personalGarments = garments.filter((item) => item.collection !== "forme");
+  const sharedBasics = garments.filter((item) => item.collection === "forme");
+  const catalogGarments = wardrobePanel === "basics" || demoMode ? sharedBasics : personalGarments;
+  const visible = catalogGarments.filter((item) => matchFilters(item, archiveFilters));
+  const studioGarments = garments.filter((item) => {
+    if (studioLibraryFilter === "personal") return item.collection !== "forme";
+    if (studioLibraryFilter === "forme") return item.collection === "forme";
+    if (studioLibraryFilter === "footwear") return item.category === "Footwear";
+    if (studioLibraryFilter === "accessories") return item.category === "Accessories";
+    return true;
+  });
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
-  const favoriteCount = garments.filter((item) => item.favorite).length;
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
   const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed").length;
@@ -752,6 +852,9 @@ export default function Home() {
             ...look,
             items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
           }));
+          accountGarmentsRef.current = loadedGarments;
+          accountLooksRef.current = normalizedLooks;
+          if (demoModeRef.current) return;
           setGarments(loadedGarments);
           void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
           if (session?.user) setProfile(session.user);
@@ -796,6 +899,44 @@ export default function Home() {
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  }
+
+  function startDemo() {
+    demoModeRef.current = true;
+    setDemoMode(true);
+    setEntryOpen(false);
+    setGarments(formeBasics);
+    setCanvasPieces(initialDemoCanvas);
+    try {
+      const storedLooks = localStorage.getItem(demoLooksStorageKey);
+      setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
+    } catch {
+      setSavedLooks([]);
+    }
+    setSelectedId("");
+    setStudioLibraryFilter("all");
+    setActiveOutfitId(null);
+    setActiveLookName("Demo FORME");
+    setStylingRecommendations([]);
+    setWardrobeError("");
+    setView("studio");
+    setLibraryOpen(true);
+  }
+
+  function openMyCloset() {
+    demoModeRef.current = false;
+    setDemoMode(false);
+    setEntryOpen(false);
+    setGarments(accountGarmentsRef.current);
+    setSavedLooks(accountLooksRef.current);
+    setCanvasPieces(initialCanvas);
+    setSelectedId("");
+    setStudioLibraryFilter("all");
+    setActiveOutfitId(currentOutfitId);
+    setActiveLookName("Conjunto actual");
+    setWardrobePanel("pieces");
+    setView("wardrobe");
+    setLibraryOpen(false);
   }
 
   function openGarmentEditor(item: Garment) {
@@ -1329,7 +1470,9 @@ export default function Home() {
   }
 
   function recommendStyle() {
-    const next = buildStylingRecommendations(garments, styleCode, styleMoment, styleOccasion);
+    const next = demoMode
+      ? buildDemoRecommendations(styleCode, styleMoment, styleOccasion)
+      : buildStylingRecommendations(garments, styleCode, styleMoment, styleOccasion);
     if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
@@ -1362,11 +1505,15 @@ export default function Home() {
   async function deleteSavedLook(lookId: string) {
     setWardrobeError("");
     try {
-      if (!isStaticDemo) {
+      if (!isStaticDemo && !demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(lookId)}`, { method: "DELETE" });
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar el look.");
       }
-      setSavedLooks((looks) => looks.filter((look) => look.id !== lookId));
+      setSavedLooks((looks) => {
+        const nextLooks = looks.filter((look) => look.id !== lookId);
+        if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
+        return nextLooks;
+      });
       if (activeOutfitId === lookId) {
         setActiveOutfitId(null);
         setActiveLookName("Nuevo look");
@@ -1385,7 +1532,7 @@ export default function Home() {
     setSavingOutfit(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo) {
+      if (!isStaticDemo && !demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -1394,7 +1541,11 @@ export default function Home() {
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
       }
       const nextLook: SavedLook = { id: outfitId, name: lookName, items: canvasPieces.map((item) => ({ ...item })) };
-      setSavedLooks((looks) => [nextLook, ...looks.filter((look) => look.id !== outfitId)]);
+      setSavedLooks((looks) => {
+        const nextLooks = [nextLook, ...looks.filter((look) => look.id !== outfitId)];
+        if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
+        return nextLooks;
+      });
       setActiveOutfitId(outfitId);
       setActiveLookName(lookName);
       setSaved(true);
@@ -1445,40 +1596,68 @@ export default function Home() {
 
   return (
     <main className={`site-shell view-${view}`}>
+      {entryOpen && (
+        <section className="entry-gate" aria-label="Entrar a FORME">
+          <div className="entry-copy">
+            <p>FORME / ARMARIO VISUAL</p>
+            <h1>Vístete con lo que ya tienes.</h1>
+            <span>Prueba el canvas inmediatamente con una selección compartida de prendas, calzado y accesorios. No necesitas subir nada.</span>
+            <div className="entry-actions">
+              <button className="entry-primary" type="button" onClick={startDemo}>PROBAR FORME <b>→</b></button>
+              <button className="entry-secondary" type="button" onClick={openMyCloset}>ABRIR MI ARMARIO</button>
+            </div>
+            <small>DEMO LIBRE · 16 BÁSICOS FORME · GESTOS EN MOBILE</small>
+          </div>
+          <div className="entry-visual" aria-hidden="true">
+            <span className="entry-index">LOOK / 001</span>
+            <img className="entry-jeans" src={imageSrc("/wardrobe/clean/blue-straight-jeans.webp")} alt="" />
+            <img className="entry-tee" src={imageSrc("/wardrobe/clean/basic-white-tee.webp")} alt="" />
+            <img className="entry-shoes" src={imageSrc("/wardrobe/basics/white-sneakers.webp")} alt="" />
+            <img className="entry-glasses" src={imageSrc("/wardrobe/basics/black-sunglasses.webp")} alt="" />
+          </div>
+        </section>
+      )}
       <header className="topbar">
-        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Ir al armario">FORME<span>®</span></button>
+        <button className="wordmark" onClick={() => openWardrobe(demoMode ? "basics" : "pieces")} aria-label="Ir al armario">FORME<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
-          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
+          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe(demoMode ? "basics" : "pieces")}>Armario</button>
           <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
         </nav>
-        <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
+        {demoMode
+          ? <button className="demo-mode-pill" onClick={() => setEntryOpen(true)}>MODO DEMO <span>×</span></button>
+          : <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
       </header>
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
           <section className="wardrobe-profile">
             <div className="profile-identity">
-              <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
-              <div><p>MI ARMARIO</p><h1>{profile.name}</h1><span>{profile.handle}</span></div>
+              {demoMode
+                ? <span className="profile-avatar demo-avatar">F</span>
+                : <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>}
+              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI ARMARIO"}</p><h1>{demoMode ? "Básicos FORME" : profile.name}</h1><span>{demoMode ? "Listos para combinar" : profile.handle}</span></div>
             </div>
             <div className="profile-stats">
-              <p><strong>{garments.length}</strong><span>Prendas</span></p>
-              <p><strong>{favoriteCount}</strong><span>Favoritas</span></p>
+              <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
+              <p><strong>{sharedBasics.length}</strong><span>Básicos</span></p>
               <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
             </div>
             <nav className="wardrobe-tabs" aria-label="Mi armario">
-              <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>
+              {!demoMode && <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>}
+              <button className={wardrobePanel === "basics" || demoMode && wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("basics")}>Básicos FORME</button>
               <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
-              <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>
+              {demoMode
+                ? <button onClick={openMyCloset}>Crear mi closet ↗</button>
+                : <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>}
             </nav>
           </section>
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
-          {wardrobePanel === "pieces" ? (
+          {wardrobePanel === "pieces" || wardrobePanel === "basics" ? (
             <section className="pieces-section">
               <div className="catalog-toolbar">
-                <div><p>COLECCIÓN</p><h2>Mis prendas</h2></div>
-                <div><span>{visible.length} de {garments.length}</span><button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button></div>
+                <div><p>{wardrobePanel === "basics" || demoMode ? "BIBLIOTECA COMPARTIDA" : "COLECCIÓN"}</p><h2>{wardrobePanel === "basics" || demoMode ? "Básicos FORME" : "Mis prendas"}</h2></div>
+                <div><span>{visible.length} de {catalogGarments.length}</span><button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button></div>
               </div>
               <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
                 <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
@@ -1493,11 +1672,11 @@ export default function Home() {
                           <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
                           {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">{item.status.startsWith("batch") ? "LOTE LOW EN PROCESO" : item.status === "cutout_pending" ? "TERMINANDO BORDE" : "PREPARANDO RECORTE"}</span>}
                           {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
-                          <button className="card-detail-open" onClick={() => openGarmentEditor(item)} aria-label={`Abrir ficha de ${translateGarmentName(item.name)}`}><span>VER FICHA ↗</span></button>
-                          <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => toggleFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
+                          <button className="card-detail-open" onClick={() => item.collection === "forme" ? addAndOpenStudio(item.id) : openGarmentEditor(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Abrir ficha de"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "VER FICHA ↗"}</span></button>
+                          {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => toggleFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
                           <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>AÑADIR AL CANVAS <span>＋</span></button>
                         </div>
-                        <button className="card-meta" onClick={() => openGarmentEditor(item)} aria-label={`Editar ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
+                        <button className="card-meta" onClick={() => item.collection === "forme" ? addAndOpenStudio(item.id) : openGarmentEditor(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORME · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
                       </article>
                     ))}
                     {visible.length === 0 && <div className="filter-empty">NO HAY PRENDAS<button onClick={() => setArchiveFilters(emptyFilters)}>LIMPIAR FILTROS</button></div>}
@@ -1511,7 +1690,7 @@ export default function Home() {
                 <div className="style-wheel-copy">
                   <p>ASISTENTE DE STYLING</p>
                   <h2>¿Para qué te estás vistiendo?</h2>
-                  <span>FORME analiza contexto, dress code, color, materiales y proporción. Después propone tres caminos usando únicamente tu armario.</span>
+                  <span>{demoMode ? "Explora tres combinaciones coherentes usando la biblioteca compartida. Después puedes reemplazar cada básico por una prenda tuya." : "FORME analiza contexto, dress code, color, materiales y proporción. Después propone tres caminos usando únicamente tu armario."}</span>
                 </div>
                 <div className="style-wheel-controls">
                   <fieldset className="option-four">
@@ -1562,7 +1741,7 @@ export default function Home() {
                       <span>ABRIR EN CANVAS ↗</span>
                     </button>
                     <div className="saved-look-meta">
-                      <div><strong>{look.name}</strong><small>{look.items.length} PRENDAS</small></div>
+                      <div><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></div>
                       <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
                     </div>
                   </article>
@@ -1596,7 +1775,7 @@ export default function Home() {
                         <img className="upload-item-thumb" src={item.preview} alt="" />
                         <div className="upload-item-fields">
                           <label>NOMBRE<input disabled={!editable} value={item.name} onChange={(event) => updateUploadItem(item.id, { name: event.target.value })} placeholder={`Prenda ${index + 1}`} /></label>
-                          <label>TIPO<select disabled={!editable} value={item.category} onChange={(event) => updateUploadItem(item.id, { category: event.target.value as Garment["category"] })}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option></select></label>
+                          <label>TIPO<select disabled={!editable} value={item.category} onChange={(event) => updateUploadItem(item.id, { category: event.target.value as Garment["category"] })}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option><option value="Footwear">Calzado</option><option value="Accessories">Accesorios</option></select></label>
                           <span className="upload-item-state">{uploadStatusLabels[item.status]}{item.error ? ` · ${item.error}` : ""}</span>
                         </div>
                         {editable && <button className="remove-upload-item" type="button" onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name || `prenda ${index + 1}`}`}>×</button>}
@@ -1616,7 +1795,7 @@ export default function Home() {
 
       {view === "studio" && (
         <section className="content studio-view">
-          <div className="section-line"><h2>CANVAS</h2><p>{canvasPieces.length} PRENDAS</p></div>
+          <div className="section-line"><h2>CANVAS</h2><p>{canvasPieces.length} PIEZAS</p></div>
           <div className="studio-layout">
             <div className="canvas-column">
               <div className="look-canvas" ref={canvasRef}>
@@ -1655,11 +1834,20 @@ export default function Home() {
             </button>
 
             <div className={`look-controls ${libraryOpen ? "panel-open" : "panel-closed"}`}>
-              <div className="floating-panel-header"><span>ARMARIO / {String(garments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
+              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORME" : "ARMARIO"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
+              <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
+                {([
+                  ["all", "Todo"],
+                  ...(demoMode ? [] : [["personal", "Mío"]]),
+                  ["forme", "FORME"],
+                  ["footwear", "Calzado"],
+                  ["accessories", "Accesorios"],
+                ] as [StudioLibraryFilter, string][]).map(([value, label]) => <button type="button" className={studioLibraryFilter === value ? "active" : ""} onClick={() => setStudioLibraryFilter(value)} key={value}>{label}</button>)}
+              </div>
               <div className="selected-readout">
-                <p>PRENDA SELECCIONADA</p>
+                <p>PIEZA SELECCIONADA</p>
                 <h3>{selectedGarment ? translateGarmentName(selectedGarment.name) : "Toca una prenda"}</h3>
-                <small>{selectedGarment ? translateValue(selectedGarment.category) : "Selecciona una prenda del canvas"}</small>
+                <small>{selectedGarment ? translateValue(selectedGarment.category) : "Selecciona una pieza del canvas"}</small>
                 {selectedPiece && <button onClick={() => sendSelected("back")}>ENVIAR ATRÁS ↓</button>}
               </div>
               <div className="canvas-tools" aria-label="Controles de la prenda seleccionada">
@@ -1671,9 +1859,9 @@ export default function Home() {
                 <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
               </div>
 
-              <div className="tray-heading"><h3>PRENDAS</h3><p>TOCA PARA AÑADIR</p></div>
+              <div className="tray-heading"><h3>PIEZAS</h3><p>TOCA PARA AÑADIR</p></div>
               <div className="sticker-tray">
-                {garments.map((item) => (
+                {studioGarments.map((item) => (
                   <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
                     <img src={imageSrc(item.image)} alt="" loading="lazy" />
                     <span>{translateGarmentName(item.name)}</span>
@@ -1759,7 +1947,7 @@ export default function Home() {
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}><span>▦</span>Armario</button>
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe(demoMode ? "basics" : "pieces")}><span>▦</span>Armario</button>
         <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}><span>◫</span>Canvas</button>
       </nav>
     </main>

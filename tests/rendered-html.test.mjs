@@ -35,7 +35,12 @@ test("keeps saved looks and styling recommendations connected to the product", a
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /type WardrobePanel = "pieces" \| "looks" \| "upload"/);
+  assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "upload"/);
+  assert.match(page, /PROBAR FORME/);
+  assert.match(page, /Básicos FORME/);
+  assert.match(page, /function buildDemoRecommendations/);
+  assert.match(page, /footwear-white-sneakers/);
+  assert.match(page, /accessory-black-sunglasses/);
   assert.match(page, /ASISTENTE DE STYLING/);
   assert.match(page, /Casual/);
   assert.match(page, /Smart/);
