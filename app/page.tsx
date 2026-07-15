@@ -79,8 +79,13 @@ type ApiGarment = Omit<GarmentDraft, "id"> & {
   deleted?: boolean;
   status: Garment["status"];
   image?: string;
+  generatedImage?: string;
+  generatedOpenImage?: string;
   originalImage?: string;
   openImage?: string;
+  quality?: "low" | "medium";
+  qaStatus?: "pending" | "passed" | "review";
+  qaNotes?: string;
 };
 type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null };
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
@@ -126,9 +131,10 @@ const emptyFilters: WardrobeFilters = {
 
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
-const operationalSiteUrl = "https://forme-wardrobe.tataportal.chatgpt.site/";
+const operationalSiteUrl = "https://forme.frensonly.club/";
 const currentOutfitId = "current-look";
 const maxBatchFiles = 12;
+const discountedBatchThreshold = 5;
 const maxUploadBytes = 20 * 1024 * 1024;
 const uploadStatusLabels: Record<UploadStatus, string> = {
   ready: "LISTA",
@@ -306,6 +312,104 @@ const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
   : path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
+
+async function processingFileFor(file: File): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const maxEdge = 2048;
+    const ratio = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * ratio));
+    const height = Math.max(1, Math.round(bitmap.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Canvas no disponible");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) throw new Error("No se pudo optimizar la foto");
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}-processing.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
+async function whiteStudioCutout(sourceUrl: string): Promise<{ file: File; qaStatus: "passed" | "review"; qaNotes: string }> {
+  const response = await fetch(sourceUrl, { cache: "no-store" });
+  if (!response.ok) throw new Error("No se pudo abrir la imagen generada.");
+  const bitmap = await createImageBitmap(await response.blob());
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("No se pudo preparar el recorte.");
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = image;
+  const width = canvas.width;
+  const height = canvas.height;
+  const total = width * height;
+  const visited = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0;
+  let tail = 0;
+  const isStudioWhite = (index: number) => {
+    const offset = index * 4;
+    const r = data[offset];
+    const g = data[offset + 1];
+    const b = data[offset + 2];
+    return Math.min(r, g, b) >= 244 && Math.max(r, g, b) - Math.min(r, g, b) <= 18;
+  };
+  const seed = (index: number) => {
+    if (!visited[index] && isStudioWhite(index)) {
+      visited[index] = 1;
+      queue[tail++] = index;
+    }
+  };
+  for (let x = 0; x < width; x += 1) { seed(x); seed((height - 1) * width + x); }
+  for (let y = 1; y < height - 1; y += 1) { seed(y * width); seed(y * width + width - 1); }
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % width;
+    const y = Math.floor(index / width);
+    if (x > 0) seed(index - 1);
+    if (x + 1 < width) seed(index + 1);
+    if (y > 0) seed(index - width);
+    if (y + 1 < height) seed(index + width);
+  }
+  for (let index = 0; index < total; index += 1) if (visited[index]) data[index * 4 + 3] = 0;
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let foreground = 0;
+  for (let index = 0; index < total; index += 1) {
+    if (data[index * 4 + 3] < 24) continue;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    foreground += 1;
+  }
+  context.putImageData(image, 0, 0);
+  const coverage = foreground / total;
+  const marginX = Math.min(minX, width - 1 - maxX) / width;
+  const marginY = Math.min(minY, height - 1 - maxY) / height;
+  const needsReview = foreground === 0 || coverage < 0.055 || coverage > 0.82 || marginX < 0.012 || marginY < 0.012;
+  const qaNotes = needsReview
+    ? "La silueta quedó demasiado cerca del borde o con una proporción inusual."
+    : "Silueta completa, márgenes correctos y fondo exterior transparente.";
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("No se pudo guardar el recorte.");
+  return { file: new File([blob], "cutout.png", { type: "image/png" }), qaStatus: needsReview ? "review" : "passed", qaNotes };
+}
 const apiPayload = (garment: Garment | GarmentDraft) => ({
   name: garment.name.trim() || "Prenda sin nombre",
   brand: garment.brand ?? "",
@@ -583,6 +687,7 @@ export default function Home() {
   const dragSession = useRef<DragSession | null>(null);
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
+  const finalizingCutouts = useRef(new Set<string>());
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
   const filterOptions = useMemo<FilterOptions>(() => {
@@ -622,8 +727,9 @@ export default function Home() {
   useEffect(() => {
     if (!isStaticDemo) {
       let active = true;
+      const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
       Promise.all([
-        fetch("/api/wardrobe", { cache: "no-store" }),
+        batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
         fetch("/api/outfits", { cache: "no-store" }),
         fetch("/api/session", { cache: "no-store" }),
       ])
@@ -647,6 +753,7 @@ export default function Home() {
             items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
           }));
           setGarments(loadedGarments);
+          void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
           if (session?.user) setProfile(session.user);
           setSavedLooks(normalizedLooks);
           const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
@@ -674,6 +781,8 @@ export default function Home() {
     } catch {
       // A malformed local edit should never block the wardrobe.
     }
+  // The initial hydration intentionally runs once; pending cutouts are idempotent and guarded by a ref.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -803,6 +912,37 @@ export default function Home() {
     setLibraryOpen(false);
   }
 
+  async function finalizeCutoutVariant(item: ApiGarment, outputVariant: "closed" | "open"): Promise<ApiGarment> {
+    const source = outputVariant === "open" ? item.generatedOpenImage : item.generatedImage;
+    if (!source) return item;
+    const lock = `${item.id}:${outputVariant}:${source}`;
+    if (finalizingCutouts.current.has(lock)) return item;
+    finalizingCutouts.current.add(lock);
+    try {
+      const cutout = await whiteStudioCutout(imageSrc(source));
+      const body = new FormData();
+      body.append("file", cutout.file);
+      body.append("outputVariant", outputVariant);
+      body.append("qaStatus", cutout.qaStatus);
+      body.append("qaNotes", cutout.qaNotes);
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}/cutout`, { method: "POST", body });
+      const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
+      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo terminar el recorte.");
+      setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+      return result.garment;
+    } finally {
+      finalizingCutouts.current.delete(lock);
+    }
+  }
+
+  async function finalizePendingCutouts(item: ApiGarment): Promise<ApiGarment> {
+    if (item.status !== "cutout_pending") return item;
+    let current = item;
+    if (current.generatedImage && !current.image) current = await finalizeCutoutVariant(current, "closed");
+    if (current.generatedOpenImage && !current.openImage) current = await finalizeCutoutVariant(current, "open");
+    return current;
+  }
+
   function resetUpload() {
     uploadItems.forEach((item) => {
       if (item.preview.startsWith("blob:") && !(isStaticDemo && item.status === "done")) URL.revokeObjectURL(item.preview);
@@ -873,6 +1013,7 @@ export default function Home() {
     }
 
     const remote = new Map<string, string>();
+    const useDiscountedBatch = pending.length >= discountedBatchThreshold && pending.every((item) => !item.garmentId);
     let failedCount = 0;
     let waitingCount = 0;
     for (const item of pending) {
@@ -892,8 +1033,11 @@ export default function Home() {
         }
         const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
         const attributes = classifyGarment(custom);
+        const processingFile = await processingFileFor(item.file);
         const body = new FormData();
-        body.append("file", item.file);
+        body.append("file", processingFile);
+        body.append("original", item.file);
+        if (useDiscountedBatch) body.append("processingMode", "batch");
         body.append("name", custom.name);
         body.append("category", item.category);
         body.append("colorFamily", attributes.colorFamily);
@@ -918,9 +1062,31 @@ export default function Home() {
       }
     }
 
+    if (useDiscountedBatch && remote.size > 1) {
+      try {
+        const batchResponse = await fetch("/api/batches", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ garmentIds: [...remote.values()] }),
+        });
+        const batchResult = await batchResponse.json().catch(() => null) as { batch?: { status?: string }; fallback?: string; error?: string } | null;
+        if (!batchResponse.ok) throw new Error(batchResult?.error || "No se pudo crear el lote.");
+        remote.forEach((_, localId) => updateUploadItem(localId, {
+          status: "processing",
+          error: batchResult?.fallback ? "Procesando ahora" : "Lote Low · hasta 24 h",
+        }));
+      } catch (error) {
+        failedCount += remote.size;
+        remote.forEach((_, localId) => updateUploadItem(localId, { status: "failed", error: error instanceof Error ? error.message : "El lote falló" }));
+        remote.clear();
+      }
+    }
+
     let timedOut = false;
-    for (let attempt = 0; attempt < 90 && remote.size > 0; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    const maxAttempts = useDiscountedBatch ? 15 : 90;
+    for (let attempt = 0; attempt < maxAttempts && remote.size > 0; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, useDiscountedBatch ? 4000 : 2000));
+      if (useDiscountedBatch && attempt % 3 === 0) await fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
       const checks = await Promise.all([...remote.entries()].map(async ([localId, garmentId]) => {
         try {
           const statusResponse = await fetch(`/api/garments/${encodeURIComponent(garmentId)}/status`, { cache: "no-store" });
@@ -932,8 +1098,12 @@ export default function Home() {
       }));
       for (const { localId, statusResponse, statusResult } of checks) {
         if (!statusResponse?.ok || !statusResult?.garment) continue;
-        setGarments((items) => mergeApiGarments(items, [statusResult.garment as ApiGarment]));
-        if (statusResult.garment.status === "ready") {
+        let updatedGarment = statusResult.garment;
+        if (updatedGarment.status === "cutout_pending") {
+          try { updatedGarment = await finalizePendingCutouts(updatedGarment); } catch { /* It will retry on the next status pass. */ }
+        }
+        setGarments((items) => mergeApiGarments(items, [updatedGarment as ApiGarment]));
+        if (updatedGarment.status === "ready") {
           updateUploadItem(localId, { status: "done", error: undefined });
           remote.delete(localId);
         } else if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
@@ -1235,11 +1405,15 @@ export default function Home() {
     }
   }
 
-  async function retryProcessing(item: Garment) {
+  async function retryProcessing(item: Garment, quality: "low" | "medium" = "low", outputVariant: "closed" | "open" = "closed") {
     setGarmentSaveError("");
     setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "queued" } : garment));
     try {
-      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}/retry`, { method: "POST" });
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}/retry`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ quality, outputVariant, presentation: outputVariant === "open" ? "open" : "closed" }),
+      });
       const result = await response.json().catch(() => null) as { job?: { status?: string }; error?: string } | null;
       if (!response.ok) throw new Error(result?.error || "No se pudo reiniciar el procesamiento.");
       if (result?.job?.status === "waiting_for_key") throw new Error("Falta conectar la clave de procesamiento.");
@@ -1249,9 +1423,11 @@ export default function Home() {
         const statusResponse = await fetch(`/api/garments/${encodeURIComponent(item.id)}/status`, { cache: "no-store" });
         const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { error?: string; status?: string } } | null;
         if (!statusResponse.ok || !statusResult?.garment) throw new Error("No se pudo revisar el recorte.");
-        setGarments((items) => mergeApiGarments(items, [statusResult.garment as ApiGarment]));
-        if (statusResult.garment.status === "ready") return;
-        if (statusResult.garment.status === "failed") throw new Error(statusResult.job?.error || "El recorte volvió a fallar.");
+        let updatedGarment = statusResult.garment;
+        if (updatedGarment.status === "cutout_pending") updatedGarment = await finalizePendingCutouts(updatedGarment);
+        setGarments((items) => mergeApiGarments(items, [updatedGarment as ApiGarment]));
+        if (updatedGarment.status === "ready") return;
+        if (updatedGarment.status === "failed") throw new Error(statusResult.job?.error || "El recorte volvió a fallar.");
       }
     } catch (error) {
       setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "failed" } : garment));
@@ -1315,7 +1491,7 @@ export default function Home() {
                       <article className="garment-card" key={item.id}>
                         <div className="image-wrap">
                           <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
-                          {(item.status === "queued" || item.status === "processing" || item.status === "uploaded") && <span className="processing-badge">PREPARANDO RECORTE</span>}
+                          {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">{item.status.startsWith("batch") ? "LOTE LOW EN PROCESO" : item.status === "cutout_pending" ? "TERMINANDO BORDE" : "PREPARANDO RECORTE"}</span>}
                           {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
                           <button className="card-detail-open" onClick={() => openGarmentEditor(item)} aria-label={`Abrir ficha de ${translateGarmentName(item.name)}`}><span>VER FICHA ↗</span></button>
                           <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => toggleFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>
@@ -1555,6 +1731,19 @@ export default function Home() {
                   {garmentDraft.tags.length > 0 && <div className="custom-tag-list">{garmentDraft.tags.map((tag) => <button type="button" key={tag} onClick={() => updateGarmentDraft("tags", garmentDraft.tags.filter((item) => item !== tag))}>#{tag}<span>×</span></button>)}</div>}
                   <div className="tag-input-row"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={handleTagKeyDown} placeholder="viaje, noche, favorito…" /><button type="button" onClick={addDraftTag} disabled={!tagInput.trim()}>AÑADIR ＋</button></div>
                 </div>
+
+                {editingGarment.originalImage && !isStaticDemo && <details className="processing-options">
+                  <summary>OPCIONES DE PROCESAMIENTO</summary>
+                  <div>
+                    <p>Generada en <strong>{(editingGarment.quality || "low").toLocaleUpperCase()}</strong> · Control de borde: <strong>{editingGarment.qaStatus === "review" ? "REVISAR" : editingGarment.qaStatus === "passed" ? "OK" : "PENDIENTE"}</strong></p>
+                    {editingGarment.qaNotes && <small>{editingGarment.qaNotes}</small>}
+                    <div className="processing-option-actions">
+                      <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "closed")}>REHACER EN MEDIUM</button>
+                      {editingGarment.category === "Outerwear" && !editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "low", "open")}>CREAR VERSIÓN ABIERTA</button>}
+                      {editingGarment.category === "Outerwear" && editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "open")}>ABIERTA EN MEDIUM</button>}
+                    </div>
+                  </div>
+                </details>}
 
                 <div className="garment-editor-actions">
                   <button type="button" className="delete-garment" onClick={() => deleteGarment(editingGarment)}>ELIMINAR</button>

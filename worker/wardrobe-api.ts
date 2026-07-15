@@ -42,9 +42,14 @@ type GarmentRow = {
   deleted: number;
   status: string;
   source_image_key: string | null;
+  processing_image_key: string | null;
   generated_image_key: string | null;
+  generated_open_image_key: string | null;
   image_key: string | null;
   open_image_key: string | null;
+  quality: string;
+  qa_status: string;
+  qa_notes: string | null;
   revision: number;
   created_at: string;
   updated_at: string;
@@ -56,6 +61,12 @@ type ProcessingJobRow = {
   status: string;
   provider: string;
   attempt: number;
+  quality: string;
+  presentation: string;
+  output_variant: string;
+  mode: string;
+  batch_id: string | null;
+  openai_file_id: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -79,13 +90,15 @@ type GarmentPresentation = "auto" | "open" | "closed";
 type GarmentOutputVariant = "closed" | "open";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring"]);
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 
 const garmentColumns = `
   id, owner_id, client_id, name, brand, category, color_family, tone, material,
-  finish, silhouette, favorite, deleted, status, source_image_key, generated_image_key,
-  image_key, open_image_key, revision, created_at, updated_at
+  finish, silhouette, favorite, deleted, status, source_image_key, processing_image_key,
+  generated_image_key, generated_open_image_key, image_key, open_image_key, quality,
+  qa_status, qa_notes, revision, created_at, updated_at
 `;
 
 function json(data: unknown, status = 200): Response {
@@ -110,7 +123,7 @@ function booleanValue(value: unknown): boolean {
   return value === true || value === 1 || value === "1" || value === "true";
 }
 
-function imageQuality(value: unknown, fallback: ImageQuality = "medium"): ImageQuality {
+function imageQuality(value: unknown, fallback: ImageQuality = "low"): ImageQuality {
   return value === "low" || value === "medium" ? value : fallback;
 }
 
@@ -229,8 +242,12 @@ function garmentJson(row: GarmentRow, tags: string[] = []) {
     deleted: Boolean(row.deleted),
     tags,
     status: row.status,
+    quality: imageQuality(row.quality),
+    qaStatus: row.qa_status,
+    qaNotes: row.qa_notes ?? undefined,
     image: row.image_key ? `/api/media/${encodeURIComponent(row.client_id)}/cutout?v=${revision}` : undefined,
     generatedImage: row.generated_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/generated?v=${revision}` : undefined,
+    generatedOpenImage: row.generated_open_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/generated-open?v=${revision}` : undefined,
     originalImage: row.source_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/original?v=${revision}` : undefined,
     openImage: row.open_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/open?v=${revision}` : undefined,
     revision,
@@ -355,16 +372,20 @@ async function createProcessingJob(
   garmentId: string,
   enabled: boolean,
   quality: ImageQuality,
+  presentation: GarmentPresentation = "auto",
+  outputVariant: GarmentOutputVariant = "closed",
+  mode: "immediate" | "batch" = "immediate",
 ): Promise<{ id: string; status: string }> {
   const id = crypto.randomUUID();
-  const status = enabled ? "queued" : "waiting_for_key";
+  const status = enabled ? (mode === "batch" ? "batch_staged" : "queued") : "waiting_for_key";
   await db.batch([
     db.prepare(`
-      INSERT INTO processing_jobs (id, garment_id, owner_id, status, provider)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(id, garmentId, ownerId, status, `openai+cloudflare:${quality}`),
+      INSERT INTO processing_jobs (
+        id, garment_id, owner_id, status, provider, quality, presentation, output_variant, mode
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, garmentId, ownerId, status, `openai+client-cutout:${quality}`, quality, presentation, outputVariant, mode),
     db.prepare("UPDATE garments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-      .bind(enabled ? "queued" : "uploaded", garmentId, ownerId),
+      .bind(enabled ? (mode === "batch" ? "batch_staged" : "queued") : "uploaded", garmentId, ownerId),
   ]);
   return { id, status };
 }
@@ -381,23 +402,37 @@ async function uploadGarment(
   const file = form.get("file");
   if (!(file instanceof File) || !file.type.startsWith("image/")) return apiError("Selecciona una foto válida.", 400);
   if (file.size > MAX_IMAGE_BYTES) return apiError("La foto pesa demasiado. El máximo es 20 MB.", 413);
+  const original = form.get("original");
+  if (original instanceof File && (!original.type.startsWith("image/") || original.size > MAX_IMAGE_BYTES)) {
+    return apiError("La foto original no es válida o supera 20 MB.", 413);
+  }
   const payload = formPayload(form);
   if (!payload) return apiError("Revisa el tipo y los datos de la prenda.", 400);
 
   const clientId = crypto.randomUUID();
   const garmentId = crypto.randomUUID();
-  const sourceKey = `users/${identity.id}/garments/${clientId}/original.${extensionFor(file)}`;
-  await env.WARDROBE_MEDIA.put(sourceKey, file.stream(), {
-    httpMetadata: { contentType: file.type || "application/octet-stream" },
-    customMetadata: { filename: file.name.slice(0, 160), owner: identity.id, garment: clientId },
+  const sourceFile = original instanceof File ? original : file;
+  const sourceKey = `users/${identity.id}/garments/${clientId}/original.${extensionFor(sourceFile)}`;
+  const processingKey = original instanceof File
+    ? `users/${identity.id}/garments/${clientId}/processing.${extensionFor(file)}`
+    : sourceKey;
+  await env.WARDROBE_MEDIA.put(sourceKey, sourceFile.stream(), {
+    httpMetadata: { contentType: sourceFile.type || "application/octet-stream" },
+    customMetadata: { filename: sourceFile.name.slice(0, 160), owner: identity.id, garment: clientId, kind: "original" },
   });
+  if (processingKey !== sourceKey) {
+    await env.WARDROBE_MEDIA.put(processingKey, file.stream(), {
+      httpMetadata: { contentType: file.type || "application/octet-stream" },
+      customMetadata: { filename: file.name.slice(0, 160), owner: identity.id, garment: clientId, kind: "processing" },
+    });
+  }
 
   try {
     await db.prepare(`
       INSERT INTO garments (
         id, owner_id, client_id, name, brand, category, color_family, tone,
-        material, finish, silhouette, favorite, status, source_image_key
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?)
+        material, finish, silhouette, favorite, status, source_image_key, processing_image_key, quality
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
     `).bind(
       garmentId,
       identity.id,
@@ -412,19 +447,22 @@ async function uploadGarment(
       payload.silhouette,
       payload.favorite ? 1 : 0,
       sourceKey,
+      processingKey,
+      imageQuality(env.OPENAI_IMAGE_QUALITY),
     ).run();
     if (payload.tags.length) {
       await db.batch(payload.tags.map((tag) => db.prepare("INSERT INTO garment_tags (garment_id, tag) VALUES (?, ?)").bind(garmentId, tag)));
     }
   } catch (error) {
-    await env.WARDROBE_MEDIA.delete(sourceKey);
+    await env.WARDROBE_MEDIA.delete([...new Set([sourceKey, processingKey])]);
     throw error;
   }
 
   const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
   const quality = imageQuality(env.OPENAI_IMAGE_QUALITY);
-  const job = await createProcessingJob(db, identity.id, garmentId, enabled, quality);
-  if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garmentId, job.id, quality));
+  const mode = form.get("processingMode") === "batch" ? "batch" : "immediate";
+  const job = await createProcessingJob(db, identity.id, garmentId, enabled, quality, "closed", "closed", mode);
+  if (enabled && mode === "immediate") ctx.waitUntil(processGarment(env, db, identity.id, garmentId, job.id, quality, "closed", "closed"));
   const row = await findGarment(db, identity.id, clientId);
   if (!row) throw new Error("No se pudo crear la prenda.");
   return json({ garment: garmentJson(row, payload.tags), job }, 202);
@@ -478,7 +516,8 @@ REMOVE ONLY PHOTOGRAPHY ARTIFACTS
 
 CATALOG OUTPUT
 - One garment only, front view, centered with the entire garment visible and comfortable margins in an exact vertical 4:5 composition.
-- Neutral pure-white seamless background, soft even studio lighting, controlled subtle shadow and faithful source color.
+- Neutral pure-white flat seamless background, soft even studio lighting and faithful source color.
+- No cast shadow, contact shadow, floor shadow, grey halo, vignette or gradient behind the garment. Keep the exterior background uniformly white so it can be removed cleanly.
 - Natural restrained texture: no aggressive sharpening, fake grain, added distressing or exaggerated gloss.
 
 FINAL CHECK BEFORE OUTPUT
@@ -514,8 +553,9 @@ async function processGarment(
     const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ? LIMIT 1`)
       .bind(garmentId, ownerId)
       .first<GarmentRow>();
-    if (!garment?.source_image_key) throw new Error("La imagen original no está disponible.");
-    const source = await env.WARDROBE_MEDIA.get(garment.source_image_key);
+    const processingKey = garment?.processing_image_key || garment?.source_image_key;
+    if (!processingKey) throw new Error("La imagen original no está disponible.");
+    const source = await env.WARDROBE_MEDIA.get(processingKey);
     if (!source) throw new Error("La imagen original no se encontró en el almacenamiento.");
     const sourceBytes = await source.arrayBuffer();
     const contentType = source.httpMetadata?.contentType || "image/jpeg";
@@ -550,7 +590,7 @@ async function processGarment(
       customMetadata: { owner: ownerId, garment: garment.client_id, kind: "generated" },
     });
 
-    let cutoutKey = generatedKey;
+    let cutoutKey: string | null = null;
     if (env.IMAGES) {
       const segmented = await env.IMAGES
         .input(new Blob([generated], { type: "image/png" }).stream())
@@ -566,30 +606,38 @@ async function processGarment(
       });
     }
 
+    const nextStatus = cutoutKey ? "ready" : "cutout_pending";
+    const nextJobStatus = cutoutKey ? "succeeded" : "awaiting_cutout";
     const garmentUpdate = outputVariant === "open"
       ? db.prepare(`
         UPDATE garments
-        SET status = 'ready', generated_image_key = ?, open_image_key = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, generated_open_image_key = ?, open_image_key = COALESCE(?, open_image_key),
+          quality = ?, qa_status = 'pending', qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(generatedKey, cutoutKey, garmentId, ownerId)
+      `).bind(nextStatus, generatedKey, cutoutKey, quality, garmentId, ownerId)
       : db.prepare(`
         UPDATE garments
-        SET status = 'ready', generated_image_key = ?, image_key = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, generated_image_key = ?, image_key = COALESCE(?, image_key),
+          quality = ?, qa_status = 'pending', qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(generatedKey, cutoutKey, garmentId, ownerId);
+      `).bind(nextStatus, generatedKey, cutoutKey, quality, garmentId, ownerId);
     await db.batch([
       garmentUpdate,
       db.prepare(`
         UPDATE processing_jobs
-        SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, error = NULL
+        SET status = ?, finished_at = CASE WHEN ? = 'succeeded' THEN CURRENT_TIMESTAMP ELSE finished_at END,
+          updated_at = CURRENT_TIMESTAMP, error = NULL
         WHERE id = ? AND owner_id = ?
-      `).bind(jobId, ownerId),
+      `).bind(nextJobStatus, nextJobStatus, jobId, ownerId),
     ]);
   } catch (error) {
     const message = (error instanceof Error ? error.message : "El procesamiento falló.").slice(0, 500);
+    const existing = await db.prepare("SELECT image_key FROM garments WHERE id = ? AND owner_id = ? LIMIT 1")
+      .bind(garmentId, ownerId)
+      .first<{ image_key: string | null }>();
     await db.batch([
-      db.prepare("UPDATE garments SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-        .bind(garmentId, ownerId),
+      db.prepare("UPDATE garments SET status = ?, qa_status = 'review', qa_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+        .bind(outputVariant === "open" && existing?.image_key ? "ready" : "failed", message, garmentId, ownerId),
       db.prepare("UPDATE processing_jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
         .bind(message, jobId, ownerId),
     ]);
@@ -608,18 +656,94 @@ async function retryGarment(
   if (!garment) return apiError("Prenda no encontrada.", 404);
   if (!garment.source_image_key) return apiError("Esta prenda no tiene una foto original para reprocesar.", 400);
   const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
-  const body = await request.json().catch(() => null) as { quality?: unknown } | null;
+  const body = await request.json().catch(() => null) as { quality?: unknown; presentation?: unknown; outputVariant?: unknown } | null;
   const quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
-  const job = await createProcessingJob(db, identity.id, garment.id, enabled, quality);
-  if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garment.id, job.id, quality));
+  const outputVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
+  const presentation = outputVariant === "open" ? "open" : garmentPresentation(body?.presentation ?? "closed");
+  const job = await createProcessingJob(db, identity.id, garment.id, enabled, quality, presentation, outputVariant);
+  if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garment.id, job.id, quality, presentation, outputVariant));
   return json({ job }, 202);
+}
+
+async function attachCutout(
+  request: Request,
+  env: WardrobeEnv,
+  ctx: WardrobeExecutionContext,
+  db: D1Database,
+  identity: Identity,
+  clientId: string,
+): Promise<Response> {
+  if (!env.WARDROBE_MEDIA) return apiError("El almacenamiento de imágenes todavía no está conectado.", 503);
+  const garment = await findGarment(db, identity.id, clientId);
+  if (!garment) return apiError("Prenda no encontrada.", 404);
+  const form = await request.formData();
+  const file = form.get("file");
+  if (!(file instanceof File) || !["image/png", "image/webp"].includes(file.type) || file.size > MAX_IMAGE_BYTES) {
+    return apiError("El recorte no es válido.", 400);
+  }
+  const outputVariant: GarmentOutputVariant = form.get("outputVariant") === "open" ? "open" : "closed";
+  const qaStatus = form.get("qaStatus") === "review" ? "review" : "passed";
+  const qaNotes = textValue(form.get("qaNotes")).slice(0, 300);
+  const key = `users/${identity.id}/garments/${clientId}/cutout-${outputVariant}-${Date.now()}.${extensionFor(file)}`;
+  await env.WARDROBE_MEDIA.put(key, file.stream(), {
+    httpMetadata: { contentType: file.type },
+    customMetadata: { filename: file.name.slice(0, 160), owner: identity.id, garment: clientId, kind: `cutout-${outputVariant}` },
+  });
+
+  const imageUpdate = outputVariant === "open"
+    ? db.prepare(`
+      UPDATE garments SET open_image_key = ?, qa_status = CASE WHEN qa_status = 'review' OR ? = 'review' THEN 'review' ELSE 'passed' END,
+        qa_notes = CASE WHEN ? = 'review' THEN ? ELSE qa_notes END, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(key, qaStatus, qaStatus, qaNotes || "Revisar el borde del recorte.", garment.id, identity.id)
+    : db.prepare(`
+      UPDATE garments SET image_key = ?, qa_status = ?, qa_notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(key, qaStatus, qaNotes || null, garment.id, identity.id);
+  await db.batch([
+    imageUpdate,
+    db.prepare(`
+      UPDATE processing_jobs SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, error = NULL
+      WHERE garment_id = ? AND owner_id = ? AND output_variant = ? AND status = 'awaiting_cutout'
+    `).bind(garment.id, identity.id, outputVariant),
+  ]);
+
+  let openedJob: { id: string; status: string } | null = null;
+  if (outputVariant === "closed" && garment.category === "Outerwear" && !garment.open_image_key) {
+    const existingOpen = await db.prepare(`
+      SELECT id FROM processing_jobs
+      WHERE garment_id = ? AND owner_id = ? AND output_variant = 'open'
+        AND status IN ('queued', 'processing', 'batch_staged', 'batch_processing', 'awaiting_cutout')
+      LIMIT 1
+    `).bind(garment.id, identity.id).first<{ id: string }>();
+    if (!existingOpen) {
+      const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
+      const quality = imageQuality(garment.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
+      openedJob = await createProcessingJob(db, identity.id, garment.id, enabled, quality, "open", "open");
+      if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garment.id, openedJob.id, quality, "open", "open"));
+    }
+  }
+
+  const pending = await db.prepare(`
+    SELECT COUNT(*) AS count FROM processing_jobs
+    WHERE garment_id = ? AND owner_id = ?
+      AND status IN ('queued', 'processing', 'batch_staged', 'batch_processing', 'awaiting_cutout')
+  `).bind(garment.id, identity.id).first<{ count: number }>();
+  const nextStatus = Number(pending?.count || 0) > 0 ? "cutout_pending" : "ready";
+  await db.prepare("UPDATE garments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+    .bind(nextStatus, garment.id, identity.id)
+    .run();
+  const updated = await findGarment(db, identity.id, clientId);
+  const tags = await garmentTagsFor(db, garment.id);
+  return json({ garment: updated ? garmentJson(updated, tags) : null, openJob: openedJob }, 201);
 }
 
 async function garmentStatus(db: D1Database, ownerId: string, clientId: string): Promise<Response> {
   const garment = await findGarment(db, ownerId, clientId);
   if (!garment) return apiError("Prenda no encontrada.", 404);
   const job = await db.prepare(`
-    SELECT id, garment_id, status, provider, attempt, error, created_at, updated_at
+    SELECT id, garment_id, status, provider, attempt, quality, presentation, output_variant,
+      mode, batch_id, openai_file_id, error, created_at, updated_at
     FROM processing_jobs
     WHERE garment_id = ? AND owner_id = ?
     ORDER BY created_at DESC
@@ -636,6 +760,7 @@ async function mediaResponse(env: WardrobeEnv, db: D1Database, ownerId: string, 
   const keys: Record<string, string | null> = {
     original: garment.source_image_key,
     generated: garment.generated_image_key,
+    "generated-open": garment.generated_open_image_key,
     cutout: garment.image_key,
     open: garment.open_image_key,
   };
@@ -675,7 +800,7 @@ async function internalGarmentOperation(
     const clientId = safeClientId(searchParams.get("clientId") ?? "");
     if (!clientId) return apiError("Prenda no válida.", 400);
     const variant = searchParams.get("variant");
-    return variant && ["original", "generated", "cutout", "open"].includes(variant)
+    return variant && ["original", "generated", "generated-open", "cutout", "open"].includes(variant)
       ? mediaResponse(env, env.DB, identity.id, clientId, variant)
       : garmentStatus(env.DB, identity.id, clientId);
   }
@@ -755,6 +880,208 @@ async function internalGarmentOperation(
     ctx.waitUntil(processGarment(env, env.DB, identity.id, garmentId, job.id, quality, presentation, outputVariant));
   }
   return json({ clientId, quality, presentation, outputVariant, job }, 202);
+}
+
+async function uploadOpenAIFile(env: WardrobeEnv, file: File, purpose: "user_data" | "batch"): Promise<string> {
+  if (!env.OPENAI_API_KEY) throw new Error("Falta la clave de procesamiento.");
+  const form = new FormData();
+  form.append("purpose", purpose);
+  form.append("file", file);
+  form.append("expires_after[anchor]", "created_at");
+  form.append("expires_after[seconds]", String(BATCH_EXPIRY_SECONDS));
+  const response = await fetch("https://api.openai.com/v1/files", {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    body: form,
+  });
+  const result = await response.json() as { id?: string; error?: { message?: string } };
+  if (!response.ok || !result.id) throw new Error(result.error?.message || `No se pudo preparar el lote (${response.status}).`);
+  return result.id;
+}
+
+async function deleteOpenAIFile(env: WardrobeEnv, fileId: string): Promise<void> {
+  if (!env.OPENAI_API_KEY || !fileId) return;
+  await fetch(`https://api.openai.com/v1/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
+  }).catch(() => null);
+}
+
+async function createGarmentBatch(
+  request: Request,
+  env: WardrobeEnv,
+  ctx: WardrobeExecutionContext,
+  db: D1Database,
+  identity: Identity,
+): Promise<Response> {
+  if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El procesamiento todavía no está conectado.", 503);
+  const body = await request.json().catch(() => null) as { garmentIds?: unknown } | null;
+  const garmentIds = Array.isArray(body?.garmentIds)
+    ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))].slice(0, 12)
+    : [];
+  if (garmentIds.length < 2) return apiError("El lote necesita al menos dos prendas.", 400);
+
+  const batchItems: Array<{ garment: GarmentRow; job: { id: string; quality: ImageQuality; presentation: GarmentPresentation; outputVariant: GarmentOutputVariant }; fileId: string }> = [];
+  const sourceFileIds = new Set<string>();
+  let batchInputFileId = "";
+  try {
+    for (const clientId of garmentIds) {
+      const garment = await findGarment(db, identity.id, clientId);
+      const processingKey = garment?.processing_image_key || garment?.source_image_key;
+      if (!garment || !processingKey) continue;
+      const source = await env.WARDROBE_MEDIA.get(processingKey);
+      if (!source) continue;
+      const bytes = await source.arrayBuffer();
+      const contentType = source.httpMetadata?.contentType || "image/jpeg";
+      const filename = source.customMetadata?.filename || `${clientId}.${contentType.split("/")[1] || "jpg"}`;
+      const fileId = await uploadOpenAIFile(env, new File([bytes], filename, { type: contentType }), "user_data");
+      sourceFileIds.add(fileId);
+
+      let closedJob = await db.prepare(`
+        SELECT id FROM processing_jobs
+        WHERE garment_id = ? AND owner_id = ? AND output_variant = 'closed' AND status = 'batch_staged'
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(garment.id, identity.id).first<{ id: string }>();
+      if (!closedJob) closedJob = await createProcessingJob(db, identity.id, garment.id, true, "low", "closed", "closed", "batch");
+      batchItems.push({ garment, job: { id: closedJob.id, quality: "low", presentation: "closed", outputVariant: "closed" }, fileId });
+
+      if (garment.category === "Outerwear") {
+        const openJob = await createProcessingJob(db, identity.id, garment.id, true, "low", "open", "open", "batch");
+        batchItems.push({ garment, job: { id: openJob.id, quality: "low", presentation: "open", outputVariant: "open" }, fileId });
+      }
+    }
+    if (batchItems.length < 2) throw new Error("No encontramos suficientes prendas válidas para el lote.");
+
+    const jsonl = batchItems.map(({ garment, job, fileId }) => JSON.stringify({
+      custom_id: job.id,
+      method: "POST",
+      url: "/v1/images/edits",
+      body: {
+        model: env.OPENAI_IMAGE_MODEL || "gpt-image-2",
+        images: [{ file_id: fileId }],
+        prompt: ghostPrompt(garment, job.presentation),
+        size: "1024x1280",
+        quality: "low",
+        output_format: "png",
+      },
+    })).join("\n");
+    const inputFileId = await uploadOpenAIFile(env, new File([jsonl], `forme-${Date.now()}.jsonl`, { type: "application/jsonl" }), "batch");
+    batchInputFileId = inputFileId;
+    const response = await fetch("https://api.openai.com/v1/batches", {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        input_file_id: inputFileId,
+        endpoint: "/v1/images/edits",
+        completion_window: "24h",
+        output_expires_after: { anchor: "created_at", seconds: BATCH_EXPIRY_SECONDS },
+        metadata: { product: "forme", owner: identity.id.slice(0, 48) },
+      }),
+    });
+    const result = await response.json() as { id?: string; status?: string; error?: { message?: string } };
+    if (!response.ok || !result.id) throw new Error(result.error?.message || `El lote respondió con ${response.status}.`);
+    await db.batch(batchItems.flatMap(({ garment, job, fileId }) => [
+      db.prepare(`
+        UPDATE processing_jobs SET status = 'batch_processing', batch_id = ?, openai_file_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(result.id, fileId, job.id, identity.id),
+      db.prepare("UPDATE garments SET status = 'batch_processing', quality = 'low', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+        .bind(garment.id, identity.id),
+    ]));
+    return json({ batch: { id: result.id, status: result.status || "validating", garments: garmentIds.length, requests: batchItems.length } }, 202);
+  } catch (error) {
+    for (const fileId of sourceFileIds) ctx.waitUntil(deleteOpenAIFile(env, fileId));
+    if (batchInputFileId) ctx.waitUntil(deleteOpenAIFile(env, batchInputFileId));
+    for (const { garment, job } of batchItems) {
+      await db.prepare("UPDATE processing_jobs SET status = 'queued', mode = 'immediate', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+        .bind(job.id, identity.id).run();
+      ctx.waitUntil(processGarment(env, db, identity.id, garment.id, job.id, job.quality, job.presentation, job.outputVariant));
+    }
+    return json({ fallback: "immediate", message: error instanceof Error ? error.message : "El lote pasó al flujo inmediato." }, 202);
+  }
+}
+
+async function reconcileGarmentBatches(
+  env: WardrobeEnv,
+  ctx: WardrobeExecutionContext,
+  db: D1Database,
+  identity: Identity,
+): Promise<Response> {
+  if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return json({ batches: [] });
+  const pending = await db.prepare(`
+    SELECT DISTINCT batch_id FROM processing_jobs
+    WHERE owner_id = ? AND batch_id IS NOT NULL AND status = 'batch_processing'
+  `).bind(identity.id).all<{ batch_id: string }>();
+  const summaries: Array<{ id: string; status: string }> = [];
+  for (const { batch_id: batchId } of pending.results) {
+    const response = await fetch(`https://api.openai.com/v1/batches/${encodeURIComponent(batchId)}`, {
+      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    });
+    const batch = await response.json() as { status?: string; output_file_id?: string | null; error_file_id?: string | null; input_file_id?: string; errors?: { data?: Array<{ message?: string }> } };
+    if (!response.ok) continue;
+    summaries.push({ id: batchId, status: batch.status || "unknown" });
+    if (batch.status === "completed" && batch.output_file_id) {
+      const outputResponse = await fetch(`https://api.openai.com/v1/files/${encodeURIComponent(batch.output_file_id)}/content`, {
+        headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
+      });
+      if (!outputResponse.ok) continue;
+      const lines = (await outputResponse.text()).split(/\r?\n/).filter(Boolean);
+      for (const line of lines) {
+        let item: { custom_id?: string; response?: { status_code?: number; body?: { data?: Array<{ b64_json?: string }>; error?: { message?: string } } }; error?: { message?: string } };
+        try { item = JSON.parse(line) as typeof item; } catch { continue; }
+        if (!item.custom_id) continue;
+        const job = await db.prepare(`
+          SELECT id, garment_id, quality, output_variant FROM processing_jobs
+          WHERE id = ? AND owner_id = ? AND batch_id = ? AND status = 'batch_processing' LIMIT 1
+        `).bind(item.custom_id, identity.id, batchId).first<{ id: string; garment_id: string; quality: string; output_variant: string }>();
+        if (!job) continue;
+        const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ? LIMIT 1`)
+          .bind(job.garment_id, identity.id).first<GarmentRow>();
+        const encoded = item.response?.body?.data?.[0]?.b64_json;
+        if (!garment || item.response?.status_code !== 200 || !encoded) {
+          const message = item.response?.body?.error?.message || item.error?.message || "La edición del lote falló.";
+          await db.prepare("UPDATE processing_jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            .bind(message.slice(0, 500), job.id, identity.id).run();
+          continue;
+        }
+        const outputVariant: GarmentOutputVariant = job.output_variant === "open" ? "open" : "closed";
+        const quality = imageQuality(job.quality);
+        const generatedKey = `users/${identity.id}/garments/${garment.client_id}/ghost-${outputVariant}-${quality}-${Date.now()}.png`;
+        await env.WARDROBE_MEDIA.put(generatedKey, decodeBase64(encoded), {
+          httpMetadata: { contentType: "image/png" },
+          customMetadata: { owner: identity.id, garment: garment.client_id, kind: `generated-${outputVariant}` },
+        });
+        const updateGarment = outputVariant === "open"
+          ? db.prepare("UPDATE garments SET generated_open_image_key = ?, status = 'cutout_pending', quality = ?, qa_status = 'pending', revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            .bind(generatedKey, quality, garment.id, identity.id)
+          : db.prepare("UPDATE garments SET generated_image_key = ?, status = 'cutout_pending', quality = ?, qa_status = 'pending', revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            .bind(generatedKey, quality, garment.id, identity.id);
+        await db.batch([
+          updateGarment,
+          db.prepare("UPDATE processing_jobs SET status = 'awaiting_cutout', updated_at = CURRENT_TIMESTAMP, error = NULL WHERE id = ? AND owner_id = ?")
+            .bind(job.id, identity.id),
+        ]);
+      }
+      await db.prepare(`
+        UPDATE processing_jobs SET status = 'failed', error = 'No se recibió una imagen para esta solicitud.', finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE owner_id = ? AND batch_id = ? AND status = 'batch_processing'
+      `).bind(identity.id, batchId).run();
+      const sourceFiles = await db.prepare("SELECT DISTINCT openai_file_id FROM processing_jobs WHERE owner_id = ? AND batch_id = ? AND openai_file_id IS NOT NULL")
+        .bind(identity.id, batchId).all<{ openai_file_id: string }>();
+      for (const file of sourceFiles.results) ctx.waitUntil(deleteOpenAIFile(env, file.openai_file_id));
+      if (batch.input_file_id) ctx.waitUntil(deleteOpenAIFile(env, batch.input_file_id));
+      ctx.waitUntil(deleteOpenAIFile(env, batch.output_file_id));
+    } else if (["failed", "expired", "cancelled"].includes(batch.status || "")) {
+      const message = batch.errors?.data?.[0]?.message || "El lote no pudo completarse.";
+      await db.batch([
+        db.prepare("UPDATE processing_jobs SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE owner_id = ? AND batch_id = ? AND status = 'batch_processing'")
+          .bind(message.slice(0, 500), identity.id, batchId),
+        db.prepare("UPDATE garments SET status = CASE WHEN image_key IS NULL THEN 'failed' ELSE 'ready' END, qa_status = 'review', qa_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE owner_id = ? AND id IN (SELECT garment_id FROM processing_jobs WHERE batch_id = ?)")
+          .bind(message.slice(0, 300), identity.id, batchId),
+      ]);
+    }
+  }
+  return json({ batches: summaries });
 }
 
 async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
@@ -897,9 +1224,11 @@ export async function handleWardrobeApi(
     }
     if (url.pathname === "/api/wardrobe" && request.method === "GET") return getWardrobe(db, identity.id);
     if (url.pathname === "/api/upload" && request.method === "POST") return uploadGarment(request, env, ctx, db, identity);
+    if (url.pathname === "/api/batches" && request.method === "POST") return createGarmentBatch(request, env, ctx, db, identity);
+    if (url.pathname === "/api/batches/status" && request.method === "GET") return reconcileGarmentBatches(env, ctx, db, identity);
     if (url.pathname === "/api/outfits" && request.method === "GET") return getOutfits(db, identity.id);
 
-    const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)\/(original|generated|cutout|open)$/);
+    const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)\/(original|generated|generated-open|cutout|open)$/);
     if (mediaMatch && request.method === "GET") {
       const clientId = safeClientId(decodeURIComponent(mediaMatch[1]));
       return clientId ? mediaResponse(env, db, identity.id, clientId, mediaMatch[2]) : apiError("Ruta inválida.", 400);
@@ -915,6 +1244,12 @@ export async function handleWardrobeApi(
     if (retryMatch && request.method === "POST") {
       const clientId = safeClientId(decodeURIComponent(retryMatch[1]));
       return clientId ? retryGarment(request, env, ctx, db, identity, clientId) : apiError("Ruta inválida.", 400);
+    }
+
+    const cutoutMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/cutout$/);
+    if (cutoutMatch && request.method === "POST") {
+      const clientId = safeClientId(decodeURIComponent(cutoutMatch[1]));
+      return clientId ? attachCutout(request, env, ctx, db, identity, clientId) : apiError("Ruta inválida.", 400);
     }
 
     const garmentMatch = url.pathname.match(/^\/api\/garments\/([^/]+)$/);
@@ -936,7 +1271,14 @@ export async function handleWardrobeApi(
           if (!payload) return apiError("Prenda no encontrada.", 404);
           garment = await saveGarment(db, identity.id, clientId, payload);
         }
-        const keys = [garment.source_image_key, garment.generated_image_key, garment.image_key, garment.open_image_key].filter(Boolean) as string[];
+        const keys = [
+          garment.source_image_key,
+          garment.processing_image_key,
+          garment.generated_image_key,
+          garment.generated_open_image_key,
+          garment.image_key,
+          garment.open_image_key,
+        ].filter(Boolean) as string[];
         if (garment.source_image_key) {
           await db.prepare("DELETE FROM garments WHERE id = ? AND owner_id = ?").bind(garment.id, identity.id).run();
         } else {

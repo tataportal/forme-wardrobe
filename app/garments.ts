@@ -15,7 +15,13 @@ export type Garment = GarmentAttributes & {
   color: string;
   image: string;
   openImage?: string;
-  status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "ready" | "failed";
+  generatedImage?: string;
+  generatedOpenImage?: string;
+  originalImage?: string;
+  quality?: "low" | "medium";
+  qaStatus?: "pending" | "passed" | "review";
+  qaNotes?: string;
+  status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "batch_staged" | "batch_processing" | "cutout_pending" | "ready" | "failed";
   favorite?: boolean;
 };
 

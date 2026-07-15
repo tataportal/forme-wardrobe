@@ -231,6 +231,16 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .tag-input-row input { min-width:0; padding:10px 0; border:0; border-bottom:1px solid var(--ink); border-radius:0; outline:0; background:transparent; font:15px/1 Georgia,serif; }
 .tag-input-row button { padding:0 10px; border:1px solid var(--ink); background:transparent; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .tag-input-row button:disabled { opacity:.25; cursor:default; }
+.processing-options { border-bottom:1px solid var(--line); }
+.processing-options summary { padding:18px 0; list-style:none; cursor:pointer; font-size:7px; letter-spacing:.13em; }
+.processing-options summary::-webkit-details-marker { display:none; }
+.processing-options summary::after { content:"＋"; float:right; font:14px/1 Georgia,serif; }
+.processing-options[open] summary::after { content:"−"; }
+.processing-options > div { padding:0 0 20px; }
+.processing-options p,.processing-options small { margin:0; color:var(--muted); font-size:9px; line-height:1.45; }
+.processing-options small { display:block; margin-top:5px; }
+.processing-option-actions { display:flex; flex-wrap:wrap; gap:7px; padding-top:13px; }
+.processing-option-actions button { min-height:38px; padding:0 11px; border:1px solid var(--ink); background:transparent; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .garment-editor-actions { position:fixed; left:0; right:0; bottom:0; z-index:2; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--ink); background:rgba(248,247,242,.96); display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; backdrop-filter:blur(12px); }
 .garment-editor-actions button { min-height:44px; padding:0 13px; border:1px solid var(--ink); background:transparent; font-size:8px; letter-spacing:.11em; cursor:pointer; }
 .garment-editor-actions button:last-child { background:var(--ink); color:var(--paper); }

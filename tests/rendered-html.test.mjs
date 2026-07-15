@@ -57,3 +57,24 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
 });
+
+test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
+  const [page, worker, schema] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(worker, /fallback: ImageQuality = "low"/);
+  assert.match(worker, /endpoint: "\/v1\/images\/edits"/);
+  assert.match(worker, /status = 'awaiting_cutout'/);
+  assert.match(worker, /garment\.category === "Outerwear"/);
+  assert.match(worker, /\/api\/batches\/status/);
+  assert.match(page, /function processingFileFor/);
+  assert.match(page, /function whiteStudioCutout/);
+  assert.match(page, /REHACER EN MEDIUM/);
+  assert.match(page, /discountedBatchThreshold = 5/);
+  assert.match(schema, /processingImageKey/);
+  assert.match(schema, /generatedOpenImageKey/);
+  assert.match(schema, /qaStatus/);
+});
