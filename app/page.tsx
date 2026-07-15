@@ -1555,8 +1555,8 @@ export default function Home() {
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
       });
-      setActiveOutfitId(outfitId);
-      setActiveLookName(lookName);
+      setActiveOutfitId(null);
+      setActiveLookName("Nuevo look");
       setSaved(true);
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
@@ -1862,7 +1862,7 @@ export default function Home() {
                 <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); }}>VACIAR</button>
               </div>
               {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
-              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit} onClick={saveCurrentOutfit}>{saved ? "LOOK GUARDADO" : savingOutfit ? "GUARDANDO…" : activeOutfitId ? "GUARDAR CAMBIOS" : "GUARDAR LOOK"}<span>{saved ? "✓" : "＋"}</span></button>
+              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}>{saved ? "LOOK GUARDADO" : savingOutfit ? "GUARDANDO…" : activeOutfitId ? "GUARDAR CAMBIOS" : "GUARDAR LOOK"}<span>{saved ? "✓" : "＋"}</span></button>
             </div>
           </div>
         </section>

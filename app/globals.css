@@ -176,6 +176,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .primary-action { width:100%; padding:16px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); display:flex; align-items:center; justify-content:space-between; font-size:9px; letter-spacing:.13em; cursor:pointer; }
 .primary-action:disabled { opacity:.3; cursor:default; }
 .primary-action.ready { background:var(--signal); border-color:var(--signal); }
+.primary-action.ready:disabled { opacity:1; }
 .upload-status { margin:0 0 16px; padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.45; }
 .upload-status.error { color:var(--signal); }
 .bulk-intake { min-height:430px; display:flex; flex-direction:column; }

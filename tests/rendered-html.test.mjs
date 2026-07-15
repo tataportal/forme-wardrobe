@@ -65,6 +65,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /\/puffer\//);
   assert.match(page, /function recommendStyle\(\)/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
+  assert.match(page, /setActiveOutfitId\(null\);\s+setActiveLookName\("Nuevo look"\);\s+setSaved\(true\)/);
+  assert.match(page, /savingOutfit \|\| saved/);
   assert.doesNotMatch(page, /Math\.random/);
   assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
   assert.match(worker, /async function deleteOutfit/);
