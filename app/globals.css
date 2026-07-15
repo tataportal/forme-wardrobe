@@ -108,7 +108,22 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .style-wheel-controls fieldset button.active { border-color:var(--ink); background:var(--ink); color:var(--paper); }
 .style-spin { min-height:48px; padding:0 15px; border:1px solid var(--signal); background:var(--signal); color:white; display:flex; align-items:center; justify-content:space-between; font-size:8px; letter-spacing:.12em; cursor:pointer; }
 .style-spin b { font:22px/1 Georgia,serif; transition:transform .35s cubic-bezier(.22,1,.36,1); }
-.style-spin:hover b { transform:rotate(180deg); }
+.style-spin:hover b { transform:translateX(3px); }
+.styling-results { padding-top:28px; }
+.styling-results-heading { padding-bottom:14px; border-bottom:1px solid var(--line); display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
+.styling-results-heading p,.styling-results-heading h2,.styling-results-heading span { margin:0; }
+.styling-results-heading p { color:var(--signal); font-size:7px; letter-spacing:.16em; }
+.styling-results-heading h2 { margin-top:5px; font:400 27px/1 Georgia,serif; letter-spacing:-.04em; }
+.styling-results-heading > span { max-width:145px; color:var(--muted); font-size:7px; line-height:1.4; letter-spacing:.09em; text-align:right; text-transform:uppercase; }
+.styling-recommendation-grid { padding-top:15px; display:grid; gap:15px; }
+.styling-recommendation { border:1px solid var(--ink); background:var(--panel); display:grid; grid-template-columns:minmax(118px,.8fr) minmax(0,1.2fr); }
+.styling-recommendation .saved-look-preview { border-right:1px solid var(--line); }
+.styling-recommendation-copy { min-width:0; padding:15px; display:flex; flex-direction:column; align-items:flex-start; }
+.styling-recommendation-copy > span { color:var(--signal); font-size:6px; letter-spacing:.13em; }
+.styling-recommendation-copy h3 { margin:7px 0 8px; font:400 20px/1 Georgia,serif; letter-spacing:-.035em; }
+.styling-recommendation-copy p { margin:0; color:var(--muted); font-size:9px; line-height:1.45; }
+.styling-recommendation-copy button { width:100%; margin-top:auto; padding:12px 0 0; border:0; border-top:1px solid var(--line); background:transparent; display:flex; align-items:center; justify-content:space-between; font-size:7px; letter-spacing:.1em; cursor:pointer; }
+.styling-recommendation-copy button b { font:14px/1 Georgia,serif; }
 .saved-looks-heading { min-height:92px; padding:28px 0 14px; border-bottom:1px solid var(--line); display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
 .saved-looks-heading p,.saved-looks-heading h2,.saved-looks-heading span { margin:0; }
 .saved-looks-heading p { color:var(--muted); font-size:7px; letter-spacing:.16em; }
@@ -285,10 +300,20 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .wardrobe-tabs { grid-column:1/-1; margin-top:20px; }
   .pieces-section,.upload-view { padding-top:30px; }
   .looks-view { padding-top:30px; }
-  .style-wheel { min-height:270px; padding:34px; grid-template-columns:minmax(0,1fr) minmax(360px,.95fr); align-items:center; gap:60px; }
+  .style-wheel { min-height:330px; padding:34px; grid-template-columns:minmax(0,1fr) minmax(420px,1.1fr); align-items:center; gap:60px; }
   .style-wheel-copy h2 { font-size:48px; }
   .style-wheel-controls { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:12px; }
   .style-wheel-controls .style-spin { grid-column:1/-1; }
+  .styling-results { padding-top:38px; }
+  .styling-results-heading { padding-bottom:17px; }
+  .styling-results-heading h2 { font-size:36px; }
+  .styling-results-heading > span { max-width:none; }
+  .styling-recommendation-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding-top:22px; }
+  .styling-recommendation { display:block; }
+  .styling-recommendation .saved-look-preview { border-right:0; border-bottom:1px solid var(--line); }
+  .styling-recommendation-copy { min-height:218px; padding:18px; }
+  .styling-recommendation-copy h3 { font-size:22px; }
+  .styling-recommendation-copy p { font-size:10px; }
   .saved-looks-heading { min-height:112px; padding-top:38px; }
   .saved-looks-heading h2 { font-size:36px; }
   .saved-looks-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:36px 14px; padding-top:22px; }

@@ -103,8 +103,17 @@ type SavedLook = {
   updatedAt?: string;
 };
 
-type StyleCode = "casual" | "formal";
+type StyleCode = "casual" | "smart" | "formal" | "experimental";
 type StyleMoment = "day" | "night";
+type StyleOccasion = "daily" | "work" | "dinner" | "event";
+type StylingStrategy = "balanced" | "contrast" | "statement";
+type StylingRecommendation = {
+  id: StylingStrategy;
+  title: string;
+  name: string;
+  reason: string;
+  items: CanvasPiece[];
+};
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
@@ -130,8 +139,10 @@ const uploadStatusLabels: Record<UploadStatus, string> = {
   failed: "REVISAR",
 };
 
-const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", formal: "Formal" };
+const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "Smart", formal: "Formal", experimental: "Experimental" };
 const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "Noche" };
+const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
+const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement" };
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -364,46 +375,150 @@ const initialCanvas: CanvasPiece[] = [
   { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
 ];
 
-function styleScore(garment: Garment, code: StyleCode, moment: StyleMoment, role: "bottom" | "top" | "outer") {
-  const searchable = `${garment.name} ${garment.material} ${garment.tone} ${garment.tags?.join(" ") ?? ""}`.toLocaleLowerCase();
-  let score = Math.random() * 0.4;
+const stylingNeutralFamilies = new Set(["Black", "White", "Grey", "Brown", "Blue"]);
 
-  if (role === "bottom" && garment.category === "Bottoms") score += 8;
-  if (role === "top" && garment.category === "Tops") score += 8;
-  if (role === "outer" && (garment.category === "Outerwear" || garment.category === "Tailoring")) score += 8;
+function searchableGarment(garment: Garment) {
+  return `${garment.name} ${garment.material} ${garment.finish} ${garment.tone} ${garment.tags?.join(" ") ?? ""}`.toLocaleLowerCase();
+}
+
+function contextGarmentScore(garment: Garment, code: StyleCode, moment: StyleMoment, occasion: StyleOccasion) {
+  const searchable = searchableGarment(garment);
+  let score = 0;
 
   if (code === "formal") {
-    if (garment.category === "Tailoring") score += 8;
-    if (/trouser|chino|shirt|blazer|coat|peacoat|draped|piped/.test(searchable)) score += 5;
-    if (/wool|leather/.test(searchable)) score += 2;
-    if (garment.silhouette === "Regular" || garment.silhouette === "Cropped") score += 1.5;
-    if (/tee|jeans|fleece|puffer|parka|track/.test(searchable)) score -= 5;
+    if (garment.category === "Tailoring") score += 12;
+    if (/trouser|chino|shirt|blazer|coat|peacoat|draped|piped/.test(searchable)) score += 7;
+    if (/tee|jeans|fleece|puffer|parka|track/.test(searchable)) score -= 7;
+  } else if (code === "smart") {
+    if (garment.category === "Tailoring") score += 7;
+    if (/shirt|blazer|trouser|chino|leather|knit|denim/.test(searchable)) score += 4;
+    if (/fleece|track/.test(searchable)) score -= 3;
+  } else if (code === "experimental") {
+    if (/graphic|embroidered|transparent|draped|kimono|cape|poncho|varsity|funnel/.test(searchable)) score += 9;
+    if (["Textured", "Glossy", "Transparent"].includes(garment.finish)) score += 5;
+    if (["Oversized", "Draped", "Cropped"].includes(garment.silhouette)) score += 4;
   } else {
-    if (/jeans|tee|bomber|puffer|crewneck|sweater|fleece|coach|parka/.test(searchable)) score += 5;
-    if (["Cotton", "Denim", "Technical nylon", "Knit", "Fleece"].includes(garment.material)) score += 2;
-    if (garment.silhouette === "Relaxed" || garment.silhouette === "Oversized") score += 2;
+    if (/jeans|tee|bomber|puffer|crewneck|sweater|fleece|coach|parka/.test(searchable)) score += 7;
+    if (["Cotton", "Denim", "Technical nylon", "Knit", "Fleece"].includes(garment.material)) score += 3;
     if (garment.category === "Tailoring") score -= 3;
   }
 
+  if (occasion === "work") {
+    if (garment.category === "Tailoring" || /shirt|trouser|chino|coat/.test(searchable)) score += 6;
+    if (/graphic|fleece|transparent|track/.test(searchable)) score -= 5;
+  } else if (occasion === "dinner") {
+    if (/leather|draped|blazer|knit/.test(searchable) || garment.finish === "Low sheen") score += 5;
+  } else if (occasion === "event") {
+    if (garment.category === "Tailoring" || /graphic|embroidered|cape|kimono|blazer/.test(searchable)) score += 6;
+  } else if (/denim|tee|coach|bomber|chino/.test(searchable)) {
+    score += 4;
+  }
+
   if (moment === "night") {
-    if (/black|negro|navy|dark/.test(searchable)) score += 4;
-    if (["Leather", "Glossy", "Low sheen"].includes(garment.material) || ["Glossy", "Low sheen"].includes(garment.finish)) score += 2;
-    if (/graphic|varsity|embroidered/.test(searchable)) score += 1;
+    if (["Black", "Blue", "Grey"].includes(garment.colorFamily)) score += 4;
+    if (["Leather", "Wool blend"].includes(garment.material) || ["Glossy", "Low sheen"].includes(garment.finish)) score += 3;
   } else {
     if (["White", "Blue", "Brown", "Green", "Grey"].includes(garment.colorFamily)) score += 3;
-    if (garment.finish === "Matte" || garment.finish === "Textured") score += 1;
-    if (/white|ivory|cream|blue|denim|camel|sage|stone|greige/.test(searchable)) score += 2;
+    if (["Matte", "Textured"].includes(garment.finish)) score += 2;
   }
 
   return score;
 }
 
-function pickStyledGarment(items: Garment[], code: StyleCode, moment: StyleMoment, role: "bottom" | "top" | "outer") {
-  const ranked = items
-    .map((garment) => ({ garment, score: styleScore(garment, code, moment, role) }))
-    .sort((a, b) => b.score - a.score);
-  const shortlist = ranked.slice(0, Math.min(4, ranked.length));
-  return shortlist[Math.floor(Math.random() * shortlist.length)]?.garment;
+function paletteScore(top: Garment, bottom: Garment, outer: Garment, strategy: StylingStrategy) {
+  const baseIsNeutral = stylingNeutralFamilies.has(top.colorFamily) && stylingNeutralFamilies.has(bottom.colorFamily);
+  const sameBase = top.colorFamily === bottom.colorFamily;
+  const outerIsNeutral = stylingNeutralFamilies.has(outer.colorFamily);
+  let score = baseIsNeutral ? 5 : 0;
+  if (sameBase) score += 2;
+  if (outer.colorFamily === top.colorFamily || outer.colorFamily === bottom.colorFamily) score += 3;
+  if (baseIsNeutral && !outerIsNeutral) score += strategy === "contrast" || strategy === "statement" ? 8 : 2;
+  if (!baseIsNeutral && !outerIsNeutral && outer.colorFamily !== top.colorFamily && outer.colorFamily !== bottom.colorFamily) score -= 5;
+  return score;
+}
+
+function silhouetteScore(top: Garment, bottom: Garment, outer: Garment) {
+  const wideBottom = ["Oversized", "Relaxed", "Draped"].includes(bottom.silhouette);
+  const largeOuter = ["Oversized", "Longline", "Draped"].includes(outer.silhouette);
+  let score = 0;
+  if (largeOuter && !wideBottom) score += 5;
+  if (wideBottom && ["Cropped", "Regular"].includes(outer.silhouette)) score += 5;
+  if (wideBottom && largeOuter) score -= 5;
+  if (top.silhouette === "Regular" && (wideBottom || largeOuter)) score += 3;
+  if (outer.openImage) score += 2;
+  return score;
+}
+
+function strategyScore(top: Garment, bottom: Garment, outer: Garment, strategy: StylingStrategy) {
+  const outerText = searchableGarment(outer);
+  if (strategy === "balanced") {
+    return (stylingNeutralFamilies.has(outer.colorFamily) ? 6 : 0)
+      + (["Matte", "Low sheen"].includes(outer.finish) ? 3 : 0)
+      + (outer.category === "Tailoring" && /jeans|denim/.test(searchableGarment(bottom)) ? 2 : 0);
+  }
+  if (strategy === "contrast") {
+    return (outer.colorFamily !== top.colorFamily && outer.colorFamily !== bottom.colorFamily ? 6 : 0)
+      + (outer.material !== top.material ? 3 : 0)
+      + (outer.category === "Tailoring" && /jeans|denim/.test(searchableGarment(bottom)) ? 5 : 0);
+  }
+  return (/graphic|embroidered|transparent|cape|kimono|varsity|funnel/.test(outerText) ? 9 : 0)
+    + (["Textured", "Glossy", "Transparent"].includes(outer.finish) ? 6 : 0)
+    + (["Oversized", "Draped", "Cropped"].includes(outer.silhouette) ? 4 : 0)
+    + (stylingNeutralFamilies.has(top.colorFamily) && stylingNeutralFamilies.has(bottom.colorFamily) ? 4 : 0);
+}
+
+function stylingReason(strategy: StylingStrategy, top: Garment, bottom: Garment, outer: Garment, occasion: StyleOccasion, moment: StyleMoment) {
+  const topName = translateGarmentName(top.name);
+  const bottomName = translateGarmentName(bottom.name);
+  const outerName = translateGarmentName(outer.name);
+  const context = `${styleOccasionLabels[occasion].toLocaleLowerCase()} de ${styleMomentLabels[moment].toLocaleLowerCase()}`;
+  if (strategy === "balanced") return `${topName} y ${bottomName} construyen una base limpia; ${outerName} mantiene la paleta y equilibra el volumen. Es la opción más fácil de llevar para ${context}.`;
+  if (strategy === "contrast") return `${outerName} introduce contraste de color o material sobre la base de ${topName} y ${bottomName}. Las siluetas no compiten, así que el look se siente intencional para ${context}.`;
+  return `${outerName} funciona como pieza protagonista. ${topName} y ${bottomName} permanecen contenidos para dejarle el foco sin perder proporción; funciona especialmente bien para ${context}.`;
+}
+
+function buildStylingRecommendations(garments: Garment[], code: StyleCode, moment: StyleMoment, occasion: StyleOccasion): StylingRecommendation[] {
+  const bottoms = garments.filter((item) => item.category === "Bottoms");
+  const tops = garments.filter((item) => item.category === "Tops");
+  const outerLayers = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
+  if (!bottoms.length || !tops.length || !outerLayers.length) return [];
+  const strategies: StylingStrategy[] = ["balanced", "contrast", "statement"];
+  const usedOuter = new Set<string>();
+  const usedCombinations = new Set<string>();
+
+  return strategies.flatMap((strategy) => {
+    const candidates = bottoms.flatMap((bottom) => tops.flatMap((top) => outerLayers.map((outer) => ({
+      bottom,
+      top,
+      outer,
+      score: contextGarmentScore(bottom, code, moment, occasion)
+        + contextGarmentScore(top, code, moment, occasion)
+        + contextGarmentScore(outer, code, moment, occasion)
+        + paletteScore(top, bottom, outer, strategy)
+        + silhouetteScore(top, bottom, outer)
+        + strategyScore(top, bottom, outer, strategy),
+    }))));
+    candidates.sort((a, b) => b.score - a.score || `${a.outer.id}-${a.top.id}-${a.bottom.id}`.localeCompare(`${b.outer.id}-${b.top.id}-${b.bottom.id}`));
+    const choice = candidates.find((candidate) => !usedOuter.has(candidate.outer.id) && !usedCombinations.has(`${candidate.bottom.id}:${candidate.top.id}:${candidate.outer.id}`)) ?? candidates[0];
+    if (!choice) return [];
+    usedOuter.add(choice.outer.id);
+    usedCombinations.add(`${choice.bottom.id}:${choice.top.id}:${choice.outer.id}`);
+    const bottomPlacement = defaultPlacement(choice.bottom);
+    const topPlacement = defaultPlacement(choice.top);
+    const outerPlacement = defaultPlacement(choice.outer);
+    const items: CanvasPiece[] = [
+      { instanceId: `${strategy}-bottom`, garmentId: choice.bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(choice.bottom.category) + 1 },
+      { instanceId: `${strategy}-top`, garmentId: choice.top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(choice.top.category) + 1 },
+      { instanceId: `${strategy}-outer`, garmentId: choice.outer.id, variant: choice.outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(choice.outer.category) + 1 },
+    ];
+    return [{
+      id: strategy,
+      title: stylingStrategyLabels[strategy],
+      name: `${styleOccasionLabels[occasion]} · ${styleCodeLabels[code]} · ${stylingStrategyLabels[strategy]}`,
+      reason: stylingReason(strategy, choice.top, choice.bottom, choice.outer, occasion, moment),
+      items,
+    }];
+  });
 }
 
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
@@ -447,6 +562,8 @@ export default function Home() {
   const [activeLookName, setActiveLookName] = useState("Conjunto actual");
   const [styleCode, setStyleCode] = useState<StyleCode>("casual");
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
+  const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
+  const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -1029,54 +1146,21 @@ export default function Home() {
     if (selectedId) removePiece(selectedId);
   }
 
-  function shuffleLook() {
-    const bottoms = garments.filter((item) => item.category === "Bottoms");
-    const tops = garments.filter((item) => item.category === "Tops");
-    const outerLayers = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
-    const bottom = bottoms[Math.floor(Math.random() * bottoms.length)];
-    const top = tops[Math.floor(Math.random() * tops.length)];
-    const outer = outerLayers[Math.floor(Math.random() * outerLayers.length)];
-    if (!bottom || !top || !outer) return;
-    const bottomPlacement = defaultPlacement(bottom);
-    const topPlacement = defaultPlacement(top);
-    const outerPlacement = defaultPlacement(outer);
-    const next: CanvasPiece[] = [
-      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(bottom.category) + 1 },
-      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(top.category) + 1 },
-      { instanceId: crypto.randomUUID(), garmentId: outer.id, variant: outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(outer.category) + 1 },
-    ];
-    setCanvasPieces(next);
-    setSelectedId(next[2].instanceId);
-    setActiveOutfitId(null);
-    setActiveLookName("Combinación libre");
-    setSaved(false);
-  }
-
   function recommendStyle() {
-    const bottom = pickStyledGarment(garments.filter((item) => item.category === "Bottoms"), styleCode, styleMoment, "bottom");
-    const top = pickStyledGarment(garments.filter((item) => item.category === "Tops"), styleCode, styleMoment, "top");
-    const outer = pickStyledGarment(
-      garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring"),
-      styleCode,
-      styleMoment,
-      "outer",
-    );
-    if (!bottom || !top || !outer) {
+    const next = buildStylingRecommendations(garments, styleCode, styleMoment, styleOccasion);
+    if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
     }
-    const bottomPlacement = defaultPlacement(bottom);
-    const topPlacement = defaultPlacement(top);
-    const outerPlacement = defaultPlacement(outer);
-    const next: CanvasPiece[] = [
-      { instanceId: crypto.randomUUID(), garmentId: bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(bottom.category) + 1 },
-      { instanceId: crypto.randomUUID(), garmentId: top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(top.category) + 1 },
-      { instanceId: crypto.randomUUID(), garmentId: outer.id, variant: outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(outer.category) + 1 },
-    ];
-    setCanvasPieces(next);
+    setStylingRecommendations(next);
+    setWardrobeError("");
+  }
+
+  function openStylingRecommendation(recommendation: StylingRecommendation) {
+    setCanvasPieces(recommendation.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
     setSelectedId("");
     setActiveOutfitId(null);
-    setActiveLookName(`${styleCodeLabels[styleCode]} · ${styleMomentLabels[styleMoment]}`);
+    setActiveLookName(recommendation.name);
     setSaved(false);
     setLibraryOpen(false);
     setWardrobeError("");
@@ -1238,21 +1322,45 @@ export default function Home() {
               <div className="style-wheel">
                 <div className="style-wheel-copy">
                   <p>ASISTENTE DE STYLING</p>
-                  <h2>¿Qué quieres vestir?</h2>
-                  <span>Elige dos variables. FORME combina únicamente prendas que ya están en tu armario.</span>
+                  <h2>¿Para qué te estás vistiendo?</h2>
+                  <span>FORME analiza contexto, dress code, color, materiales y proporción. Después propone tres caminos usando únicamente tu armario.</span>
                 </div>
                 <div className="style-wheel-controls">
-                  <fieldset>
-                    <legend>CÓDIGO</legend>
-                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => setStyleCode(option)} key={option}>{styleCodeLabels[option]}</button>)}
+                  <fieldset className="option-four">
+                    <legend>PLAN</legend>
+                    {(Object.keys(styleOccasionLabels) as StyleOccasion[]).map((option) => <button type="button" className={styleOccasion === option ? "active" : ""} onClick={() => { setStyleOccasion(option); setStylingRecommendations([]); }} key={option}>{styleOccasionLabels[option]}</button>)}
+                  </fieldset>
+                  <fieldset className="option-four">
+                    <legend>DRESS CODE</legend>
+                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => { setStyleCode(option); setStylingRecommendations([]); }} key={option}>{styleCodeLabels[option]}</button>)}
                   </fieldset>
                   <fieldset>
                     <legend>MOMENTO</legend>
-                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => setStyleMoment(option)} key={option}>{styleMomentLabels[option]}</button>)}
+                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => { setStyleMoment(option); setStylingRecommendations([]); }} key={option}>{styleMomentLabels[option]}</button>)}
                   </fieldset>
-                  <button className="style-spin" type="button" onClick={recommendStyle}><span>CREAR RECOMENDACIÓN</span><b>↻</b></button>
+                  <button className="style-spin" type="button" onClick={recommendStyle}><span>ANALIZAR MI ARMARIO</span><b>→</b></button>
                 </div>
               </div>
+
+              {stylingRecommendations.length > 0 && <section className="styling-results" aria-live="polite">
+                <div className="styling-results-heading">
+                  <div><p>ANÁLISIS COMPLETO</p><h2>Tres direcciones que sí funcionan</h2></div>
+                  <span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span>
+                </div>
+                <div className="styling-recommendation-grid">
+                  {stylingRecommendations.map((recommendation, index) => (
+                    <article className="styling-recommendation" key={recommendation.id}>
+                      <LookPreview look={{ id: recommendation.id, name: recommendation.name, items: recommendation.items }} garmentById={garmentById} />
+                      <div className="styling-recommendation-copy">
+                        <span>0{index + 1} / {recommendation.title.toLocaleUpperCase()}</span>
+                        <h3>{recommendation.name}</h3>
+                        <p>{recommendation.reason}</p>
+                        <button type="button" onClick={() => openStylingRecommendation(recommendation)}>PROBAR EN CANVAS <b>↗</b></button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>}
 
               <div className="saved-looks-heading">
                 <div><p>ARCHIVO PERSONAL</p><h2>Looks guardados</h2></div>
@@ -1271,7 +1379,7 @@ export default function Home() {
                     </div>
                   </article>
                 ))}
-                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={recommendStyle}>CREAR EL PRIMERO ↻</button></div>}
+                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={recommendStyle}>ANALIZAR MI ARMARIO →</button></div>}
               </div>
             </section>
           ) : (
@@ -1386,7 +1494,7 @@ export default function Home() {
               </div>
 
               <div className="studio-actions">
-                <button className="shuffle" onClick={shuffleLook}>CONJUNTO ALEATORIO <span>↻</span></button>
+                <button className="shuffle" onClick={() => openWardrobe("looks")}>RECOMENDACIONES <span>→</span></button>
                 <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); }}>VACIAR</button>
               </div>
               {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
