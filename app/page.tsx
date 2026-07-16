@@ -3135,14 +3135,16 @@ export default function Home() {
         </aside>
       </div>}
       <header className="topbar">
-        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORMÉ<span>®</span></button>
-        <nav className="zone-nav" aria-label="Secciones principales">
-          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
-          <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
-        </nav>
-        {demoMode
-          ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "REVISANDO SESIÓN" : "CONTINUAR CON GOOGLE"}</button>
-          : <button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
+        <div className="topbar-inner">
+          <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORMÉ<span>®</span></button>
+          <nav className="zone-nav" aria-label="Secciones principales">
+            <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
+            <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
+          </nav>
+          {demoMode
+            ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "REVISANDO SESIÓN" : "CONTINUAR CON GOOGLE"}</button>
+            : <button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
+        </div>
       </header>
 
       {view === "wardrobe" && (

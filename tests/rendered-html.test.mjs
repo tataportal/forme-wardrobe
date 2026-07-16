@@ -25,6 +25,7 @@ test("server-renders the FORMÉ wardrobe", async () => {
   assert.match(html, />Mi closet</);
   assert.match(html, />Looks guardados</);
   assert.match(html, />Asistente</);
+  assert.match(html, /class="topbar-inner"/);
   assert.match(html, /＋ Agregar/);
   assert.match(html, /CONTINUAR CON GOOGLE|REVISANDO SESIÓN/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
