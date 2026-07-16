@@ -38,7 +38,8 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .profile-photo.local-profile { transform:scale(2.28); transform-origin:50% 49%; }
 .content { width:100%; max-width:1600px; margin:0 auto; padding:0 16px 48px; }
 
-.wardrobe-profile { padding:0; border-bottom:1px solid var(--ink); }
+.wardrobe-profile { padding:0; border-bottom:1px solid var(--ink); display:flex; align-items:stretch; justify-content:space-between; gap:14px; overflow-x:auto; scrollbar-width:none; }
+.wardrobe-profile::-webkit-scrollbar { display:none; }
 .profile-identity { display:flex; align-items:center; gap:14px; }
 .profile-avatar { width:58px; height:58px; overflow:hidden; display:grid; place-items:center; flex:0 0 auto; border:1px solid var(--ink); border-radius:50%; font:12px/1 Arial,sans-serif; }
 .profile-identity p,.profile-identity h1,.profile-identity span { margin:0; }
@@ -49,9 +50,12 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .profile-stats p { margin:0; display:flex; flex-direction:column; gap:3px; }
 .profile-stats strong { font:400 22px/1 Georgia,serif; }
 .profile-stats span { color:var(--muted); font-size:8px; letter-spacing:.08em; text-transform:uppercase; }
-.wardrobe-tabs { display:flex; gap:22px; overflow-x:auto; }
+.wardrobe-tabs { min-width:max-content; display:flex; gap:22px; overflow-x:auto; }
 .wardrobe-tabs button { min-height:46px; border:0; border-bottom:2px solid transparent; background:transparent; padding:0; white-space:nowrap; color:var(--muted); font-size:9px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .wardrobe-tabs button.active { border-color:var(--ink); color:var(--ink); }
+.wardrobe-tab-actions { min-width:max-content; padding:6px 0; display:flex; align-items:center; gap:8px; position:sticky; right:0; z-index:2; background:var(--paper); box-shadow:-14px 0 18px var(--paper); }
+.wardrobe-tab-actions button { min-height:34px; padding:0 12px; border:1px solid var(--ink); background:transparent; font-size:8px; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; cursor:pointer; }
+.wardrobe-tab-actions button.active,.wardrobe-tab-actions .closet-add { background:var(--ink); color:var(--paper); }
 .app-message { margin:14px 0 0; padding:10px 12px; border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:9px; line-height:1.4; }
 .app-message.error { border-color:rgba(232,59,37,.45); color:var(--signal); }
 .app-message button { border:0; background:transparent; font:18px/1 Georgia,serif; cursor:pointer; }
@@ -149,7 +153,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .style-exploration-control > div:first-child strong { font:400 22px/1 Georgia,serif; }
 .style-save-error { margin:0 0 12px!important; color:var(--signal)!important; font:13px/1.4 Arial,sans-serif!important; letter-spacing:.02em!important; }
 
-.pieces-section { padding-top:10px; }
+.pieces-section { padding-top:0; }
 .upload-view { padding-top:24px; }
 .catalog-toolbar { min-height:46px; display:flex; align-items:center; justify-content:flex-end; gap:18px; padding-bottom:10px; border-bottom:1px solid var(--line); }
 .catalog-toolbar p,.catalog-toolbar h2 { margin:0; }
@@ -673,12 +677,13 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .zone-nav button { min-width:105px; padding:9px 16px; border:0; border-radius:100px; background:transparent; color:var(--muted); font-size:8px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
   .zone-nav button.active { background:var(--ink); color:var(--paper); }
   .content { padding:0 32px 70px; }
-  .wardrobe-profile { padding-top:0; display:block; }
+  .wardrobe-profile { padding-top:0; display:flex; }
   .profile-avatar { width:72px; height:72px; }
   .profile-identity h1 { font-size:40px; }
   .profile-stats { justify-self:end; padding:0 0 20px; }
-  .wardrobe-tabs { margin-top:0; }
-  .pieces-section { padding-top:12px; }
+  .wardrobe-tabs { flex:1 1 auto; margin-top:0; }
+  .wardrobe-tab-actions { box-shadow:none; }
+  .pieces-section { padding-top:0; }
   .upload-view { padding-top:30px; }
   .looks-view,.assistant-view { padding-top:30px; }
   .taste-calibration { padding:34px; }

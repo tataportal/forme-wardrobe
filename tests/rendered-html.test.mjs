@@ -108,6 +108,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-identity"/);
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
+  assert.match(page, /className="wardrobe-tab-actions"/);
+  assert.doesNotMatch(page, /className="catalog-toolbar"/);
   assert.match(page, /expanded-hitbox/);
   assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| saved/);

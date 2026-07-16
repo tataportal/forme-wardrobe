@@ -3062,17 +3062,15 @@ export default function Home() {
               <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
               <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => setWardrobePanel("assistant")}>Asistente</button>
             </nav>
+            {wardrobePanel === "closet" && closetMode === "browse" && <div className="wardrobe-tab-actions">
+              <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
+              <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
+            </div>}
           </section>
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              <div className="catalog-toolbar">
-                <div className="catalog-toolbar-actions">
-                  <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
-                  <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
-                </div>
-              </div>
               <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
                 <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
                   <div className="filter-sidebar-header"><strong>Filtros</strong><button onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></div>
