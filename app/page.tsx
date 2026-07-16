@@ -154,6 +154,33 @@ type StylingRecommendation = {
   reason: string;
   items: CanvasPiece[];
 };
+type AssistantIntent = "outfit" | "underused" | "favorites" | "experimental" | "missing";
+type AssistantFollowup = {
+  id: string;
+  label: string;
+  detail: string;
+  occasion: StyleOccasion;
+  code: StyleCode;
+  moment: StyleMoment;
+  intent: AssistantIntent;
+  focus: string;
+};
+type AssistantPreset = {
+  id: string;
+  label: string;
+  detail: string;
+  followup: string;
+  options: AssistantFollowup[];
+};
+type AssistantAnswer = {
+  question: string;
+  followup: string;
+  eyebrow: string;
+  title: string;
+  summary: string;
+  signals: string[];
+  intent: AssistantIntent;
+};
 type StyleAudience = "hombre" | "mujer";
 type StyleFamilyId = "classic" | "minimal" | "relaxed" | "tailored" | "preppy" | "streetwear" | "sporty" | "utility" | "romantic" | "bohemian" | "rebel" | "avant_garde";
 type StyleFeedbackReason = "color" | "silhouette" | "combination" | "formality" | "expression" | "fit" | "footwear" | "specific";
@@ -209,6 +236,68 @@ const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "No
 const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
 const weeklyOccasionLabels: Record<WeeklyOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento", weekend: "Fin de semana" };
 const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement", minimal: "Esencial", layered: "Capas" };
+const assistantPresets: AssistantPreset[] = [
+  {
+    id: "today",
+    label: "¿Qué me pongo hoy?",
+    detail: "Una respuesta rápida con lo que ya tienes.",
+    followup: "¿Cómo será tu día?",
+    options: [
+      { id: "today-work", label: "Trabajo", detail: "Pulido, sin verse rígido", occasion: "work", code: "smart", moment: "day", intent: "outfit", focus: "un día de trabajo" },
+      { id: "today-casual", label: "Día casual", detail: "Cómodo y fácil de repetir", occasion: "daily", code: "casual", moment: "day", intent: "outfit", focus: "un día casual" },
+      { id: "today-dinner", label: "Cena", detail: "Más intención para la noche", occasion: "dinner", code: "smart", moment: "night", intent: "outfit", focus: "una cena" },
+      { id: "today-event", label: "Evento", detail: "Una opción con mayor presencia", occasion: "event", code: "formal", moment: "night", intent: "outfit", focus: "un evento" },
+    ],
+  },
+  {
+    id: "week",
+    label: "¿Cómo visto mi semana?",
+    detail: "Cinco direcciones que puedas guardar y rotar.",
+    followup: "¿Qué domina tu semana?",
+    options: [
+      { id: "week-office", label: "Oficina", detail: "Bases repetibles con capas pulidas", occasion: "work", code: "smart", moment: "day", intent: "outfit", focus: "una semana de oficina" },
+      { id: "week-mixed", label: "Semana mixta", detail: "Del día a una salida", occasion: "daily", code: "smart", moment: "day", intent: "outfit", focus: "una semana con planes mixtos" },
+      { id: "week-night", label: "Más planes de noche", detail: "Looks que suben el registro", occasion: "dinner", code: "smart", moment: "night", intent: "outfit", focus: "una semana con planes de noche" },
+      { id: "week-casual", label: "Todo casual", detail: "Comodidad con proporción", occasion: "daily", code: "casual", moment: "day", intent: "outfit", focus: "una semana casual" },
+    ],
+  },
+  {
+    id: "rotation",
+    label: "Quiero usar más mi closet",
+    detail: "Prioriza prendas que ya son tuyas, pero aparecen poco.",
+    followup: "¿Qué quieres recuperar?",
+    options: [
+      { id: "rotation-forgotten", label: "Piezas olvidadas", detail: "Lo que casi no aparece en tus looks", occasion: "daily", code: "casual", moment: "day", intent: "underused", focus: "recuperar piezas poco usadas" },
+      { id: "rotation-favorites", label: "Mis favoritas", detail: "Nuevas combinaciones alrededor de ellas", occasion: "daily", code: "smart", moment: "day", intent: "favorites", focus: "volver a tus favoritas" },
+      { id: "rotation-new", label: "Algo que aún no usé", detail: "Una entrada fácil para una pieza nueva", occasion: "daily", code: "experimental", moment: "day", intent: "underused", focus: "estrenar una pieza del closet" },
+      { id: "rotation-safe", label: "Una base segura", detail: "Repetir mejor, sin complicarlo", occasion: "daily", code: "casual", moment: "day", intent: "outfit", focus: "construir una base segura" },
+    ],
+  },
+  {
+    id: "explore",
+    label: "Quiero probar algo distinto",
+    detail: "Se aleja de tus repeticiones sin dejar de parecerte a ti.",
+    followup: "¿Qué quieres mover primero?",
+    options: [
+      { id: "explore-color", label: "Más color", detail: "Un acento fuera de tu base habitual", occasion: "daily", code: "experimental", moment: "day", intent: "experimental", focus: "introducir más color" },
+      { id: "explore-shape", label: "Otra silueta", detail: "Cambiar proporción antes que comprar", occasion: "event", code: "experimental", moment: "night", intent: "experimental", focus: "probar otra silueta" },
+      { id: "explore-polished", label: "Más pulido", detail: "Subir el registro de lo cotidiano", occasion: "work", code: "formal", moment: "day", intent: "experimental", focus: "verte más pulido" },
+      { id: "explore-relaxed", label: "Más relajado", detail: "Volumen y comodidad con intención", occasion: "daily", code: "casual", moment: "day", intent: "experimental", focus: "verte más relajado" },
+    ],
+  },
+  {
+    id: "missing",
+    label: "¿Qué falta en mi closet?",
+    detail: "Lee huecos reales antes de sugerirte comprar algo.",
+    followup: "¿Qué quieres desbloquear?",
+    options: [
+      { id: "missing-combinations", label: "Más combinaciones", detail: "Categorías puente y proporción", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "crear más combinaciones" },
+      { id: "missing-work", label: "Trabajo", detail: "Cobertura para días pulidos", occasion: "work", code: "smart", moment: "day", intent: "missing", focus: "vestirte para trabajo" },
+      { id: "missing-night", label: "Noche", detail: "Opciones para cena y evento", occasion: "dinner", code: "smart", moment: "night", intent: "missing", focus: "tener más opciones de noche" },
+      { id: "missing-weather", label: "Entretiempo", detail: "Capas ligeras y piezas puente", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "resolver el entretiempo" },
+    ],
+  },
+];
 const styleFamilyMeta: Array<{ id: StyleFamilyId; label: string; description: string; file: string }> = [
   { id: "classic", label: "Clásico", description: "Piezas atemporales, líneas claras y combinaciones que sobreviven a cualquier temporada.", file: "01-clasico.webp" },
   { id: "minimal", label: "Minimalista", description: "Paleta contenida, pocos elementos y proporciones precisas sin ruido visual.", file: "02-minimalista.webp" },
@@ -805,6 +894,7 @@ function buildStylingRecommendations(
   occasion: StyleOccasion,
   excludedSignatures: Set<string> = new Set(),
   styleProfile?: StyleProfile | null,
+  priorityGarmentIds: Set<string> = new Set(),
 ): StylingRecommendation[] {
   const bottoms = garments.filter((item) => item.category === "Bottoms");
   const tops = garments.filter((item) => item.category === "Tops");
@@ -829,6 +919,9 @@ function buildStylingRecommendations(
         + stylePreferenceScore(bottom, styleProfile)
         + stylePreferenceScore(top, styleProfile)
         + stylePreferenceScore(outer, styleProfile)
+        + (priorityGarmentIds.has(bottom.id) ? 18 : 0)
+        + (priorityGarmentIds.has(top.id) ? 18 : 0)
+        + (priorityGarmentIds.has(outer.id) ? 18 : 0)
         + paletteScore(top, bottom, outer, strategy)
         + silhouetteScore(top, bottom, outer)
         + strategyScore(top, bottom, outer, strategy),
@@ -848,8 +941,8 @@ function buildStylingRecommendations(
 
     const selectedBase = [choice.top, choice.bottom, choice.outer];
     const rankComplement = (pool: Garment[]) => [...pool].sort((a, b) => {
-      const aScore = complementScore(a, selectedBase, code, moment, occasion) + stylePreferenceScore(a, styleProfile) - (usedComplements.has(a.id) ? 10 : 0);
-      const bScore = complementScore(b, selectedBase, code, moment, occasion) + stylePreferenceScore(b, styleProfile) - (usedComplements.has(b.id) ? 10 : 0);
+      const aScore = complementScore(a, selectedBase, code, moment, occasion) + stylePreferenceScore(a, styleProfile) + (priorityGarmentIds.has(a.id) ? 14 : 0) - (usedComplements.has(a.id) ? 10 : 0);
+      const bScore = complementScore(b, selectedBase, code, moment, occasion) + stylePreferenceScore(b, styleProfile) + (priorityGarmentIds.has(b.id) ? 14 : 0) - (usedComplements.has(b.id) ? 10 : 0);
       return bScore - aScore || a.id.localeCompare(b.id);
     })[0];
     const shoe = rankComplement(footwear);
@@ -1055,6 +1148,83 @@ function countGarments(garments: Garment[], value: (garment: Garment) => string)
   const counts = new Map<string, number>();
   for (const garment of garments) counts.set(value(garment), (counts.get(value(garment)) ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function buildAssistantAnswer({
+  preset,
+  followup,
+  profile,
+  styleProfile,
+  garments,
+  savedLooks,
+  weeklyPlan,
+  demoMode,
+}: {
+  preset: AssistantPreset;
+  followup: AssistantFollowup;
+  profile: WardrobeProfile;
+  styleProfile: StyleProfile | null;
+  garments: Garment[];
+  savedLooks: SavedLook[];
+  weeklyPlan: WeeklyPlanEntry[];
+  demoMode: boolean;
+}): AssistantAnswer {
+  const categoryCounts = countGarments(garments, (garment) => garment.category);
+  const colorCounts = countGarments(garments, (garment) => garment.colorFamily);
+  const materialCounts = countGarments(garments, (garment) => garment.material);
+  const essentialCategories: Garment["category"][] = ["Tops", "Bottoms", "Outerwear", "Footwear", "Accessories"];
+  const missingCategories = essentialCategories.filter((category) => !categoryCounts.some(([name, count]) => name === category && count > 0));
+  const topStyles = styleProfile?.ratings.length
+    ? styleFamilyMeta
+      .map((family) => ({ ...family, rating: styleProfile.ratings.find((rating) => rating.family === family.id) }))
+      .filter((family) => family.rating && !family.rating.blocked)
+      .sort((a, b) => (b.rating?.affinity ?? 0) - (a.rating?.affinity ?? 0))
+      .slice(0, 2)
+      .map((family) => family.label)
+    : [];
+  const name = demoMode ? "" : profile.name.split(" ")[0];
+  const salutation = name ? `${name}, ` : "";
+  const dominantCategory = categoryCounts[0]?.[0];
+  const dominantColor = colorCounts[0]?.[0];
+  const dominantMaterial = materialCounts[0]?.[0];
+  const usedGarmentIds = new Set(savedLooks.flatMap((look) => look.items.map((item) => item.garmentId)));
+  const underusedCount = garments.filter((garment) => !usedGarmentIds.has(garment.id)).length;
+
+  let title = `${salutation}empezaría por cinco direcciones reales.`;
+  let summary = `Las opciones responden a ${followup.focus} y se construyen con las prendas disponibles en tu closet, sin inventar piezas.`;
+  if (followup.intent === "underused") {
+    title = `${salutation}hay ${underusedCount} piezas que todavía pueden entrar en rotación.`;
+    summary = `Voy a priorizar prendas que aparecen poco o nunca en tus ${savedLooks.length} ${savedLooks.length === 1 ? "look guardado" : "looks guardados"}, manteniendo una base fácil de usar.`;
+  } else if (followup.intent === "favorites") {
+    const favoriteCount = garments.filter((garment) => garment.favorite).length;
+    title = `${salutation}vamos a construir alrededor de tus favoritas.`;
+    summary = `Parto de ${favoriteCount || "las"} piezas marcadas como favoritas y cambio sus acompañantes para que no termines repitiendo el mismo look.`;
+  } else if (followup.intent === "experimental") {
+    title = `${salutation}podemos mover el look sin perder tu centro.`;
+    summary = `La propuesta busca ${followup.focus}. Tu nivel de exploración y las familias que elegiste regulan qué tan lejos se mueve cada opción.`;
+  } else if (followup.intent === "missing") {
+    title = missingCategories.length
+      ? `${salutation}el hueco principal está en ${missingCategories.slice(0, 2).map((category) => translateValue(category).toLocaleLowerCase()).join(" y ")}.`
+      : `${salutation}no falta una categoría completa; falta balancear lo que ya tienes.`;
+    summary = missingCategories.length
+      ? `Completar esa cobertura desbloquea más looks para ${followup.focus}. Primero conviene probar el efecto con los básicos compartidos antes de comprar.`
+      : `${translateValue(dominantCategory ?? "tu categoría principal")} concentra la mayor parte del closet. Para ${followup.focus}, una pieza puente en una categoría menos representada aportaría más que otra variante de lo mismo.`;
+  }
+
+  return {
+    question: preset.label,
+    followup: followup.label,
+    eyebrow: followup.intent === "missing" ? "LECTURA PERSONAL" : "RESPUESTA PERSONALIZADA",
+    title,
+    summary,
+    intent: followup.intent,
+    signals: [
+      demoMode ? "Persona: modo de prueba, todavía sin cuenta" : `Persona: ${profile.name} · ${profile.handle}`,
+      topStyles.length ? `Perfil: ${topStyles.join(" + ")} · exploración ${styleProfile?.exploration ?? 35}%` : "Perfil: falta calibrar tus preferencias de estilo",
+      garments.length ? `Closet: ${garments.length} prendas · base ${translateValue(dominantColor ?? "sin definir")} · ${translateValue(dominantMaterial ?? "material mixto")}` : "Closet: todavía no hay prendas personales para leer",
+      `Uso: ${savedLooks.length} looks guardados · ${weeklyPlan.length} días planeados`,
+    ],
+  };
 }
 
 function versatilityScore(garment: Garment): number {
@@ -1626,6 +1796,9 @@ export default function Home() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
+  const [assistantPresetId, setAssistantPresetId] = useState("");
+  const [assistantFollowupId, setAssistantFollowupId] = useState("");
+  const [assistantAnswer, setAssistantAnswer] = useState<AssistantAnswer | null>(null);
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
   const [activeIterationIndex, setActiveIterationIndex] = useState(-1);
@@ -1710,6 +1883,18 @@ export default function Home() {
       .sort((a, b) => (b.rating?.affinity ?? 0) - (a.rating?.affinity ?? 0))
       .slice(0, 3)
     : [];
+  const selectedAssistantPreset = assistantPresets.find((preset) => preset.id === assistantPresetId);
+  const assistantProfileReady = Boolean(styleProfile?.ratings.length);
+  const assistantClosetCategories = new Set(personalGarments.map((garment) => garment.category));
+  const assistantClosetReady = personalGarments.length >= 8
+    && assistantClosetCategories.has("Tops")
+    && assistantClosetCategories.has("Bottoms")
+    && (assistantClosetCategories.has("Outerwear") || assistantClosetCategories.has("Tailoring"));
+  const assistantDataGaps = [
+    demoMode ? "Inicia sesión para que las respuestas partan de tu identidad y no del closet de prueba." : "",
+    !demoMode && !assistantProfileReady ? "Calibra tu estilo para que Formé entienda afinidad, límites y nivel de exploración." : "",
+    !demoMode && !assistantClosetReady ? "Añade al menos ocho prendas y una base de top, pantalón y capa para ganar precisión." : "",
+  ].filter(Boolean);
 
   useEffect(() => {
     if (!selectedPlanDate && weekDays.length) setSelectedPlanDate(weekDays.find((day) => day.isToday)?.key ?? weekDays[0].key);
@@ -2460,14 +2645,50 @@ export default function Home() {
     if (selectedId) removePiece(selectedId);
   }
 
-  function recommendStyle() {
+  function answerAssistantFollowup(preset: AssistantPreset, followup: AssistantFollowup) {
+    setAssistantPresetId(preset.id);
+    setAssistantFollowupId(followup.id);
+    setStyleCode(followup.code);
+    setStyleMoment(followup.moment);
+    setStyleOccasion(followup.occasion);
+    setAssistantAnswer(buildAssistantAnswer({
+      preset,
+      followup,
+      profile,
+      styleProfile,
+      garments: personalGarments,
+      savedLooks,
+      weeklyPlan,
+      demoMode,
+    }));
+
+    if (followup.intent === "missing") {
+      setStylingRecommendations([]);
+      setWardrobeError("");
+      return;
+    }
+
     const savedSignatures = savedLooks
       .map((look) => savedLookCoreSignature(look, garmentById))
       .filter(Boolean);
     const excludedSignatures = new Set([...recommendationHistory, ...savedSignatures]);
+    const usedGarmentIds = new Set(savedLooks.flatMap((look) => look.items.map((item) => item.garmentId)));
+    const priorityGarmentIds = new Set<string>();
+    if (followup.intent === "underused") {
+      personalGarments.filter((garment) => !usedGarmentIds.has(garment.id)).forEach((garment) => priorityGarmentIds.add(garment.id));
+    } else if (followup.intent === "favorites") {
+      personalGarments.filter((garment) => garment.favorite).forEach((garment) => priorityGarmentIds.add(garment.id));
+    } else if (followup.intent === "experimental") {
+      personalGarments.filter((garment) => {
+        if (followup.id === "explore-color") return !["Black", "White", "Grey", "Brown", "Blue"].includes(garment.colorFamily);
+        if (followup.id === "explore-polished") return garment.category === "Tailoring" || (garment.category === "Footwear" && garment.material === "Leather");
+        if (followup.id === "explore-relaxed") return ["Relaxed", "Oversized", "Draped"].includes(garment.silhouette);
+        return !["Regular", "Relaxed"].includes(garment.silhouette) || garment.finish === "Graphic";
+      }).forEach((garment) => priorityGarmentIds.add(garment.id));
+    }
     const next = demoMode
-      ? buildDemoRecommendations(styleCode, styleMoment, styleOccasion)
-      : buildStylingRecommendations(assistantGarments, styleCode, styleMoment, styleOccasion, excludedSignatures, styleProfile);
+      ? buildDemoRecommendations(followup.code, followup.moment, followup.occasion)
+      : buildStylingRecommendations(assistantGarments, followup.code, followup.moment, followup.occasion, excludedSignatures, styleProfile, priorityGarmentIds);
     if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
@@ -2475,6 +2696,12 @@ export default function Home() {
     setStylingRecommendations(next);
     setRecommendationHistory((history) => [...new Set([...history, ...next.map((recommendation) => recommendation.signature)])].slice(-80));
     setWardrobeError("");
+  }
+
+  function repeatAssistantAnswer() {
+    if (!selectedAssistantPreset) return;
+    const followup = selectedAssistantPreset.options.find((option) => option.id === assistantFollowupId);
+    if (followup) answerAssistantFollowup(selectedAssistantPreset, followup);
   }
 
   function iterateCurrentLook() {
@@ -2965,33 +3192,57 @@ export default function Home() {
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
-              <div className="style-wheel">
-                <div className="style-wheel-copy">
+              <section className="assistant-dialogue">
+                <div className="assistant-dialogue-copy">
                   <p>ASISTENTE DE STYLING</p>
-                  <h2>¿Para qué te estás vistiendo?</h2>
-                  <span>{demoMode ? "Prueba cinco direcciones usando los básicos compartidos. Cuando inicies sesión, el análisis cambia a tus propias prendas." : `Formé está leyendo ${assistantGarments.length} prendas por contexto, color, material, acabado y proporción. Cada nueva búsqueda evita las combinaciones que ya viste o guardaste.`}</span>
+                  <h2>Pregúntale a tu propio closet.</h2>
+                  <span>Elige una pregunta y afina el contexto. Formé responde desde quién eres, tu calibración y las prendas que realmente tienes.</span>
                 </div>
-                <div className="style-wheel-controls">
-                  <fieldset className="option-four">
-                    <legend>PLAN</legend>
-                    {(Object.keys(styleOccasionLabels) as StyleOccasion[]).map((option) => <button type="button" className={styleOccasion === option ? "active" : ""} onClick={() => { setStyleOccasion(option); setStylingRecommendations([]); }} key={option}>{styleOccasionLabels[option]}</button>)}
-                  </fieldset>
-                  <fieldset className="option-four">
-                    <legend>DRESS CODE</legend>
-                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => { setStyleCode(option); setStylingRecommendations([]); }} key={option}>{styleCodeLabels[option]}</button>)}
-                  </fieldset>
-                  <fieldset>
-                    <legend>MOMENTO</legend>
-                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => { setStyleMoment(option); setStylingRecommendations([]); }} key={option}>{styleMomentLabels[option]}</button>)}
-                  </fieldset>
-                  <button className="style-spin" type="button" onClick={recommendStyle}><span>{stylingRecommendations.length ? "DAME CINCO DISTINTOS" : "RECOMENDAR CINCO LOOKS"}</span><b>→</b></button>
+                <div className="assistant-data-readiness">
+                  <div className="assistant-signal-row">
+                    <span className={!demoMode ? "ready" : ""}>PERSONA {!demoMode ? "✓" : "—"}</span>
+                    <span className={assistantProfileReady ? "ready" : ""}>PERFIL {assistantProfileReady ? "✓" : "—"}</span>
+                    <span className={assistantClosetReady ? "ready" : ""}>CLOSET {assistantClosetReady ? "✓" : "—"}</span>
+                  </div>
+                  {assistantDataGaps.length > 0
+                    ? <div className="assistant-data-gap"><p>PARA RESPUESTAS MÁS EXACTAS</p><span>{assistantDataGaps[0]}</span><div>
+                      {demoMode && <button type="button" onClick={beginGoogleSignIn}>INICIAR SESIÓN →</button>}
+                      {!demoMode && !assistantProfileReady && <button type="button" onClick={() => setStyleOnboardingOpen(true)}>CALIBRAR MI ESTILO →</button>}
+                      {!demoMode && !assistantClosetReady && <button type="button" onClick={() => { setWardrobePanel("closet"); setClosetMode("upload"); }}>AGREGAR PRENDAS →</button>}
+                    </div></div>
+                    : <p className="assistant-data-ready">LECTURA PERSONAL ACTIVA · {personalGarments.length} PRENDAS + {savedLooks.length} LOOKS + PERFIL DE ESTILO</p>}
                 </div>
-              </div>
+
+                <div className="assistant-question-flow">
+                  <div className="assistant-preset-list">
+                    <p>01 / ELIGE UNA PREGUNTA</p>
+                    {assistantPresets.map((preset) => <button type="button" className={assistantPresetId === preset.id ? "active" : ""} onClick={() => { setAssistantPresetId(preset.id); setAssistantFollowupId(""); setAssistantAnswer(null); setStylingRecommendations([]); }} key={preset.id}>
+                      <span><strong>{preset.label}</strong><small>{preset.detail}</small></span><b>→</b>
+                    </button>)}
+                  </div>
+
+                  {selectedAssistantPreset && <div className="assistant-followup-list">
+                    <p>02 / {selectedAssistantPreset.followup.toLocaleUpperCase()}</p>
+                    <div>{selectedAssistantPreset.options.map((option) => <button type="button" className={assistantFollowupId === option.id ? "active" : ""} onClick={() => answerAssistantFollowup(selectedAssistantPreset, option)} key={option.id}>
+                      <strong>{option.label}</strong><small>{option.detail}</small>
+                    </button>)}</div>
+                  </div>}
+                </div>
+              </section>
+
+              {assistantAnswer && <section className="assistant-response" aria-live="polite">
+                <div className="assistant-response-copy"><p>{assistantAnswer.eyebrow}</p><h2>{assistantAnswer.title}</h2><span>{assistantAnswer.summary}</span><small>{assistantAnswer.question} · {assistantAnswer.followup}</small></div>
+                <div className="assistant-response-signals">{assistantAnswer.signals.map((signal, index) => <article key={signal}><span>0{index + 1}</span><p>{signal}</p></article>)}</div>
+                {assistantAnswer.intent === "missing" && <div className="assistant-response-actions">
+                  {!assistantProfileReady && !demoMode && <button type="button" onClick={() => setStyleOnboardingOpen(true)}>CALIBRAR PARA AFINAR →</button>}
+                  <button type="button" onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>REVISAR MI CLOSET →</button>
+                </div>}
+              </section>}
 
               {stylingRecommendations.length > 0 && <section className="styling-results" aria-live="polite">
                 <div className="styling-results-heading">
-                  <div><p>RECOMENDACIONES NUEVAS</p><h2>Cinco direcciones para guardar</h2></div>
-                  <span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span>
+                  <div><p>CINCO RESPUESTAS DESDE TU CLOSET</p><h2>Guarda las que sí te representan</h2></div>
+                  <div className="styling-results-meta"><span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span><button type="button" onClick={repeatAssistantAnswer}>DAME CINCO DISTINTOS ↻</button></div>
                 </div>
                 <div className="styling-recommendation-grid">
                   {stylingRecommendations.map((recommendation, index) => {
