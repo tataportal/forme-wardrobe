@@ -170,15 +170,6 @@ type StyleProfile = {
   completedAt?: string | null;
   ratings: StyleFamilyRating[];
 };
-type CalibrationAudience = "masculine" | "feminine" | "mixed";
-type ExplorationLevel = "safe" | "curious" | "open" | "experimental";
-type CalibrationLane = "familiar" | "adjacent" | "experimental";
-type CalibrationCard = StylingRecommendation & {
-  lane: CalibrationLane;
-  expression: CalibrationAudience;
-  preferenceTags: string[];
-};
-type CalibrationFeedbackReason = "color" | "combination" | "silhouette" | "formality" | "expression" | "fit" | "footwear" | "specific" | "recent" | "never";
 type LookIteration = {
   id: string;
   title: string;
@@ -198,7 +189,6 @@ const emptyFilters: WardrobeFilters = {
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const demoLooksStorageKey = "forme-demo-looks-v1";
 const demoWeekStorageKey = "forme-demo-week-v1";
-const calibrationStorageKey = "forme-style-calibration-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 const operationalSiteUrl = "https://forme.gallery/";
 const currentOutfitId = "current-look";
@@ -243,22 +233,6 @@ const styleFeedbackLabels: Record<StyleFeedbackReason, string> = {
   footwear: "Calzado",
   specific: "Prenda específica",
 };
-const calibrationAudienceLabels: Record<CalibrationAudience, string> = { masculine: "Masculino", feminine: "Femenino", mixed: "Mixto" };
-const explorationLabels: Record<ExplorationLevel, string> = { safe: "Seguro", curious: "Curioso", open: "Abierto", experimental: "Experimental" };
-const calibrationLaneLabels: Record<CalibrationLane, string> = { familiar: "Familiar", adjacent: "Adyacente", experimental: "Fuera de tu zona" };
-const calibrationFeedbackLabels: Record<CalibrationFeedbackReason, string> = {
-  color: "El color",
-  combination: "La combinación",
-  silhouette: "La silueta",
-  formality: "Muy formal o casual",
-  expression: "Muy masculino o femenino",
-  fit: "El fit o nivel de cobertura",
-  footwear: "El calzado",
-  specific: "Una prenda específica",
-  recent: "Ya usé algo parecido",
-  never: "Nunca recomendar algo así",
-};
-
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
   { key: "colorFamily", label: "Color" },
@@ -972,92 +946,6 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   }));
 }
 
-type CalibrationRecipe = {
-  id: string;
-  lane: CalibrationLane;
-  title: string;
-  reason: string;
-  ids: string[];
-  tags: string[];
-};
-
-const calibrationRecipes: Record<CalibrationAudience, CalibrationRecipe[]> = {
-  masculine: [
-    { id: "masc-clean", lane: "familiar", title: "Uniforme limpio", reason: "Una base blanca y denim con outerwear técnico. Familiar, directo y fácil de repetir.", ids: ["top-basic-white-tee", "bottom-blue-jeans", "archive-002", "footwear-white-sneakers", "accessory-black-cap"], tags: ["Neutro", "Casual", "Relajado"] },
-    { id: "masc-dark", lane: "familiar", title: "Capas oscuras", reason: "Volúmenes relajados y una paleta negra con textura suficiente para no sentirse plana.", ids: ["top-oversized-black-tee", "bottom-black-jeans", "archive-046", "footwear-black-leather-shoes", "accessory-black-beanie"], tags: ["Oscuro", "Oversize", "Capas"] },
-    { id: "masc-smart", lane: "familiar", title: "Pulido sin rigidez", reason: "Camisa, pantalón ancho y abrigo sastre; la proporción sigue siendo cómoda aunque el registro suba.", ids: ["top-blue-long-sleeve-shirt", "bottom-black-trouser", "archive-003", "footwear-brown-leather-shoes", "accessory-black-tote"], tags: ["Sastre", "Trabajo", "Clásico"] },
-    { id: "masc-camel", lane: "adjacent", title: "Neutral cálido", reason: "Mantiene una base masculina conocida e introduce camel como una capa más suave y menos predecible.", ids: ["top-basic-white-tee", "bottom-stone-chino", "archive-016", "footwear-brown-leather-shoes", "accessory-black-sunglasses"], tags: ["Camel", "Largo", "Adyacente"] },
-    { id: "masc-graphic", lane: "adjacent", title: "Gráfico controlado", reason: "La chaqueta concentra el gesto visual; el resto permanece negro para que el look no compita consigo mismo.", ids: ["top-oversized-black-tee", "bottom-black-trouser", "archive-023", "footwear-white-sneakers", "accessory-black-sunglasses"], tags: ["Gráfico", "Statement", "Street"] },
-    { id: "masc-draped", lane: "experimental", title: "Sastrería drapeada", reason: "Prueba una capa corta y una camisa con caída dentro de una lectura masculina y monocromática.", ids: ["archive-044", "bottom-black-trouser", "archive-050", "footwear-black-leather-shoes", "accessory-black-tote"], tags: ["Drapeado", "Cropped", "Experimental"] },
-  ],
-  feminine: [
-    { id: "fem-ivory", lane: "familiar", title: "Marfil gráfico", reason: "La chaqueta clara enmarca una base negra amplia; el tacón y el tote afinan el registro sin sobrecargarlo.", ids: ["top-black-short-sleeve-shirt", "bottom-black-trouser", "archive-039", "footwear-black-pumps", "accessory-black-tote"], tags: ["Marfil", "Pulido", "Amplio"] },
-    { id: "fem-cropped", lane: "familiar", title: "Proporción corta", reason: "Una capa cropped sobre pantalón ancho define la cintura visual y mantiene movimiento en la parte inferior.", ids: ["top-basic-white-tee", "bottom-black-trouser", "archive-050", "footwear-black-pumps", "accessory-black-sunglasses"], tags: ["Cropped", "Sastre", "Noche"] },
-    { id: "fem-camel", lane: "familiar", title: "Camel cotidiano", reason: "Denim, camiseta y abrigo envolvente construyen un look diario con una silueta larga y suave.", ids: ["top-basic-white-tee", "bottom-blue-jeans", "archive-016", "footwear-black-pumps", "accessory-black-tote"], tags: ["Camel", "Diario", "Suave"] },
-    { id: "fem-cape", lane: "adjacent", title: "Volumen protagonista", reason: "La capa cambia la silueta sin alterar la base monocromática. El resultado se siente dramático pero usable.", ids: ["top-oversized-black-tee", "bottom-black-trouser", "archive-038", "footwear-black-pumps", "accessory-black-sunglasses"], tags: ["Capa", "Volumen", "Statement"] },
-    { id: "fem-denim", lane: "adjacent", title: "Denim pulido", reason: "Una chaqueta denim clara baja la formalidad del pantalón y el tote, manteniendo una composición ordenada.", ids: ["top-black-short-sleeve-shirt", "bottom-black-trouser", "archive-040", "footwear-white-sneakers", "accessory-black-tote"], tags: ["Denim", "Contraste", "Casual"] },
-    { id: "fem-transparent", lane: "experimental", title: "Capa transparente", reason: "La transparencia introduce profundidad y color sobre una base negra sin cambiar el nivel de cobertura del look.", ids: ["archive-043", "bottom-black-trouser", "archive-037", "footwear-black-pumps", "accessory-black-tote"], tags: ["Transparente", "Color", "Experimental"] },
-  ],
-  mixed: [
-    { id: "mix-clean", lane: "familiar", title: "Base compartida", reason: "Piezas simples, fit relajado y accesorios gráficos crean un punto de partida sin una expresión rígida.", ids: ["top-basic-white-tee", "bottom-black-trouser", "archive-039", "footwear-white-sneakers", "accessory-black-sunglasses"], tags: ["Unisex", "Limpio", "Relajado"] },
-    { id: "mix-soft", lane: "familiar", title: "Volumen suave", reason: "El puffer salvia aporta color y volumen sobre básicos cotidianos sin volver el look demasiado técnico.", ids: ["top-basic-white-tee", "bottom-blue-jeans", "archive-029", "footwear-white-sneakers", "accessory-black-tote"], tags: ["Salvia", "Puffer", "Casual"] },
-    { id: "mix-tailored", lane: "familiar", title: "Sastre abierto", reason: "La capa estructurada se lleva abierta sobre una base sencilla para combinar códigos formales y cotidianos.", ids: ["top-oversized-black-tee", "bottom-stone-chino", "archive-030", "footwear-black-leather-shoes", "accessory-black-tote"], tags: ["Sastre", "Abierto", "Mixto"] },
-    { id: "mix-frog", lane: "adjacent", title: "Cierre protagonista", reason: "Una chaqueta marfil de cierres gráficos cambia el vocabulario del look sin alterar la base funcional.", ids: ["top-black-short-sleeve-shirt", "bottom-black-jeans", "archive-042", "footwear-white-sneakers", "accessory-black-cap"], tags: ["Gráfico", "Marfil", "Adyacente"] },
-    { id: "mix-draped", lane: "adjacent", title: "Negro con caída", reason: "La camisa drapeada y el pantalón amplio prueban una expresión más fluida dentro de una paleta segura.", ids: ["archive-044", "bottom-black-trouser", "archive-010", "footwear-black-pumps", "accessory-black-sunglasses"], tags: ["Fluido", "Cuero", "Noche"] },
-    { id: "mix-rain", lane: "experimental", title: "Transparencia técnica", reason: "Una capa transparente y multicolor pone a prueba cuánto color y experimentación quieres conservar.", ids: ["top-basic-white-tee", "bottom-stone-chino", "archive-037", "footwear-black-leather-shoes", "accessory-black-tote"], tags: ["Técnico", "Transparente", "Experimental"] },
-  ],
-};
-
-function buildCalibrationDeck(audience: CalibrationAudience, exploration: ExplorationLevel): CalibrationCard[] {
-  const byId = new Map(starterGarments.map((item) => [item.id, item]));
-  const laneOrder: Record<ExplorationLevel, CalibrationLane[]> = {
-    safe: ["familiar", "familiar", "familiar", "adjacent", "adjacent", "experimental"],
-    curious: ["familiar", "adjacent", "familiar", "adjacent", "familiar", "experimental"],
-    open: ["adjacent", "familiar", "experimental", "familiar", "adjacent", "familiar"],
-    experimental: ["experimental", "adjacent", "familiar", "adjacent", "familiar", "familiar"],
-  };
-  const recipes = calibrationRecipes[audience];
-  const remaining = [...recipes];
-  const ordered = laneOrder[exploration].flatMap((lane) => {
-    const index = remaining.findIndex((recipe) => recipe.lane === lane);
-    if (index < 0) return [];
-    return remaining.splice(index, 1);
-  });
-  ordered.push(...remaining);
-
-  return ordered.map((recipe, recipeIndex) => {
-    const selected = recipe.ids.map((id) => byId.get(id)).filter((item): item is Garment => Boolean(item));
-    const outer = selected.find((item) => item.category === "Outerwear" || item.category === "Tailoring");
-    const items = selected.map((garment, itemIndex) => {
-      const placement = garment.category === "Tops" && outer
-        ? recommendationTopPlacement(garment, outer)
-        : garment.category === "Outerwear" || garment.category === "Tailoring"
-          ? recommendationOuterPlacement(garment)
-          : defaultPlacement(garment);
-      return {
-        instanceId: `calibration-${recipe.id}-${garment.id}`,
-        garmentId: garment.id,
-        variant: (garment === outer && garment.openImage ? "open" : "closed") as "open" | "closed",
-        ...placement,
-        rotation: 0,
-        z: layerBase(garment.category) + itemIndex + 1,
-      };
-    });
-    return {
-      id: `calibration-${audience}-${recipe.id}`,
-      strategy: recipe.lane === "experimental" ? "statement" : recipe.lane === "adjacent" ? "contrast" : "balanced",
-      signature: [...recipe.ids].sort().join(":"),
-      title: calibrationLaneLabels[recipe.lane],
-      name: recipe.title,
-      reason: recipe.reason,
-      items,
-      lane: recipe.lane,
-      expression: audience,
-      preferenceTags: recipe.tags,
-    } satisfies CalibrationCard;
-  });
-}
-
 const iterationProfiles = [
   { id: "clean", title: "Limpio", outer: /collarless|coach|field|shell/, footwear: /white|sneaker/, accessory: /tote/ },
   { id: "contrast", title: "Contraste", outer: /puffer|fleece|tan|camel|sage|denim/, footwear: /black leather/, accessory: /sunglasses/ },
@@ -1349,139 +1237,6 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!result) throw new Error("No se pudo exportar la historia.");
   return result;
-}
-
-function TasteCalibrationDeck() {
-  const [audience, setAudience] = useState<CalibrationAudience>("masculine");
-  const [exploration, setExploration] = useState<ExplorationLevel>("curious");
-  const [cardIndex, setCardIndex] = useState(0);
-  const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
-  const [feedbackCard, setFeedbackCard] = useState<CalibrationCard | null>(null);
-  const [likedCount, setLikedCount] = useState(0);
-  const [rejectedCount, setRejectedCount] = useState(0);
-  const gestureStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
-  const deck = useMemo(() => buildCalibrationDeck(audience, exploration), [audience, exploration]);
-  const garmentById = useMemo(() => new Map(starterGarments.map((item) => [item.id, item])), []);
-  const current = deck[cardIndex];
-  const next = deck[cardIndex + 1];
-  const complete = cardIndex >= deck.length;
-
-  useEffect(() => {
-    // This legacy demo deck resets as one unit whenever its two controls change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCardIndex(0);
-    setLikedCount(0);
-    setRejectedCount(0);
-    setFeedbackCard(null);
-    setDrag({ x: 0, y: 0, active: false });
-  }, [audience, exploration]);
-
-  function persistCalibration(card: CalibrationCard, action: "like" | "reject" | "variation", reason?: CalibrationFeedbackReason) {
-    const entry = { cardId: card.id, audience, exploration, lane: card.lane, action, reason, tags: card.preferenceTags, createdAt: new Date().toISOString() };
-    try {
-      const currentLog = JSON.parse(localStorage.getItem(calibrationStorageKey) || "[]") as unknown[];
-      localStorage.setItem(calibrationStorageKey, JSON.stringify([...currentLog, entry].slice(-120)));
-    } catch {
-      localStorage.setItem(calibrationStorageKey, JSON.stringify([entry]));
-    }
-  }
-
-  function advance(card: CalibrationCard, action: "like" | "reject" | "variation", reason?: CalibrationFeedbackReason) {
-    persistCalibration(card, action, reason);
-    if (action === "like") setLikedCount((count) => count + 1);
-    if (action === "reject") setRejectedCount((count) => count + 1);
-    setFeedbackCard(null);
-    setDrag({ x: 0, y: 0, active: false });
-    setCardIndex((index) => index + 1);
-  }
-
-  function showFeedback(card: CalibrationCard) {
-    setDrag({ x: 0, y: 0, active: false });
-    setFeedbackCard(card);
-  }
-
-  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!current || (event.target as HTMLElement).closest("button")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    gestureStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    setDrag({ x: 0, y: 0, active: true });
-  }
-
-  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!gestureStart.current || gestureStart.current.pointerId !== event.pointerId) return;
-    setDrag({ x: event.clientX - gestureStart.current.x, y: event.clientY - gestureStart.current.y, active: true });
-  }
-
-  function handlePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!current || !gestureStart.current || gestureStart.current.pointerId !== event.pointerId) return;
-    const { x, y } = drag;
-    gestureStart.current = null;
-    if (x > 82 && Math.abs(x) > Math.abs(y)) advance(current, "like");
-    else if (x < -82 && Math.abs(x) > Math.abs(y)) showFeedback(current);
-    else if (y < -92 && Math.abs(y) > Math.abs(x)) advance(current, "variation");
-    else setDrag({ x: 0, y: 0, active: false });
-  }
-
-  return <section className="taste-calibration">
-    <div className="calibration-heading">
-      <div><p>CALIBRACIÓN DE ESTILO</p><h2>Enséñale tu gusto a Formé</h2><span>Desliza como Tinder. Ninguna respuesta es un “nunca” salvo que lo indiques.</span></div>
-      <strong>{Math.min(cardIndex + 1, deck.length)} / {deck.length}</strong>
-    </div>
-
-    <div className="calibration-settings">
-      <fieldset><legend>LOOKS QUE QUIERES VER</legend>{(Object.keys(calibrationAudienceLabels) as CalibrationAudience[]).map((option) => <button type="button" className={audience === option ? "active" : ""} onClick={() => setAudience(option)} key={option}>{calibrationAudienceLabels[option]}</button>)}</fieldset>
-      <fieldset><legend>APERTURA A EXPLORAR</legend>{(Object.keys(explorationLabels) as ExplorationLevel[]).map((option) => <button type="button" className={exploration === option ? "active" : ""} onClick={() => setExploration(option)} key={option}>{explorationLabels[option]}</button>)}</fieldset>
-    </div>
-
-    <div className="calibration-stage">
-      {complete ? <div className="calibration-complete">
-        <p>PRIMERA LECTURA</p>
-        <h3>Ya tenemos una señal inicial.</h3>
-        <span>{likedCount} looks guardados · {rejectedCount} respuestas afinadas. En el producto final esto actualiza color, fit, expresión y nivel experimental.</span>
-        <button type="button" onClick={() => setCardIndex(0)}>REPETIR CALIBRACIÓN →</button>
-      </div> : <>
-        {next && <article className="taste-card next-card" aria-hidden="true"><LookPreview look={{ id: next.id, name: next.name, items: next.items }} garmentById={garmentById} /></article>}
-        {current && <article
-          className={`taste-card current-card ${drag.active ? "dragging" : ""}`}
-          style={{ transform: `translate3d(${drag.x}px,${Math.min(drag.y, 24)}px,0) rotate(${drag.x / 22}deg)` }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
-        >
-          <div className="taste-card-visual">
-            <LookPreview look={{ id: current.id, name: current.name, items: current.items }} garmentById={garmentById} />
-            <span className="swipe-stamp reject" style={{ opacity: Math.max(0, Math.min(1, -drag.x / 90)) }}>NO ES MI ESTILO</span>
-            <span className="swipe-stamp like" style={{ opacity: Math.max(0, Math.min(1, drag.x / 90)) }}>ME GUSTA</span>
-          </div>
-          <div className="taste-card-copy">
-            <div><span>{calibrationLaneLabels[current.lane]}</span><small>{calibrationAudienceLabels[current.expression]}</small></div>
-            <h3>{current.name}</h3>
-            <p>{current.reason}</p>
-            <div className="taste-tags">{current.preferenceTags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-          </div>
-        </article>}
-      </>}
-    </div>
-
-    {!complete && current && <div className="calibration-actions">
-      <button type="button" className="reject" onClick={() => showFeedback(current)}><b>×</b><span>NO ES MI ESTILO</span></button>
-      <button type="button" onClick={() => advance(current, "variation")}><b>↑</b><span>VARIAR</span></button>
-      <button type="button" className="like" onClick={() => advance(current, "like")}><b>♥</b><span>ME GUSTA</span></button>
-    </div>}
-    {!complete && <p className="calibration-gesture-hint">← NO · DESLIZA ARRIBA PARA VARIAR · SÍ →</p>}
-
-    {feedbackCard && <div className="calibration-feedback" role="dialog" aria-modal="true" aria-label="Explicar por qué no te gusta este look">
-      <button type="button" className="feedback-backdrop" aria-label="Cerrar" onClick={() => setFeedbackCard(null)} />
-      <section>
-        <div><p>AFINAR PREFERENCIA</p><button type="button" onClick={() => setFeedbackCard(null)} aria-label="Cerrar">×</button></div>
-        <h3>¿Qué no funcionó?</h3>
-        <span>Esto reduce la afinidad; no bloquea nada automáticamente.</span>
-        <div className="feedback-reasons">{(Object.keys(calibrationFeedbackLabels) as CalibrationFeedbackReason[]).filter((reason) => reason !== "never").map((reason) => <button type="button" onClick={() => advance(feedbackCard, "reject", reason)} key={reason}>{calibrationFeedbackLabels[reason]}</button>)}</div>
-        <button type="button" className="feedback-never" onClick={() => advance(feedbackCard, "reject", "never")}>NUNCA RECOMENDAR ALGO ASÍ</button>
-      </section>
-    </div>}
-  </section>;
 }
 
 function WeeklyPlanView({
@@ -2755,20 +2510,6 @@ export default function Home() {
   function closeLookIterations() {
     setLookIterations([]);
     setActiveIterationIndex(-1);
-  }
-
-  function openStylingRecommendation(recommendation: StylingRecommendation) {
-    setCanvasPieces(recommendation.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
-    setSelectedId("");
-    setActiveOutfitId(null);
-    setActiveLookName(recommendation.name);
-    setSaved(false);
-    setLookIterations([]);
-    setActiveIterationIndex(-1);
-    setLibraryOpen(false);
-    setSavedLooksOpen(false);
-    setWardrobeError("");
-    openStudio("assistant");
   }
 
   async function saveStylingRecommendation(recommendation: StylingRecommendation) {

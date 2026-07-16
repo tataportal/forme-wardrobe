@@ -3,7 +3,7 @@
   "name": "forme-gallery",
   "account_id": "9b26741155656b971477eb0674099db3",
   "main": "./worker/index.ts",
-  "compatibility_date": "2026-07-16",
+  "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
   "routes": [
     {

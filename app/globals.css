@@ -55,7 +55,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .wardrobe-tabs { min-width:max-content; display:flex; gap:22px; overflow-x:auto; }
 .wardrobe-tabs button { min-height:46px; border:0; border-bottom:2px solid transparent; background:transparent; padding:0; white-space:nowrap; color:var(--muted); font-size:9px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .wardrobe-tabs button.active { border-color:var(--ink); color:var(--ink); }
-.wardrobe-tab-actions { min-width:max-content; padding:6px 0; display:flex; align-items:center; gap:8px; position:sticky; right:0; z-index:2; background:var(--paper); box-shadow:-14px 0 18px var(--paper); }
+.wardrobe-tab-actions { min-width:max-content; flex:0 0 auto; padding:6px 0; display:flex; align-items:center; gap:8px; position:static; background:var(--paper); }
 .wardrobe-tab-actions button { min-height:34px; padding:0 12px; border:1px solid var(--ink); background:transparent; font-size:8px; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; cursor:pointer; }
 .wardrobe-tab-actions button.active,.wardrobe-tab-actions .closet-add { background:var(--ink); color:var(--paper); }
 .app-message { margin:14px 0 0; padding:10px 12px; border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:9px; line-height:1.4; }
@@ -665,6 +665,14 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .view-studio .studio-view { position:fixed; inset:68px 0 72px; padding:0; }
 .view-studio .studio-view > .section-line { display:none; }
 .view-studio .studio-layout,.view-studio .canvas-column { width:100%; height:100%; }
+
+@media (max-width:759px) {
+  .wardrobe-profile { gap:8px; }
+  .wardrobe-tabs { gap:10px; }
+  .wardrobe-tabs button { font-size:7.5px; letter-spacing:.075em; }
+  .wardrobe-tab-actions { gap:6px; }
+  .wardrobe-tab-actions button { min-height:38px; padding:0 8px; font-size:7.5px; letter-spacing:.075em; }
+}
 
 @media (min-width:760px) {
   .canvas-piece.selected { cursor:move; }
