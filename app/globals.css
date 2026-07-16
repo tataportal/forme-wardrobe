@@ -82,15 +82,16 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .style-audience-options small { color:var(--muted); font-size:6px; letter-spacing:.12em; }
 .style-audience-options strong { align-self:end; font:400 29px/1 Georgia,serif; letter-spacing:-.04em; }
 .style-audience-options b { grid-column:2; grid-row:1/-1; font:20px/1 Georgia,serif; }
-.style-family-stage { min-height:calc(100dvh - 54px); padding:18px 16px 28px; display:grid; grid-template-rows:auto auto auto; gap:16px; }
-.style-family-copy .style-back { margin-bottom:18px; }
-.style-family-copy h1 { margin:7px 0 8px; font-size:38px; }
-.style-family-copy > span { display:block; font-size:9px; }
-.style-family-progress { height:2px; margin-top:14px; overflow:hidden; background:var(--line); }
+.style-family-stage { height:calc(100dvh - 54px); min-height:610px; position:relative; overflow:hidden; padding:0 16px; }
+.style-family-copy { position:relative; z-index:2; padding-top:24px; pointer-events:none; }
+.style-family-copy .style-back { margin-bottom:42px; pointer-events:auto; }
+.style-family-copy h1 { width:max-content; max-width:94vw; margin:7px 0 10px; font-size:clamp(54px,15vw,70px); line-height:.84; position:relative; z-index:2; }
+.style-family-copy > span { display:block; width:min(46vw,190px); font-size:8px; line-height:1.42; }
+.style-family-progress { position:absolute; top:66px; left:0; width:calc(100vw - 32px); height:2px; margin:0; overflow:hidden; background:var(--line); }
 .style-family-progress b { height:100%; display:block; background:var(--signal); transition:width .25s ease; }
-.style-family-card { width:min(58vw,238px); aspect-ratio:9/16; margin:0 auto; overflow:hidden; border:1px solid var(--ink); background:#e8e3d9; box-shadow:0 16px 40px rgba(17,17,15,.12); }
+.style-family-card { width:min(61vw,260px); aspect-ratio:9/16; margin:0; overflow:hidden; border:0; background:#e8e3d9; box-shadow:0 18px 42px rgba(17,17,15,.11); position:absolute; z-index:1; top:88px; right:16px; }
 .style-family-card img { width:100%; height:100%; display:block; object-fit:cover; }
-.style-rating-panel { min-width:0; align-self:end; padding-top:2px; }
+.style-rating-panel { min-width:0; position:absolute; z-index:3; left:0; right:0; bottom:0; max-height:42dvh; overflow-y:auto; padding:16px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--ink); background:rgba(242,240,233,.96); backdrop-filter:blur(18px); }
 .style-rating-value { display:flex; align-items:baseline; justify-content:space-between; gap:14px; }
 .style-rating-value span { color:var(--muted); font-size:6px; letter-spacing:.13em; }
 .style-rating-value strong { font:400 20px/1 Georgia,serif; }
@@ -102,10 +103,10 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .style-feedback-reasons > div { display:flex; gap:5px; overflow-x:auto; scrollbar-width:none; }
 .style-feedback-reasons button { flex:0 0 auto; min-height:28px; padding:0 8px; border:1px solid var(--line); border-radius:100px; background:transparent; font-size:6px; cursor:pointer; }
 .style-feedback-reasons button.active { border-color:var(--ink); background:var(--ink); color:var(--paper); }
-.style-rating-actions { margin-top:14px; display:grid; grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr); gap:7px; }
-.style-rating-actions > button:first-child { min-height:48px; padding:0 8px; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:6px; letter-spacing:.08em; cursor:pointer; }
+.style-rating-actions { margin-top:12px; display:grid; grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr); gap:7px; }
+.style-rating-actions > button:first-child { min-height:44px; padding:0 8px; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:6px; letter-spacing:.08em; cursor:pointer; }
 .style-rating-actions > button:first-child.blocked { border-color:var(--signal); color:var(--signal); }
-.style-rating-actions .style-primary-action { min-height:48px; }
+.style-rating-actions .style-primary-action { min-height:44px; }
 .style-onboarding-result { justify-content:flex-start; }
 .style-onboarding-result h1 { font-size:48px; }
 .style-result-ranking { margin:32px 0 24px; border-top:1px solid var(--ink); }
@@ -608,13 +609,14 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .style-onboarding-audience h1,.style-onboarding-result h1 { font-size:68px; }
   .style-audience-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .style-onboarding-audience > .style-primary-action,.style-onboarding-result > .style-primary-action { width:340px; align-self:flex-end; }
-  .style-family-stage { min-height:calc(100dvh - 62px); padding:28px; grid-template-columns:minmax(220px,.72fr) minmax(270px,.9fr) minmax(320px,1fr); grid-template-rows:1fr; align-items:center; gap:clamp(28px,4vw,72px); }
-  .style-family-copy { align-self:center; }
+  .style-family-stage { height:auto; min-height:calc(100dvh - 62px); padding:28px; display:grid; overflow:visible; grid-template-columns:minmax(220px,.72fr) minmax(270px,.9fr) minmax(320px,1fr); grid-template-rows:1fr; align-items:center; gap:clamp(28px,4vw,72px); }
+  .style-family-copy { position:static; align-self:center; padding:0; pointer-events:auto; }
+  .style-family-copy .style-back { margin-bottom:30px; }
   .style-family-copy h1 { font-size:clamp(48px,5vw,78px); }
   .style-family-copy > span { max-width:330px; font-size:10px; }
-  .style-family-progress { max-width:330px; margin-top:30px; }
-  .style-family-card { width:auto; height:min(76dvh,780px); max-width:100%; }
-  .style-rating-panel { align-self:center; max-width:500px; }
+  .style-family-progress { position:static; width:auto; max-width:330px; margin-top:30px; }
+  .style-family-card { width:auto; height:min(76dvh,780px); max-width:100%; position:static; margin:0 auto; }
+  .style-rating-panel { position:static; align-self:center; max-width:500px; max-height:none; overflow:visible; padding:0; border:0; background:transparent; backdrop-filter:none; }
   .style-rating-value strong { font-size:28px; }
   .style-rating-actions { margin-top:28px; }
   .style-feedback-reasons > div { flex-wrap:wrap; overflow:visible; }
