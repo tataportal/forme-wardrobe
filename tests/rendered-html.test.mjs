@@ -22,11 +22,10 @@ test("server-renders the FORME wardrobe", async () => {
   const html = await response.text();
   assert.match(html, /<title>FORME — Tu armario visual<\/title>/i);
   assert.match(html, /CLOSET DE PRUEBA/);
-  assert.match(html, /Mis prendas/);
-  assert.match(html, />Looks</);
-  assert.match(html, />Semana</);
-  assert.match(html, />Insights</);
-  assert.match(html, /Añadir mis prendas/);
+  assert.match(html, />Mi closet</);
+  assert.match(html, />Looks guardados</);
+  assert.match(html, />Asistente</);
+  assert.match(html, /＋ Agregar/);
   assert.match(html, /CONTINUAR CON GOOGLE|REVISANDO SESIÓN/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
@@ -38,7 +37,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "week" \| "insights" \| "upload"/);
+  assert.match(page, /type WardrobePanel = "closet" \| "looks" \| "assistant"/);
+  assert.match(page, /type ClosetMode = "browse" \| "upload"/);
   assert.match(page, /useState\(true\)/);
   assert.match(page, /useState\(formeBasics\)/);
   assert.match(page, /function beginGoogleSignIn/);
@@ -46,6 +46,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /CONTINUAR CON GOOGLE/);
   assert.doesNotMatch(page, /entry-gate/);
   assert.match(page, /Básicos FORME/);
+  assert.match(page, /visiblePersonalGarments/);
+  assert.match(page, /visibleFormeBasics/);
+  assert.match(page, /＋ Agregar/);
   assert.match(page, /function buildDemoRecommendations/);
   assert.match(page, /footwear-white-sneakers/);
   assert.match(page, /accessory-black-sunglasses/);
@@ -56,11 +59,18 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Experimental/);
   assert.match(page, /Día/);
   assert.match(page, /Noche/);
-  assert.match(page, /ANÁLISIS COMPLETO/);
+  assert.match(page, /Qué haría ahora/);
   assert.match(page, /Seguro/);
   assert.match(page, /Contraste/);
   assert.match(page, /Statement/);
+  assert.match(page, /Esencial/);
+  assert.match(page, /Capas/);
   assert.match(page, /function buildStylingRecommendations/);
+  assert.match(page, /const strategies: StylingStrategy\[\] = \["balanced", "contrast", "statement", "minimal", "layered"\]/);
+  assert.match(page, /excludedSignatures/);
+  assert.match(page, /recommendationHistory/);
+  assert.match(page, /function saveStylingRecommendation/);
+  assert.match(page, /GUARDAR COMO LOOK/);
   assert.match(page, /function buildLookIterations/);
   assert.match(page, /const iterationProfiles = \[/);
   assert.match(page, /MEZCLAR/);

@@ -14,7 +14,8 @@ import {
 import { classifyGarment, formeBasics, Garment, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
-type WardrobePanel = "pieces" | "basics" | "looks" | "week" | "insights" | "upload";
+type WardrobePanel = "closet" | "looks" | "assistant";
+type ClosetMode = "browse" | "upload";
 type StudioLibraryFilter = "all" | "personal" | "forme" | "footwear" | "accessories";
 type CanvasPiece = {
   instanceId: string;
@@ -131,9 +132,11 @@ type WeekDay = {
 type StyleCode = "casual" | "smart" | "formal" | "experimental";
 type StyleMoment = "day" | "night";
 type StyleOccasion = "daily" | "work" | "dinner" | "event";
-type StylingStrategy = "balanced" | "contrast" | "statement";
+type StylingStrategy = "balanced" | "contrast" | "statement" | "minimal" | "layered";
 type StylingRecommendation = {
-  id: StylingStrategy;
+  id: string;
+  strategy: StylingStrategy;
+  signature: string;
   title: string;
   name: string;
   reason: string;
@@ -177,7 +180,7 @@ const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "S
 const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "Noche" };
 const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
 const weeklyOccasionLabels: Record<WeeklyOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento", weekend: "Fin de semana" };
-const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement" };
+const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement", minimal: "Esencial", layered: "Capas" };
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "category", label: "Tipo" },
@@ -658,6 +661,18 @@ function strategyScore(top: Garment, bottom: Garment, outer: Garment, strategy: 
       + (outer.material !== top.material ? 3 : 0)
       + (outer.category === "Tailoring" && /jeans|denim/.test(searchableGarment(bottom)) ? 5 : 0);
   }
+  if (strategy === "minimal") {
+    return (stylingNeutralFamilies.has(top.colorFamily) && stylingNeutralFamilies.has(bottom.colorFamily) && stylingNeutralFamilies.has(outer.colorFamily) ? 8 : 0)
+      + (["Matte", "Low sheen"].includes(outer.finish) ? 4 : 0)
+      + (["Regular", "Relaxed"].includes(top.silhouette) ? 3 : 0)
+      + (outer.colorFamily === top.colorFamily || outer.colorFamily === bottom.colorFamily ? 3 : 0);
+  }
+  if (strategy === "layered") {
+    return (outer.openImage ? 7 : 0)
+      + (outer.material !== top.material ? 5 : 0)
+      + (["Relaxed", "Oversized", "Longline"].includes(outer.silhouette) ? 4 : 0)
+      + (/shirt|knit|tee|crewneck/.test(searchableGarment(top)) ? 3 : 0);
+  }
   return (/graphic|embroidered|transparent|cape|kimono|varsity|funnel/.test(outerText) ? 9 : 0)
     + (["Textured", "Glossy", "Transparent"].includes(outer.finish) ? 6 : 0)
     + (["Oversized", "Draped", "Cropped"].includes(outer.silhouette) ? 4 : 0)
@@ -671,23 +686,63 @@ function stylingReason(strategy: StylingStrategy, top: Garment, bottom: Garment,
   const context = `${styleOccasionLabels[occasion].toLocaleLowerCase()} de ${styleMomentLabels[moment].toLocaleLowerCase()}`;
   if (strategy === "balanced") return `${topName} y ${bottomName} construyen una base limpia; ${outerName} mantiene la paleta y equilibra el volumen. Es la opción más fácil de llevar para ${context}.`;
   if (strategy === "contrast") return `${outerName} introduce contraste de color o material sobre la base de ${topName} y ${bottomName}. Las siluetas no compiten, así que el look se siente intencional para ${context}.`;
+  if (strategy === "minimal") return `${topName}, ${bottomName} y ${outerName} comparten una lectura contenida. La variación está en la proporción y no en sumar ruido; funciona como uniforme para ${context}.`;
+  if (strategy === "layered") return `${outerName} se usa abierto para dejar visible ${topName}; ${bottomName} sostiene la silueta. La diferencia de materiales le da profundidad sin perder claridad para ${context}.`;
   return `${outerName} funciona como pieza protagonista. ${topName} y ${bottomName} permanecen contenidos para dejarle el foco sin perder proporción; funciona especialmente bien para ${context}.`;
 }
 
-function buildStylingRecommendations(garments: Garment[], code: StyleCode, moment: StyleMoment, occasion: StyleOccasion): StylingRecommendation[] {
+function stableTextScore(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  return hash;
+}
+
+function coreRecommendationSignature(top: Garment, bottom: Garment, outer: Garment): string {
+  return [top.id, bottom.id, outer.id].sort().join(":");
+}
+
+function savedLookCoreSignature(look: SavedLook, garmentById: Map<string, Garment>): string {
+  return look.items
+    .map((item) => garmentById.get(item.garmentId))
+    .filter((item): item is Garment => Boolean(item) && ["Tops", "Bottoms", "Outerwear", "Tailoring"].includes(item.category))
+    .map((item) => item.id)
+    .sort()
+    .join(":");
+}
+
+function complementScore(garment: Garment, selected: Garment[], code: StyleCode, moment: StyleMoment, occasion: StyleOccasion) {
+  const selectedColors = new Set(selected.map((item) => item.colorFamily));
+  let score = contextGarmentScore(garment, code, moment, occasion);
+  if (stylingNeutralFamilies.has(garment.colorFamily)) score += 5;
+  if (selectedColors.has(garment.colorFamily)) score += 4;
+  if (garment.category === "Footwear" && ["Leather", "Cotton"].includes(garment.material)) score += 2;
+  return score;
+}
+
+function buildStylingRecommendations(
+  garments: Garment[],
+  code: StyleCode,
+  moment: StyleMoment,
+  occasion: StyleOccasion,
+  excludedSignatures: Set<string> = new Set(),
+): StylingRecommendation[] {
   const bottoms = garments.filter((item) => item.category === "Bottoms");
   const tops = garments.filter((item) => item.category === "Tops");
   const outerLayers = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
   if (!bottoms.length || !tops.length || !outerLayers.length) return [];
-  const strategies: StylingStrategy[] = ["balanced", "contrast", "statement"];
-  const usedOuter = new Set<string>();
-  const usedCombinations = new Set<string>();
+  const footwear = garments.filter((item) => item.category === "Footwear");
+  const accessories = garments.filter((item) => item.category === "Accessories");
+  const strategies: StylingStrategy[] = ["balanced", "contrast", "statement", "minimal", "layered"];
+  const garmentUse = new Map<string, number>();
+  const selectedSignatures = new Set<string>();
+  const usedComplements = new Set<string>();
 
-  return strategies.flatMap((strategy) => {
+  return strategies.flatMap((strategy, recommendationIndex) => {
     const candidates = bottoms.flatMap((bottom) => tops.flatMap((top) => outerLayers.map((outer) => ({
       bottom,
       top,
       outer,
+      signature: coreRecommendationSignature(top, bottom, outer),
       score: contextGarmentScore(bottom, code, moment, occasion)
         + contextGarmentScore(top, code, moment, occasion)
         + contextGarmentScore(outer, code, moment, occasion)
@@ -695,11 +750,29 @@ function buildStylingRecommendations(garments: Garment[], code: StyleCode, momen
         + silhouetteScore(top, bottom, outer)
         + strategyScore(top, bottom, outer, strategy),
     }))));
-    candidates.sort((a, b) => b.score - a.score || `${a.outer.id}-${a.top.id}-${a.bottom.id}`.localeCompare(`${b.outer.id}-${b.top.id}-${b.bottom.id}`));
-    const choice = candidates.find((candidate) => !usedOuter.has(candidate.outer.id) && !usedCombinations.has(`${candidate.bottom.id}:${candidate.top.id}:${candidate.outer.id}`)) ?? candidates[0];
+    const effectiveScore = (candidate: typeof candidates[number]) => candidate.score
+      - (garmentUse.get(candidate.bottom.id) ?? 0) * 11
+      - (garmentUse.get(candidate.top.id) ?? 0) * 11
+      - (garmentUse.get(candidate.outer.id) ?? 0) * 14
+      + stableTextScore(`${strategy}:${candidate.signature}`) % 100 / 1000;
+    candidates.sort((a, b) => effectiveScore(b) - effectiveScore(a) || a.signature.localeCompare(b.signature));
+    const choice = candidates.find((candidate) => !excludedSignatures.has(candidate.signature) && !selectedSignatures.has(candidate.signature))
+      ?? candidates.find((candidate) => !selectedSignatures.has(candidate.signature))
+      ?? candidates[0];
     if (!choice) return [];
-    usedOuter.add(choice.outer.id);
-    usedCombinations.add(`${choice.bottom.id}:${choice.top.id}:${choice.outer.id}`);
+    selectedSignatures.add(choice.signature);
+    for (const garment of [choice.bottom, choice.top, choice.outer]) garmentUse.set(garment.id, (garmentUse.get(garment.id) ?? 0) + 1);
+
+    const selectedBase = [choice.top, choice.bottom, choice.outer];
+    const rankComplement = (pool: Garment[]) => [...pool].sort((a, b) => {
+      const aScore = complementScore(a, selectedBase, code, moment, occasion) - (usedComplements.has(a.id) ? 10 : 0);
+      const bScore = complementScore(b, selectedBase, code, moment, occasion) - (usedComplements.has(b.id) ? 10 : 0);
+      return bScore - aScore || a.id.localeCompare(b.id);
+    })[0];
+    const shoe = rankComplement(footwear);
+    if (shoe) usedComplements.add(shoe.id);
+    const accessory = rankComplement(accessories.filter((item) => item.id !== shoe?.id));
+    if (accessory) usedComplements.add(accessory.id);
     const bottomPlacement = defaultPlacement(choice.bottom);
     const topPlacement = recommendationTopPlacement(choice.top, choice.outer);
     const outerPlacement = recommendationOuterPlacement(choice.outer);
@@ -707,9 +780,13 @@ function buildStylingRecommendations(garments: Garment[], code: StyleCode, momen
       { instanceId: `${strategy}-bottom`, garmentId: choice.bottom.id, variant: "closed", ...bottomPlacement, rotation: 0, z: layerBase(choice.bottom.category) + 1 },
       { instanceId: `${strategy}-top`, garmentId: choice.top.id, variant: "closed", ...topPlacement, rotation: 0, z: layerBase(choice.top.category) + 1 },
       { instanceId: `${strategy}-outer`, garmentId: choice.outer.id, variant: choice.outer.openImage ? "open" : "closed", ...outerPlacement, rotation: 0, z: layerBase(choice.outer.category) + 1 },
+      ...(shoe ? [{ instanceId: `${strategy}-shoe`, garmentId: shoe.id, variant: "closed" as const, ...defaultPlacement(shoe), rotation: 0, z: layerBase(shoe.category) + 1 }] : []),
+      ...(accessory ? [{ instanceId: `${strategy}-accessory`, garmentId: accessory.id, variant: "closed" as const, ...defaultPlacement(accessory), rotation: 0, z: layerBase(accessory.category) + 1 }] : []),
     ];
     return [{
-      id: strategy,
+      id: `${strategy}-${recommendationIndex}-${choice.signature}`,
+      strategy,
+      signature: choice.signature,
       title: stylingStrategyLabels[strategy],
       name: `${styleOccasionLabels[occasion]} · ${styleCodeLabels[code]} · ${stylingStrategyLabels[strategy]}`,
       reason: stylingReason(strategy, choice.top, choice.bottom, choice.outer, occasion, moment),
@@ -723,7 +800,7 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   const dressy = code === "formal" || code === "smart" || occasion === "work" || occasion === "dinner";
   const recipes = [
     {
-      id: "balanced" as const,
+      id: "balanced" as StylingStrategy,
       title: "Seguro",
       name: `${styleOccasionLabels[occasion]} · ${styleCodeLabels[code]} · Base limpia`,
       reason: dressy
@@ -734,23 +811,39 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
         : ["top-basic-white-tee", "bottom-blue-jeans", "footwear-white-sneakers", "accessory-black-cap"],
     },
     {
-      id: "contrast" as const,
+      id: "contrast" as StylingStrategy,
       title: "Contraste",
       name: `${styleMomentLabels[moment]} · Contraste controlado`,
       reason: "El top negro contiene la parte superior, mientras el denim azul y el calzado oscuro separan los volúmenes con claridad.",
       ids: ["top-black-short-sleeve-shirt", "bottom-blue-jeans", "footwear-black-leather-shoes", "accessory-black-sunglasses"],
     },
     {
-      id: "statement" as const,
+      id: "statement" as StylingStrategy,
       title: "Statement",
       name: `${styleCodeLabels[code]} · Monocromo`,
       reason: "La silueta negra conecta top, pantalón y accesorios. El tacón estiliza la base y el tote mantiene el look funcional.",
       ids: ["top-oversized-black-tee", "bottom-black-trouser", "footwear-black-pumps", "accessory-black-tote", "accessory-black-sunglasses"],
     },
+    {
+      id: "minimal" as StylingStrategy,
+      title: "Esencial",
+      name: `${styleOccasionLabels[occasion]} · Uniforme claro`,
+      reason: "La camisa azul, el chino piedra y las zapatillas blancas forman un uniforme ligero con contraste bajo y piezas fáciles de repetir.",
+      ids: ["top-blue-long-sleeve-shirt", "bottom-stone-chino", "footwear-white-sneakers", "accessory-black-sunglasses"],
+    },
+    {
+      id: "layered" as StylingStrategy,
+      title: "Capas",
+      name: `${styleMomentLabels[moment]} · Base oscura`,
+      reason: "La camiseta negra y el denim lavado construyen una base tonal; los zapatos marrones y la gorra cambian el registro sin perder comodidad.",
+      ids: ["top-oversized-black-tee", "bottom-black-jeans", "footwear-brown-leather-shoes", "accessory-black-cap"],
+    },
   ];
 
   return recipes.map((recipe) => ({
-    id: recipe.id,
+    id: `demo-${recipe.id}`,
+    strategy: recipe.id,
+    signature: [...recipe.ids].sort().join(":"),
     title: recipe.title,
     name: recipe.name,
     reason: recipe.reason,
@@ -1089,11 +1182,43 @@ function WardrobeInsightsView({
   );
 }
 
+function ClosetGarmentGrid({
+  garments,
+  emptyLabel,
+  onOpen,
+  onAdd,
+  onFavorite,
+  onResetFilters,
+}: {
+  garments: Garment[];
+  emptyLabel: string;
+  onOpen: (garment: Garment) => void;
+  onAdd: (garment: Garment) => void;
+  onFavorite: (garment: Garment) => void;
+  onResetFilters: () => void;
+}) {
+  return <div className="garment-grid">
+    {garments.map((item) => <article className="garment-card" key={item.id}>
+      <div className="image-wrap">
+        <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
+        {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">{item.status.startsWith("batch") ? "LOTE LOW EN PROCESO" : item.status === "cutout_pending" ? "TERMINANDO BORDE" : "PREPARANDO RECORTE"}</span>}
+        {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
+        <button className="card-detail-open" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Abrir ficha de"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "VER FICHA ↗"}</span></button>
+        {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
+        <button className="card-studio-add" onClick={() => onAdd(item)}>AÑADIR AL CANVAS <span>＋</span></button>
+      </div>
+      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORME · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
+    </article>)}
+    {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>LIMPIAR FILTROS</button></div>}
+  </div>;
+}
+
 export default function Home() {
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [view, setView] = useState<View>("wardrobe");
-  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("basics");
+  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("closet");
+  const [closetMode, setClosetMode] = useState<ClosetMode>("browse");
   const [studioLibraryFilter, setStudioLibraryFilter] = useState<StudioLibraryFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [garments, setGarments] = useState(formeBasics);
@@ -1115,6 +1240,7 @@ export default function Home() {
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
+  const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
@@ -1154,8 +1280,14 @@ export default function Home() {
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
   const insightGarments = demoMode ? sharedBasics : personalGarments;
-  const catalogGarments = wardrobePanel === "basics" || demoMode ? sharedBasics : personalGarments;
-  const visible = catalogGarments.filter((item) => matchFilters(item, archiveFilters));
+  const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
+  const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
+  const assistantGarments = useMemo(() => {
+    if (demoMode || personalGarments.length === 0) return sharedBasics;
+    const categories = new Set(personalGarments.map((item) => item.category));
+    const fallbackBasics = sharedBasics.filter((item) => !categories.has(item.category));
+    return [...personalGarments, ...fallbackBasics];
+  }, [demoMode, personalGarments, sharedBasics]);
   const studioGarments = garments.filter((item) => {
     if (studioLibraryFilter === "personal") return item.collection !== "forme";
     if (studioLibraryFilter === "forme") return item.collection === "forme";
@@ -1243,7 +1375,7 @@ export default function Home() {
         setProfile(session.user);
         setSavedLooks(normalizedLooks);
         setWeeklyPlan(week.entries);
-        setWardrobePanel("pieces");
+        setWardrobePanel("closet");
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
         const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
         if (savedLook?.items.length) {
@@ -1406,9 +1538,10 @@ export default function Home() {
     }
   }
 
-  function openWardrobe(panel: WardrobePanel = "pieces") {
+  function openWardrobe(panel: WardrobePanel = "closet") {
     setView("wardrobe");
     setWardrobePanel(panel);
+    setClosetMode("browse");
     setLibraryOpen(false);
     setSavedLooksOpen(false);
   }
@@ -1830,14 +1963,19 @@ export default function Home() {
   }
 
   function recommendStyle() {
+    const savedSignatures = savedLooks
+      .map((look) => savedLookCoreSignature(look, garmentById))
+      .filter(Boolean);
+    const excludedSignatures = new Set([...recommendationHistory, ...savedSignatures]);
     const next = demoMode
       ? buildDemoRecommendations(styleCode, styleMoment, styleOccasion)
-      : buildStylingRecommendations(garments, styleCode, styleMoment, styleOccasion);
+      : buildStylingRecommendations(assistantGarments, styleCode, styleMoment, styleOccasion, excludedSignatures);
     if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
     }
     setStylingRecommendations(next);
+    setRecommendationHistory((history) => [...new Set([...history, ...next.map((recommendation) => recommendation.signature)])].slice(-80));
     setWardrobeError("");
   }
 
@@ -1875,6 +2013,36 @@ export default function Home() {
     setSavedLooksOpen(false);
     setWardrobeError("");
     setView("studio");
+  }
+
+  async function saveStylingRecommendation(recommendation: StylingRecommendation) {
+    if (savingOutfit) return;
+    const outfitId = `look-${crypto.randomUUID()}`;
+    const lookName = `${recommendation.name} · ${String(savedLooks.length + 1).padStart(2, "0")}`;
+    const items = recommendation.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() }));
+    setSavingOutfit(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: lookName, items }),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar la recomendación.");
+      }
+      const nextLook: SavedLook = { id: outfitId, name: lookName, items };
+      setSavedLooks((looks) => {
+        const nextLooks = [nextLook, ...looks];
+        if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
+        return nextLooks;
+      });
+      setRecommendationHistory((history) => [...new Set([...history, recommendation.signature])].slice(-80));
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar la recomendación.");
+    } finally {
+      setSavingOutfit(false);
+    }
   }
 
   function openSavedLook(look: SavedLook) {
@@ -2149,9 +2317,9 @@ export default function Home() {
   return (
     <main className={`site-shell view-${view}`}>
       <header className="topbar">
-        <button className="wordmark" onClick={() => openWardrobe(demoMode ? "basics" : "pieces")} aria-label="Ir al armario">FORME<span>®</span></button>
+        <button className="wordmark" onClick={() => openWardrobe("closet")} aria-label="Ir al closet">FORME<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
-          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe(demoMode ? "basics" : "pieces")}>Armario</button>
+          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe("closet")}>Armario</button>
           <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
         </nav>
         {demoMode
@@ -2166,31 +2334,30 @@ export default function Home() {
               {demoMode
                 ? <span className="profile-avatar demo-avatar">F</span>
                 : <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>}
-              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI ARMARIO"}</p><h1>{demoMode ? "Básicos FORME" : profile.name}</h1><span>{demoMode ? "Prueba ahora · inicia sesión para subir el tuyo" : profile.handle}</span></div>
+              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI CLOSET"}</p><h1>{demoMode ? "FORME" : profile.name}</h1><span>{demoMode ? "Prueba ahora · inicia sesión para subir el tuyo" : profile.handle}</span></div>
             </div>
             <div className="profile-stats">
               <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
               <p><strong>{sharedBasics.length}</strong><span>Básicos</span></p>
               <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
             </div>
-            <nav className="wardrobe-tabs" aria-label="Mi armario">
-              {!demoMode && <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>}
-              <button className={wardrobePanel === "basics" || demoMode && wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("basics")}>Básicos FORME</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks</button>
-              <button className={wardrobePanel === "week" ? "active" : ""} onClick={() => setWardrobePanel("week")}>Semana</button>
-              <button className={wardrobePanel === "insights" ? "active" : ""} onClick={() => setWardrobePanel("insights")}>Insights</button>
-              {demoMode
-                ? <button onClick={beginGoogleSignIn}>＋ Añadir mis prendas</button>
-                : <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>}
+            <nav className="wardrobe-tabs" aria-label="Mi closet">
+              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
+              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => setWardrobePanel("assistant")}>Asistente</button>
             </nav>
           </section>
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
-          {wardrobePanel === "pieces" || wardrobePanel === "basics" ? (
+          {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
               <div className="catalog-toolbar">
-                <div><p>{wardrobePanel === "basics" || demoMode ? "BIBLIOTECA COMPARTIDA" : "COLECCIÓN"}</p><h2>{wardrobePanel === "basics" || demoMode ? "Básicos FORME" : "Mis prendas"}</h2></div>
-                <div><span>{visible.length} de {catalogGarments.length}</span><button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button></div>
+                <div><p>MI CLOSET</p><h2>Prendas</h2></div>
+                <div>
+                  <span>{visiblePersonalGarments.length + visibleFormeBasics.length} de {personalGarments.length + sharedBasics.length}</span>
+                  <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
+                  <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
+                </div>
               </div>
               <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
                 <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
@@ -2198,70 +2365,21 @@ export default function Home() {
                   <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
                 </aside>
                 <div className="catalog-results">
-                  <div className="garment-grid">
-                    {visible.map((item) => (
-                      <article className="garment-card" key={item.id}>
-                        <div className="image-wrap">
-                          <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
-                          {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">{item.status.startsWith("batch") ? "LOTE LOW EN PROCESO" : item.status === "cutout_pending" ? "TERMINANDO BORDE" : "PREPARANDO RECORTE"}</span>}
-                          {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
-                          <button className="card-detail-open" onClick={() => item.collection === "forme" ? addAndOpenStudio(item.id) : openGarmentEditor(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Abrir ficha de"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "VER FICHA ↗"}</span></button>
-                          {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => toggleFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
-                          <button className="card-studio-add" onClick={() => addAndOpenStudio(item.id)}>AÑADIR AL CANVAS <span>＋</span></button>
-                        </div>
-                        <button className="card-meta" onClick={() => item.collection === "forme" ? addAndOpenStudio(item.id) : openGarmentEditor(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORME · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
-                      </article>
-                    ))}
-                    {visible.length === 0 && <div className="filter-empty">NO HAY PRENDAS<button onClick={() => setArchiveFilters(emptyFilters)}>LIMPIAR FILTROS</button></div>}
-                  </div>
+                  <section className="closet-group personal-group">
+                    <div className="closet-group-heading"><div><p>TUS PRENDAS</p><h3>Mi colección</h3></div><span>{personalGarments.length}</span></div>
+                    {personalGarments.length > 0
+                      ? <ClosetGarmentGrid garments={visiblePersonalGarments} emptyLabel="NO HAY PRENDAS CON ESTOS FILTROS" onOpen={openGarmentEditor} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
+                      : <div className="closet-empty-personal"><p>{demoMode ? "Inicia sesión para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "CONTINUAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
+                  </section>
+                  <section className="closet-group forme-group">
+                    <div className="closet-group-heading"><div><p>BIBLIOTECA COMPARTIDA</p><h3>Básicos FORME</h3></div><span>{sharedBasics.length}</span></div>
+                    <ClosetGarmentGrid garments={visibleFormeBasics} emptyLabel="NO HAY BÁSICOS CON ESTOS FILTROS" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
+                  </section>
                 </div>
               </div>
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
-              <div className="style-wheel">
-                <div className="style-wheel-copy">
-                  <p>ASISTENTE DE STYLING</p>
-                  <h2>¿Para qué te estás vistiendo?</h2>
-                  <span>{demoMode ? "Explora tres combinaciones coherentes usando la biblioteca compartida. Después puedes reemplazar cada básico por una prenda tuya." : "FORME analiza contexto, dress code, color, materiales y proporción. Después propone tres caminos usando únicamente tu armario."}</span>
-                </div>
-                <div className="style-wheel-controls">
-                  <fieldset className="option-four">
-                    <legend>PLAN</legend>
-                    {(Object.keys(styleOccasionLabels) as StyleOccasion[]).map((option) => <button type="button" className={styleOccasion === option ? "active" : ""} onClick={() => { setStyleOccasion(option); setStylingRecommendations([]); }} key={option}>{styleOccasionLabels[option]}</button>)}
-                  </fieldset>
-                  <fieldset className="option-four">
-                    <legend>DRESS CODE</legend>
-                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => { setStyleCode(option); setStylingRecommendations([]); }} key={option}>{styleCodeLabels[option]}</button>)}
-                  </fieldset>
-                  <fieldset>
-                    <legend>MOMENTO</legend>
-                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => { setStyleMoment(option); setStylingRecommendations([]); }} key={option}>{styleMomentLabels[option]}</button>)}
-                  </fieldset>
-                  <button className="style-spin" type="button" onClick={recommendStyle}><span>ANALIZAR MI ARMARIO</span><b>→</b></button>
-                </div>
-              </div>
-
-              {stylingRecommendations.length > 0 && <section className="styling-results" aria-live="polite">
-                <div className="styling-results-heading">
-                  <div><p>ANÁLISIS COMPLETO</p><h2>Tres direcciones que sí funcionan</h2></div>
-                  <span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span>
-                </div>
-                <div className="styling-recommendation-grid">
-                  {stylingRecommendations.map((recommendation, index) => (
-                    <article className="styling-recommendation" key={recommendation.id}>
-                      <LookPreview look={{ id: recommendation.id, name: recommendation.name, items: recommendation.items }} garmentById={garmentById} />
-                      <div className="styling-recommendation-copy">
-                        <span>0{index + 1} / {recommendation.title.toLocaleUpperCase()}</span>
-                        <h3>{recommendation.name}</h3>
-                        <p>{recommendation.reason}</p>
-                        <button type="button" onClick={() => openStylingRecommendation(recommendation)}>PROBAR EN CANVAS <b>↗</b></button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>}
-
               <div className="saved-looks-heading">
                 <div><p>ARCHIVO PERSONAL</p><h2>Looks guardados</h2></div>
                 <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
@@ -2279,38 +2397,83 @@ export default function Home() {
                     </div>
                   </article>
                 ))}
-                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={recommendStyle}>ANALIZAR MI ARMARIO →</button></div>}
+                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={() => setWardrobePanel("assistant")}>IR AL ASISTENTE →</button></div>}
               </div>
             </section>
-          ) : wardrobePanel === "week" ? (
-            <WeeklyPlanView
-              weekDays={weekDays}
-              entries={weeklyPlan}
-              selectedDate={selectedPlanDate}
-              savedLooks={savedLooks}
-              garmentById={garmentById}
-              busy={planningWeek}
-              onSelectDate={setSelectedPlanDate}
-              onAssign={(date, lookId, occasion) => void assignLookToDate(date, lookId, occasion)}
-              onRemove={(date) => void removeLookFromDate(date)}
-              onToggleWorn={(entry) => void togglePlannedLookWorn(entry)}
-              onOpenLook={openSavedLook}
-              onAutoPlan={() => void autoPlanCurrentWeek()}
-              onCreateLook={createLookFromWeek}
-            />
-          ) : wardrobePanel === "insights" ? (
-            <WardrobeInsightsView
-              garments={insightGarments}
-              savedLooks={savedLooks}
-              entries={weeklyPlan}
-              weekDays={weekDays}
-              onOpenGarment={(garment) => garment.collection === "forme" ? addAndOpenStudio(garment.id) : openGarmentEditor(garment)}
-              onGoToLooks={() => setWardrobePanel("looks")}
-              onGoToPieces={() => setWardrobePanel(demoMode ? "basics" : "pieces")}
-            />
+          ) : wardrobePanel === "assistant" ? (
+            <section className="assistant-view">
+              <div className="style-wheel">
+                <div className="style-wheel-copy">
+                  <p>ASISTENTE DE STYLING</p>
+                  <h2>¿Para qué te estás vistiendo?</h2>
+                  <span>{demoMode ? "Prueba cinco direcciones usando los básicos compartidos. Cuando inicies sesión, el análisis cambia a tus propias prendas." : `FORME está leyendo ${assistantGarments.length} prendas por contexto, color, material, acabado y proporción. Cada nueva búsqueda evita las combinaciones que ya viste o guardaste.`}</span>
+                </div>
+                <div className="style-wheel-controls">
+                  <fieldset className="option-four">
+                    <legend>PLAN</legend>
+                    {(Object.keys(styleOccasionLabels) as StyleOccasion[]).map((option) => <button type="button" className={styleOccasion === option ? "active" : ""} onClick={() => { setStyleOccasion(option); setStylingRecommendations([]); }} key={option}>{styleOccasionLabels[option]}</button>)}
+                  </fieldset>
+                  <fieldset className="option-four">
+                    <legend>DRESS CODE</legend>
+                    {(Object.keys(styleCodeLabels) as StyleCode[]).map((option) => <button type="button" className={styleCode === option ? "active" : ""} onClick={() => { setStyleCode(option); setStylingRecommendations([]); }} key={option}>{styleCodeLabels[option]}</button>)}
+                  </fieldset>
+                  <fieldset>
+                    <legend>MOMENTO</legend>
+                    {(Object.keys(styleMomentLabels) as StyleMoment[]).map((option) => <button type="button" className={styleMoment === option ? "active" : ""} onClick={() => { setStyleMoment(option); setStylingRecommendations([]); }} key={option}>{styleMomentLabels[option]}</button>)}
+                  </fieldset>
+                  <button className="style-spin" type="button" onClick={recommendStyle}><span>{stylingRecommendations.length ? "DAME CINCO DISTINTOS" : "RECOMENDAR CINCO LOOKS"}</span><b>→</b></button>
+                </div>
+              </div>
+
+              {stylingRecommendations.length > 0 && <section className="styling-results" aria-live="polite">
+                <div className="styling-results-heading">
+                  <div><p>RECOMENDACIONES NUEVAS</p><h2>Cinco direcciones para guardar</h2></div>
+                  <span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span>
+                </div>
+                <div className="styling-recommendation-grid">
+                  {stylingRecommendations.map((recommendation, index) => {
+                    const alreadySaved = savedLooks.some((look) => savedLookCoreSignature(look, garmentById) === recommendation.signature);
+                    return <article className="styling-recommendation" key={recommendation.id}>
+                      <LookPreview look={{ id: recommendation.id, name: recommendation.name, items: recommendation.items }} garmentById={garmentById} />
+                      <div className="styling-recommendation-copy">
+                        <span>0{index + 1} / {recommendation.title.toLocaleUpperCase()}</span>
+                        <h3>{recommendation.name}</h3>
+                        <p>{recommendation.reason}</p>
+                        <button type="button" disabled={alreadySaved || savingOutfit} onClick={() => void saveStylingRecommendation(recommendation)}>{alreadySaved ? "GUARDADO ✓" : "GUARDAR COMO LOOK"} <b>{alreadySaved ? "" : "＋"}</b></button>
+                      </div>
+                    </article>;
+                  })}
+                </div>
+              </section>}
+
+              <WardrobeInsightsView
+                garments={insightGarments}
+                savedLooks={savedLooks}
+                entries={weeklyPlan}
+                weekDays={weekDays}
+                onOpenGarment={(garment) => garment.collection === "forme" ? addAndOpenStudio(garment.id) : openGarmentEditor(garment)}
+                onGoToLooks={() => setWardrobePanel("looks")}
+                onGoToPieces={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}
+              />
+              <WeeklyPlanView
+                weekDays={weekDays}
+                entries={weeklyPlan}
+                selectedDate={selectedPlanDate}
+                savedLooks={savedLooks}
+                garmentById={garmentById}
+                busy={planningWeek}
+                onSelectDate={setSelectedPlanDate}
+                onAssign={(date, lookId, occasion) => void assignLookToDate(date, lookId, occasion)}
+                onRemove={(date) => void removeLookFromDate(date)}
+                onToggleWorn={(entry) => void togglePlannedLookWorn(entry)}
+                onOpenLook={openSavedLook}
+                onAutoPlan={() => void autoPlanCurrentWeek()}
+                onCreateLook={createLookFromWeek}
+              />
+            </section>
           ) : (
             <section className="upload-view">
-              <div className="upload-heading"><p>NUEVAS PRENDAS</p><h2>Añadir al armario</h2></div>
+              <div className="upload-heading"><div><p>NUEVAS PRENDAS</p><h2>Añadir al closet</h2></div><button type="button" onClick={() => setClosetMode("browse")}>← VOLVER A PRENDAS</button></div>
               <div className="upload-layout">
                 <label
                   className={`dropzone bulk-dropzone ${uploadItems.length ? "has-files" : ""} ${draggingUpload ? "dragging" : ""}`}
@@ -2343,7 +2506,7 @@ export default function Home() {
                     : <div className="queue-empty"><p>Selecciona varias fotos y corrige el nombre o tipo antes de procesarlas.</p></div>}
                   {uploadError && <p className={`upload-status ${uploadItems.some((item) => item.status === "failed") ? "error" : ""}`}>{uploadError}</p>}
                   {uploadItems.length > 0 && uploadRetryableCount === 0 && !uploadingBatch
-                    ? <button className="primary-action ready" onClick={() => { resetUpload(); setWardrobePanel("pieces"); }}>VER EN MI ARMARIO <span>→</span></button>
+                    ? <button className="primary-action ready" onClick={() => { resetUpload(); setClosetMode("browse"); }}>VER EN MI CLOSET <span>→</span></button>
                     : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PROCESANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadItems.some((item) => item.status === "failed") ? `REINTENTAR ${uploadRetryableCount}` : `CREAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "RECORTE" : "RECORTES"}`}<span>→</span></button>}
                 </div>
               </div>
@@ -2543,7 +2706,7 @@ export default function Home() {
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe(demoMode ? "basics" : "pieces")}><span>▦</span>Armario</button>
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe("closet")}><span>▦</span>Armario</button>
         <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}><span>◫</span>Canvas</button>
       </nav>
     </main>

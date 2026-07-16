@@ -65,6 +65,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .catalog-toolbar > div:last-child span { color:var(--muted); font-size:9px; white-space:nowrap; }
 .catalog-toolbar button { border:1px solid var(--ink); background:transparent; padding:9px 12px; font-size:8px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .catalog-toolbar button.active { background:var(--ink); color:var(--paper); }
+.catalog-toolbar .closet-add { background:var(--ink); color:var(--paper); }
 .wardrobe-catalog { padding-top:16px; }
 .filter-sidebar { display:none; margin-bottom:20px; border-bottom:1px solid var(--ink); }
 .filter-sidebar.open { display:block; }
@@ -98,8 +99,20 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .garment-card:hover .card-meta b,.card-meta:focus-visible b { opacity:1; transform:translate(2px,-2px); }
 .filter-empty { grid-column:1/-1; min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; border:1px dashed var(--line); color:var(--muted); font:18px/1 Georgia,serif; }
 .filter-empty button { border:0; border-bottom:1px solid var(--ink); background:transparent; padding:3px 0; color:var(--ink); font:7px Arial,sans-serif; letter-spacing:.12em; cursor:pointer; }
+.closet-group + .closet-group { margin-top:54px; padding-top:24px; border-top:1px solid var(--ink); }
+.closet-group-heading { min-height:62px; padding-bottom:13px; border-bottom:1px solid var(--line); display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }
+.closet-group-heading p,.closet-group-heading h3,.closet-group-heading > span { margin:0; }
+.closet-group-heading p { color:var(--muted); font-size:6px; letter-spacing:.14em; }
+.closet-group-heading h3 { margin-top:5px; font:400 25px/1 Georgia,serif; letter-spacing:-.04em; }
+.closet-group-heading > span { color:var(--muted); font-size:8px; letter-spacing:.1em; }
+.closet-group .garment-grid { padding-top:16px; }
+.closet-empty-personal { min-height:240px; border:1px dashed var(--line); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; }
+.closet-empty-personal p { margin:0; font:400 22px/1.05 Georgia,serif; letter-spacing:-.03em; }
+.closet-empty-personal button { padding:7px 0; border:0; border-bottom:1px solid var(--ink); background:transparent; font-size:7px; letter-spacing:.1em; cursor:pointer; }
+.forme-group { padding-bottom:18px; }
 
-.looks-view { padding-top:24px; }
+.looks-view,.assistant-view { padding-top:24px; }
+.assistant-view > .insights-view,.assistant-view > .week-view { margin-top:58px; padding-top:34px; border-top:1px solid var(--ink); }
 .style-wheel { padding:20px; border:1px solid var(--ink); background:var(--panel); display:grid; gap:26px; position:relative; overflow:hidden; }
 .style-wheel::after { content:"↻"; position:absolute; right:-14px; top:-43px; color:rgba(17,17,15,.035); font:190px/1 Georgia,serif; pointer-events:none; }
 .style-wheel-copy { position:relative; z-index:1; }
@@ -130,6 +143,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .styling-recommendation-copy p { margin:0; color:var(--muted); font-size:9px; line-height:1.45; }
 .styling-recommendation-copy button { width:100%; margin-top:auto; padding:12px 0 0; border:0; border-top:1px solid var(--line); background:transparent; display:flex; align-items:center; justify-content:space-between; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .styling-recommendation-copy button b { font:14px/1 Georgia,serif; }
+.styling-recommendation-copy button:disabled { color:var(--signal); cursor:default; }
 .saved-looks-heading { min-height:92px; padding:28px 0 14px; border-bottom:1px solid var(--line); display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
 .saved-looks-heading p,.saved-looks-heading h2,.saved-looks-heading span { margin:0; }
 .saved-looks-heading p { color:var(--muted); font-size:7px; letter-spacing:.16em; }
@@ -266,8 +280,9 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .versatile-grid strong { font:400 15px/1 Georgia,serif; }
 .versatile-grid small { margin-top:5px; color:var(--muted); font-size:7px; text-transform:uppercase; }
 
-.upload-heading { padding-bottom:16px; border-bottom:1px solid var(--line); }
+.upload-heading { padding-bottom:16px; border-bottom:1px solid var(--line); display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
 .upload-heading p,.upload-heading h2 { margin-bottom:0; }
+.upload-heading > button { padding:7px 0; border:0; border-bottom:1px solid var(--ink); background:transparent; font-size:7px; letter-spacing:.1em; cursor:pointer; }
 .upload-layout { padding-top:18px; }
 .dropzone { min-height:430px; border:1px dashed var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; cursor:pointer; position:relative; background:rgba(255,255,255,.2); overflow:hidden; }
 .dropzone.has-files { justify-content:flex-start; border-style:solid; background:rgba(255,255,255,.28); }
@@ -471,7 +486,8 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .profile-stats { justify-self:end; padding:0 0 20px; }
   .wardrobe-tabs { grid-column:1/-1; margin-top:20px; }
   .pieces-section,.upload-view { padding-top:30px; }
-  .looks-view { padding-top:30px; }
+  .looks-view,.assistant-view { padding-top:30px; }
+  .closet-group + .closet-group { margin-top:72px; padding-top:32px; }
   .week-view,.insights-view { padding-top:30px; }
   .app-section-heading { min-height:126px; }
   .app-section-heading h2 { font-size:42px; }
