@@ -119,3 +119,26 @@ export const weeklyPlanEntries = sqliteTable("weekly_plan_entries", {
   index("weekly_plan_owner_idx").on(table.ownerId),
   index("weekly_plan_outfit_idx").on(table.outfitClientId),
 ]);
+
+export const styleProfiles = sqliteTable("style_profiles", {
+  ownerId: text("owner_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  audience: text("audience").notNull().default("hombre"),
+  exploration: integer("exploration").notNull().default(35),
+  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const styleFamilyRatings = sqliteTable("style_family_ratings", {
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  family: text("family").notNull(),
+  affinity: integer("affinity").notNull().default(50),
+  blocked: integer("blocked", { mode: "boolean" }).notNull().default(false),
+  reason: text("reason"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  primaryKey({ columns: [table.ownerId, table.family] }),
+  index("style_family_ratings_owner_idx").on(table.ownerId),
+  index("style_family_ratings_affinity_idx").on(table.ownerId, table.affinity),
+]);

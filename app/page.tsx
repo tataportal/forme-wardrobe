@@ -142,6 +142,22 @@ type StylingRecommendation = {
   reason: string;
   items: CanvasPiece[];
 };
+type StyleAudience = "hombre" | "mujer";
+type StyleFamilyId = "classic" | "minimal" | "relaxed" | "tailored" | "preppy" | "streetwear" | "sporty" | "utility" | "romantic" | "bohemian" | "rebel" | "avant_garde";
+type StyleFeedbackReason = "color" | "silhouette" | "combination" | "formality" | "expression" | "fit" | "footwear" | "specific";
+type StyleFamilyRating = {
+  family: StyleFamilyId;
+  affinity: number;
+  blocked: boolean;
+  reason: StyleFeedbackReason | null;
+};
+type StyleProfile = {
+  audience: StyleAudience;
+  exploration: number;
+  completed: boolean;
+  completedAt?: string | null;
+  ratings: StyleFamilyRating[];
+};
 type CalibrationAudience = "masculine" | "feminine" | "mixed";
 type ExplorationLevel = "safe" | "curious" | "open" | "experimental";
 type CalibrationLane = "familiar" | "adjacent" | "experimental";
@@ -191,6 +207,30 @@ const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "No
 const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
 const weeklyOccasionLabels: Record<WeeklyOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento", weekend: "Fin de semana" };
 const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement", minimal: "Esencial", layered: "Capas" };
+const styleFamilyMeta: Array<{ id: StyleFamilyId; label: string; description: string; file: string }> = [
+  { id: "classic", label: "Clásico", description: "Piezas atemporales, líneas claras y combinaciones que sobreviven a cualquier temporada.", file: "01-clasico.webp" },
+  { id: "minimal", label: "Minimalista", description: "Paleta contenida, pocos elementos y proporciones precisas sin ruido visual.", file: "02-minimalista.webp" },
+  { id: "relaxed", label: "Relajado", description: "Capas cómodas, volúmenes suaves y prendas fáciles de repetir en la vida diaria.", file: "03-relajado.webp" },
+  { id: "tailored", label: "Sastrero", description: "Estructura, pantalones definidos y capas pulidas sin necesidad de verse rígido.", file: "04-sastrero.webp" },
+  { id: "preppy", label: "Preppy", description: "Códigos colegiales, tejidos limpios y una formalidad joven y ordenada.", file: "05-preppy.webp" },
+  { id: "streetwear", label: "Streetwear", description: "Siluetas amplias, gráficos y referencias urbanas con más presencia visual.", file: "06-streetwear.webp" },
+  { id: "sporty", label: "Deportivo", description: "Prendas técnicas y cómodas llevadas fuera del entrenamiento como parte del look.", file: "07-deportivo.webp" },
+  { id: "utility", label: "Utilitario", description: "Bolsillos, capas funcionales y materiales resistentes con una intención práctica.", file: "08-utilitario.webp" },
+  { id: "romantic", label: "Romántico", description: "Texturas suaves, curvas y detalles delicados que aportan ligereza o contraste.", file: "09-romantico.webp" },
+  { id: "bohemian", label: "Bohemio", description: "Capas sueltas, textura y mezcla de materiales con una lectura más orgánica.", file: "10-bohemio.webp" },
+  { id: "rebel", label: "Rebelde", description: "Cuero, oscuridad y piezas con actitud que rompen la pulcritud del conjunto.", file: "11-rebelde.webp" },
+  { id: "avant_garde", label: "Vanguardista", description: "Proporciones inesperadas y prendas protagonistas que exploran otra silueta.", file: "12-vanguardista.webp" },
+];
+const styleFeedbackLabels: Record<StyleFeedbackReason, string> = {
+  color: "Color",
+  silhouette: "Silueta",
+  combination: "Combinación",
+  formality: "Formalidad",
+  expression: "Expresión",
+  fit: "Ajuste",
+  footwear: "Calzado",
+  specific: "Prenda específica",
+};
 const calibrationAudienceLabels: Record<CalibrationAudience, string> = { masculine: "Masculino", feminine: "Femenino", mixed: "Mixto" };
 const explorationLabels: Record<ExplorationLevel, string> = { safe: "Seguro", curious: "Curioso", open: "Abierto", experimental: "Experimental" };
 const calibrationLaneLabels: Record<CalibrationLane, string> = { familiar: "Familiar", adjacent: "Adyacente", experimental: "Fuera de tu zona" };
@@ -744,12 +784,41 @@ function complementScore(garment: Garment, selected: Garment[], code: StyleCode,
   return score;
 }
 
+function matchesStyleFamily(garment: Garment, family: StyleFamilyId): boolean {
+  const searchable = searchableGarment(garment);
+  if (family === "classic") return /shirt|chino|trouser|coat|peacoat|leather shoe|loafer|straight/.test(searchable) || garment.category === "Tailoring";
+  if (family === "minimal") return stylingNeutralFamilies.has(garment.colorFamily) && garment.finish !== "Graphic" && !/graphic|embroidered|floral|varsity/.test(searchable);
+  if (family === "relaxed") return ["Relaxed", "Oversized", "Longline"].includes(garment.silhouette) || /tee|denim|jeans|fleece|puffer|knit/.test(searchable);
+  if (family === "tailored") return garment.category === "Tailoring" || /blazer|trouser|pleated|coat|peacoat|piped/.test(searchable);
+  if (family === "preppy") return /oxford|shirt|chino|knit|crewneck|peacoat|loafer|pleated/.test(searchable);
+  if (family === "streetwear") return /graphic|varsity|bomber|coach|oversized|sneaker|track/.test(searchable);
+  if (family === "sporty") return /track|technical|shell|puffer|sneaker|nylon/.test(searchable);
+  if (family === "utility") return /field|parka|cargo|utility|technical|pocket|shell/.test(searchable);
+  if (family === "romantic") return /ivory|draped|wrap|cape|cream|soft|pumps/.test(searchable) || garment.silhouette === "Draped";
+  if (family === "bohemian") return /embroidered|floral|shearling|fleece|textured|brown|camel|poncho/.test(searchable);
+  if (family === "rebel") return /leather|black|graphic|distressed|biker/.test(searchable) || garment.finish === "Glossy";
+  return /asymmetric|transparent|draped|kimono|cape|poncho|cropped|funnel/.test(searchable) || ["Draped", "Cropped"].includes(garment.silhouette);
+}
+
+function stylePreferenceScore(garment: Garment, profile?: StyleProfile | null): number {
+  if (!profile?.completed || !profile.ratings.length) return 0;
+  let score = 0;
+  for (const rating of profile.ratings) {
+    if (!matchesStyleFamily(garment, rating.family)) continue;
+    score += rating.blocked ? -30 : (rating.affinity - 50) / 6;
+  }
+  const experimental = matchesStyleFamily(garment, "avant_garde") || matchesStyleFamily(garment, "rebel") || matchesStyleFamily(garment, "streetwear");
+  if (experimental) score += (profile.exploration - 35) / 8;
+  return score;
+}
+
 function buildStylingRecommendations(
   garments: Garment[],
   code: StyleCode,
   moment: StyleMoment,
   occasion: StyleOccasion,
   excludedSignatures: Set<string> = new Set(),
+  styleProfile?: StyleProfile | null,
 ): StylingRecommendation[] {
   const bottoms = garments.filter((item) => item.category === "Bottoms");
   const tops = garments.filter((item) => item.category === "Tops");
@@ -771,6 +840,9 @@ function buildStylingRecommendations(
       score: contextGarmentScore(bottom, code, moment, occasion)
         + contextGarmentScore(top, code, moment, occasion)
         + contextGarmentScore(outer, code, moment, occasion)
+        + stylePreferenceScore(bottom, styleProfile)
+        + stylePreferenceScore(top, styleProfile)
+        + stylePreferenceScore(outer, styleProfile)
         + paletteScore(top, bottom, outer, strategy)
         + silhouetteScore(top, bottom, outer)
         + strategyScore(top, bottom, outer, strategy),
@@ -790,8 +862,8 @@ function buildStylingRecommendations(
 
     const selectedBase = [choice.top, choice.bottom, choice.outer];
     const rankComplement = (pool: Garment[]) => [...pool].sort((a, b) => {
-      const aScore = complementScore(a, selectedBase, code, moment, occasion) - (usedComplements.has(a.id) ? 10 : 0);
-      const bScore = complementScore(b, selectedBase, code, moment, occasion) - (usedComplements.has(b.id) ? 10 : 0);
+      const aScore = complementScore(a, selectedBase, code, moment, occasion) + stylePreferenceScore(a, styleProfile) - (usedComplements.has(a.id) ? 10 : 0);
+      const bScore = complementScore(b, selectedBase, code, moment, occasion) + stylePreferenceScore(b, styleProfile) - (usedComplements.has(b.id) ? 10 : 0);
       return bScore - aScore || a.id.localeCompare(b.id);
     })[0];
     const shoe = rankComplement(footwear);
@@ -1135,6 +1207,8 @@ function TasteCalibrationDeck() {
   const complete = cardIndex >= deck.length;
 
   useEffect(() => {
+    // This legacy demo deck resets as one unit whenever its two controls change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCardIndex(0);
     setLikedCount(0);
     setRejectedCount(0);
@@ -1286,6 +1360,8 @@ function WeeklyPlanView({
   const [occasion, setOccasion] = useState<WeeklyOccasion>("daily");
 
   useEffect(() => {
+    // Keep the planner form aligned with the selected day or saved entry.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOccasion(selectedEntry?.occasion ?? (selectedDay?.shortLabel === "SÁB" || selectedDay?.shortLabel === "DOM" ? "weekend" : "daily"));
   }, [selectedEntry?.occasion, selectedDay?.key, selectedDay?.shortLabel]);
 
@@ -1455,6 +1531,127 @@ function ClosetGarmentGrid({
   </div>;
 }
 
+function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
+  profile: StyleProfile | null;
+  saving: boolean;
+  dismissible: boolean;
+  onClose: () => void;
+  onSave: (profile: StyleProfile) => Promise<void>;
+}) {
+  const [stage, setStage] = useState<"intro" | "audience" | "families" | "result">("intro");
+  const [audience, setAudience] = useState<StyleAudience>(profile?.audience ?? "hombre");
+  const [exploration, setExploration] = useState(profile?.exploration ?? 35);
+  const [familyIndex, setFamilyIndex] = useState(0);
+  const [saveError, setSaveError] = useState("");
+  const [ratings, setRatings] = useState<Record<StyleFamilyId, StyleFamilyRating>>(() => Object.fromEntries(
+    styleFamilyMeta.map((family) => [family.id, profile?.ratings.find((rating) => rating.family === family.id) ?? { family: family.id, affinity: 50, blocked: false, reason: null }]),
+  ) as Record<StyleFamilyId, StyleFamilyRating>);
+
+  const family = styleFamilyMeta[familyIndex];
+  const rating = family ? ratings[family.id] : null;
+  const rankedFamilies = styleFamilyMeta
+    .map((item) => ({ ...item, ...ratings[item.id] }))
+    .filter((item) => !item.blocked)
+    .sort((a, b) => b.affinity - a.affinity)
+    .slice(0, 3);
+  const updateRating = (next: Partial<StyleFamilyRating>) => {
+    if (!family) return;
+    setRatings((current) => ({ ...current, [family.id]: { ...current[family.id], ...next } }));
+  };
+  const continueFamily = () => {
+    if (familyIndex + 1 < styleFamilyMeta.length) setFamilyIndex((index) => index + 1);
+    else setStage("result");
+  };
+  const goBack = () => {
+    if (stage === "audience") setStage("intro");
+    else if (stage === "families" && familyIndex === 0) setStage("audience");
+    else if (stage === "families") setFamilyIndex((index) => Math.max(0, index - 1));
+    else if (stage === "result") { setStage("families"); setFamilyIndex(styleFamilyMeta.length - 1); }
+  };
+  const submitProfile = async () => {
+    setSaveError("");
+    try {
+      await onSave({ audience, exploration, completed: true, ratings: styleFamilyMeta.map((item) => ratings[item.id]) });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo guardar tu perfil.");
+    }
+  };
+
+  return <div className="style-onboarding-backdrop" role="dialog" aria-modal="true" aria-label="Calibrar mi estilo">
+    <section className={`style-onboarding stage-${stage}`}>
+      <header className="style-onboarding-header">
+        <strong>FORME® / CALIBRACIÓN</strong>
+        <span>{stage === "families" ? `${String(familyIndex + 1).padStart(2, "0")} / ${styleFamilyMeta.length}` : "TU PERFIL DE ESTILO"}</span>
+        {dismissible && <button type="button" onClick={onClose} aria-label="Cerrar calibración">×</button>}
+      </header>
+
+      {stage === "intro" && <div className="style-onboarding-intro">
+        <p>ANTES DE RECOMENDAR</p>
+        <h1>12 looks.<br />Menos de dos minutos.</h1>
+        <span>No buscamos encasillarte. Esta primera lectura define qué te resulta familiar, qué quieres explorar y qué no necesitas ver.</span>
+        <div className="style-onboarding-scale-preview"><i>FAMILIAR</i><b /><i>EXPERIMENTAL</i></div>
+        <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR</span><b>→</b></button>
+      </div>}
+
+      {stage === "audience" && <div className="style-onboarding-audience">
+        <button className="style-back" type="button" onClick={goBack}>← VOLVER</button>
+        <p>PUNTO DE PARTIDA</p>
+        <h1>¿Qué versión quieres evaluar?</h1>
+        <span>Esto solo define las prendas que verás en las cards; no intenta definir tu identidad ni limita lo que podrás usar después.</span>
+        <div className="style-audience-options">
+          {(["hombre", "mujer"] as StyleAudience[]).map((option) => <button key={option} type="button" className={audience === option ? "active" : ""} onClick={() => setAudience(option)}>
+            <small>12 FAMILIAS</small><strong>{option === "hombre" ? "Hombre" : "Mujer"}</strong><b>{audience === option ? "✓" : "→"}</b>
+          </button>)}
+        </div>
+        <button className="style-primary-action" type="button" onClick={() => setStage("families")}><span>CONTINUAR</span><b>→</b></button>
+      </div>}
+
+      {stage === "families" && family && rating && <div className="style-family-stage">
+        <div className="style-family-copy">
+          <button className="style-back" type="button" onClick={goBack}>← VOLVER</button>
+          <p>FAMILIA {String(familyIndex + 1).padStart(2, "0")}</p>
+          <h1>{family.label}</h1>
+          <span>{family.description}</span>
+          <div className="style-family-progress" aria-hidden="true"><b style={{ width: `${((familyIndex + 1) / styleFamilyMeta.length) * 100}%` }} /></div>
+        </div>
+        <div className="style-family-card">
+          <img src={asset(`/onboarding/style-families/${audience}/${family.file}`)} alt={`Look de estilo ${family.label}`} />
+        </div>
+        <div className="style-rating-panel">
+          <div className="style-rating-value"><span>¿CUÁNTO TE REPRESENTA?</span><strong>{rating.blocked ? "NO MOSTRAR" : `${rating.affinity}%`}</strong></div>
+          <input type="range" min="0" max="100" step="5" value={rating.blocked ? 0 : rating.affinity} disabled={rating.blocked} onChange={(event) => updateRating({ affinity: Number(event.target.value), blocked: false })} aria-label={`Afinidad con ${family.label}`} />
+          <div className="style-rating-labels"><span>NO ES LO MÍO</span><span>ME LO PONDRÍA</span></div>
+          {(rating.affinity <= 25 || rating.blocked) && <div className="style-feedback-reasons">
+            <p>¿QUÉ NO TE CIERRA?</p>
+            <div>{(Object.keys(styleFeedbackLabels) as StyleFeedbackReason[]).map((reason) => <button type="button" key={reason} className={rating.reason === reason ? "active" : ""} onClick={() => updateRating({ reason })}>{styleFeedbackLabels[reason]}</button>)}</div>
+          </div>}
+          <div className="style-rating-actions">
+            <button type="button" className={rating.blocked ? "blocked" : ""} onClick={() => updateRating({ blocked: !rating.blocked, affinity: rating.blocked ? 50 : 0 })}>{rating.blocked ? "VOLVER A EVALUAR" : "NO MOSTRAR"}</button>
+            <button className="style-primary-action" type="button" onClick={continueFamily}><span>{familyIndex + 1 === styleFamilyMeta.length ? "VER MI PERFIL" : "SIGUIENTE"}</span><b>→</b></button>
+          </div>
+        </div>
+      </div>}
+
+      {stage === "result" && <div className="style-onboarding-result">
+        <button className="style-back" type="button" onClick={goBack}>← REVISAR</button>
+        <p>PRIMERA LECTURA</p>
+        <h1>Tu estilo empieza acá.</h1>
+        <span>Estas son tus afinidades más altas. Se irán ajustando con los looks que guardes, descartes y realmente uses.</span>
+        <div className="style-result-ranking">
+          {rankedFamilies.map((item, index) => <article key={item.id}><span>0{index + 1}</span><strong>{item.label}</strong><b>{item.affinity}%</b></article>)}
+        </div>
+        <div className="style-exploration-control">
+          <div><span>NIVEL EXPERIMENTAL</span><strong>{exploration}%</strong></div>
+          <input type="range" min="0" max="100" step="5" value={exploration} onChange={(event) => setExploration(Number(event.target.value))} aria-label="Nivel experimental" />
+          <div><small>QUIERO LO FAMILIAR</small><small>SORPRÉNDEME</small></div>
+        </div>
+        {saveError && <p className="style-save-error" role="alert">{saveError}</p>}
+        <button className="style-primary-action" type="button" disabled={saving} onClick={() => void submitProfile()}><span>{saving ? "GUARDANDO…" : "ENTRAR A MI CLOSET"}</span><b>{saving ? "" : "→"}</b></button>
+      </div>}
+    </section>
+  </div>;
+}
+
 export default function Home() {
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
@@ -1481,6 +1678,9 @@ export default function Home() {
   const [styleCode, setStyleCode] = useState<StyleCode>("casual");
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
+  const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
+  const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
+  const [savingStyleProfile, setSavingStyleProfile] = useState(false);
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
@@ -1590,10 +1790,11 @@ export default function Home() {
         if (!sessionResponse.ok) throw new Error("No se pudo revisar tu sesión.");
         const session = await sessionResponse.json() as { user: WardrobeProfile };
         const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
-        const [wardrobeResponse, outfitsResponse, weekResponse] = await Promise.all([
+        const [wardrobeResponse, outfitsResponse, weekResponse, styleProfileResponse] = await Promise.all([
           batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
           fetch("/api/outfits", { cache: "no-store" }),
           fetch("/api/week", { cache: "no-store" }),
+          fetch("/api/style-profile", { cache: "no-store" }),
         ]);
         if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
         const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
@@ -1603,6 +1804,9 @@ export default function Home() {
         const week = weekResponse.ok
           ? await weekResponse.json() as { entries: WeeklyPlanEntry[] }
           : { entries: [] };
+        const loadedStyleProfile = styleProfileResponse.ok
+          ? (await styleProfileResponse.json() as { profile: StyleProfile }).profile
+          : { audience: "hombre" as const, exploration: 35, completed: false, ratings: [] };
         if (!active) return;
         const baseGarments = session.user.isOwner ? starterGarments : formeBasics;
         const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments);
@@ -1617,6 +1821,8 @@ export default function Home() {
         setProfile(session.user);
         setSavedLooks(normalizedLooks);
         setWeeklyPlan(week.entries);
+        setStyleProfile(loadedStyleProfile);
+        setStyleOnboardingOpen(!loadedStyleProfile.completed);
         setWardrobePanel("closet");
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
         const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
@@ -1670,6 +1876,31 @@ export default function Home() {
 
   function beginGoogleSignIn() {
     window.location.assign("/signin-with-chatgpt?return_to=%2F");
+  }
+
+  async function saveStyleCalibration(nextProfile: StyleProfile) {
+    setSavingStyleProfile(true);
+    setWardrobeError("");
+    try {
+      const response = await fetch("/api/style-profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(nextProfile),
+      });
+      const result = await response.json().catch(() => null) as { profile?: StyleProfile; error?: string } | null;
+      if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar tu perfil de estilo.");
+      setStyleProfile(result.profile);
+      setStyleOnboardingOpen(false);
+      setWardrobePanel("closet");
+      setView("wardrobe");
+      setStylingRecommendations([]);
+      setRecommendationHistory([]);
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar tu perfil de estilo.");
+      throw error;
+    } finally {
+      setSavingStyleProfile(false);
+    }
   }
 
   function openGarmentEditor(item: Garment) {
@@ -2211,7 +2442,7 @@ export default function Home() {
     const excludedSignatures = new Set([...recommendationHistory, ...savedSignatures]);
     const next = demoMode
       ? buildDemoRecommendations(styleCode, styleMoment, styleOccasion)
-      : buildStylingRecommendations(assistantGarments, styleCode, styleMoment, styleOccasion, excludedSignatures);
+      : buildStylingRecommendations(assistantGarments, styleCode, styleMoment, styleOccasion, excludedSignatures, styleProfile);
     if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
@@ -2558,6 +2789,13 @@ export default function Home() {
 
   return (
     <main className={`site-shell view-${view}`}>
+      {!demoMode && styleOnboardingOpen && <StyleOnboarding
+        profile={styleProfile}
+        saving={savingStyleProfile}
+        dismissible={Boolean(styleProfile?.completed)}
+        onClose={() => setStyleOnboardingOpen(false)}
+        onSave={saveStyleCalibration}
+      />}
       <header className="topbar">
         <button className="wordmark" onClick={() => openWardrobe("closet")} aria-label="Ir al closet">FORME<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
@@ -2582,6 +2820,7 @@ export default function Home() {
               <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
               <p><strong>{sharedBasics.length}</strong><span>Básicos</span></p>
               <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
+              {!demoMode && <button className="profile-calibrate" type="button" onClick={() => setStyleOnboardingOpen(true)}>CALIBRAR ESTILO ↗</button>}
             </div>
             <nav className="wardrobe-tabs" aria-label="Mi closet">
               <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
@@ -2644,7 +2883,6 @@ export default function Home() {
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
-              <TasteCalibrationDeck />
               <div className="style-wheel">
                 <div className="style-wheel-copy">
                   <p>ASISTENTE DE STYLING</p>

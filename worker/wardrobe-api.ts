@@ -88,10 +88,33 @@ type GarmentPayload = {
 type ImageQuality = "low" | "medium";
 type GarmentPresentation = "auto" | "open" | "closed";
 type GarmentOutputVariant = "closed" | "open";
+type StyleAudience = "hombre" | "mujer";
+
+type StyleFamilyRatingPayload = {
+  family: string;
+  affinity: number;
+  blocked: boolean;
+  reason: string | null;
+};
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
+const styleFamilies = new Set([
+  "classic",
+  "minimal",
+  "relaxed",
+  "tailored",
+  "preppy",
+  "streetwear",
+  "sporty",
+  "utility",
+  "romantic",
+  "bohemian",
+  "rebel",
+  "avant_garde",
+]);
+const styleFeedbackReasons = new Set(["color", "silhouette", "combination", "formality", "expression", "fit", "footwear", "specific"]);
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 
 const garmentColumns = `
@@ -1272,6 +1295,100 @@ async function deleteWeeklyPlanEntry(db: D1Database, ownerId: string, planDate: 
   return new Response(null, { status: 204 });
 }
 
+async function getStyleProfile(db: D1Database, ownerId: string): Promise<Response> {
+  const profile = await db.prepare(`
+    SELECT audience, exploration, completed, completed_at, updated_at
+    FROM style_profiles
+    WHERE owner_id = ?
+    LIMIT 1
+  `).bind(ownerId).first<{
+    audience: string;
+    exploration: number;
+    completed: number;
+    completed_at: string | null;
+    updated_at: string;
+  }>();
+  const ratings = await db.prepare(`
+    SELECT family, affinity, blocked, reason, updated_at
+    FROM style_family_ratings
+    WHERE owner_id = ?
+    ORDER BY affinity DESC, family
+  `).bind(ownerId).all<{
+    family: string;
+    affinity: number;
+    blocked: number;
+    reason: string | null;
+    updated_at: string;
+  }>();
+  return json({
+    profile: {
+      audience: profile?.audience === "mujer" ? "mujer" : "hombre",
+      exploration: Math.max(0, Math.min(100, profile?.exploration ?? 35)),
+      completed: Boolean(profile?.completed),
+      completedAt: profile?.completed_at ?? null,
+      updatedAt: profile?.updated_at ?? null,
+      ratings: ratings.results.map((rating) => ({
+        family: rating.family,
+        affinity: rating.affinity,
+        blocked: Boolean(rating.blocked),
+        reason: rating.reason,
+      })),
+    },
+  });
+}
+
+async function saveStyleProfile(request: Request, db: D1Database, ownerId: string): Promise<Response> {
+  const value = await request.json().catch(() => null) as {
+    audience?: unknown;
+    exploration?: unknown;
+    completed?: unknown;
+    ratings?: unknown;
+  } | null;
+  if (!value || !Array.isArray(value.ratings)) return apiError("La calibración no es válida.", 400);
+  const audience: StyleAudience = value.audience === "mujer" ? "mujer" : "hombre";
+  const exploration = Math.max(0, Math.min(100, Math.round(Number(value.exploration) || 0)));
+  const completed = booleanValue(value.completed);
+  const unique = new Map<string, StyleFamilyRatingPayload>();
+  for (const raw of value.ratings) {
+    if (!raw || typeof raw !== "object") continue;
+    const rating = raw as Record<string, unknown>;
+    const family = textValue(rating.family, "").toLocaleLowerCase();
+    if (!styleFamilies.has(family)) continue;
+    const affinity = Math.max(0, Math.min(100, Math.round(Number(rating.affinity) || 0)));
+    const blocked = booleanValue(rating.blocked);
+    const rawReason = textValue(rating.reason, "").toLocaleLowerCase();
+    const reason = styleFeedbackReasons.has(rawReason) ? rawReason : null;
+    unique.set(family, { family, affinity: blocked ? 0 : affinity, blocked, reason });
+  }
+  if (completed && unique.size !== styleFamilies.size) return apiError("Califica las 12 familias para terminar.", 400);
+  const statements = [
+    db.prepare(`
+      INSERT INTO style_profiles (owner_id, audience, exploration, completed, completed_at)
+      VALUES (?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END)
+      ON CONFLICT(owner_id) DO UPDATE SET
+        audience = excluded.audience,
+        exploration = excluded.exploration,
+        completed = excluded.completed,
+        completed_at = CASE
+          WHEN excluded.completed = 1 THEN COALESCE(style_profiles.completed_at, CURRENT_TIMESTAMP)
+          ELSE style_profiles.completed_at
+        END,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(ownerId, audience, exploration, completed ? 1 : 0, completed ? 1 : 0),
+    ...[...unique.values()].map((rating) => db.prepare(`
+      INSERT INTO style_family_ratings (owner_id, family, affinity, blocked, reason)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(owner_id, family) DO UPDATE SET
+        affinity = excluded.affinity,
+        blocked = excluded.blocked,
+        reason = excluded.reason,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(ownerId, rating.family, rating.affinity, rating.blocked ? 1 : 0, rating.reason)),
+  ];
+  await db.batch(statements);
+  return getStyleProfile(db, ownerId);
+}
+
 export async function handleWardrobeApi(
   request: Request,
   env: WardrobeEnv,
@@ -1303,6 +1420,8 @@ export async function handleWardrobeApi(
     if (url.pathname === "/api/batches/status" && request.method === "GET") return reconcileGarmentBatches(env, ctx, db, identity);
     if (url.pathname === "/api/outfits" && request.method === "GET") return getOutfits(db, identity.id);
     if (url.pathname === "/api/week" && request.method === "GET") return getWeeklyPlan(db, identity.id);
+    if (url.pathname === "/api/style-profile" && request.method === "GET") return getStyleProfile(db, identity.id);
+    if (url.pathname === "/api/style-profile" && request.method === "PUT") return saveStyleProfile(request, db, identity.id);
 
     const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)\/(original|generated|generated-open|cutout|open)$/);
     if (mediaMatch && request.method === "GET") {
