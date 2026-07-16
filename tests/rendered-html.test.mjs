@@ -111,7 +111,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function recommendStyle\(\)/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
   assert.match(page, /studioReturnPanel/);
-  assert.match(page, /openStudio\(view === "studio" \? studioReturnPanel : wardrobePanel\)/);
+  assert.match(page, /function openSavedLook[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /function centeredLookPreviewItems/);
   assert.match(page, /function createInstagramStoryBlob/);
   assert.match(page, /navigator\.share/);

@@ -2811,7 +2811,9 @@ export default function Home() {
     setActiveIterationIndex(-1);
     setLibraryOpen(false);
     setSavedLooksOpen(false);
-    openStudio(view === "studio" ? studioReturnPanel : wardrobePanel);
+    // A saved look always belongs to the Looks archive. Even when it is opened
+    // from the Canvas side panel, returning to the wardrobe should land there.
+    openStudio("looks");
   }
 
   function persistDemoWeek(entries: WeeklyPlanEntry[]) {
