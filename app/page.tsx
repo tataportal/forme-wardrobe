@@ -1586,11 +1586,11 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
       </header>
 
       {stage === "intro" && <div className="style-onboarding-intro">
-        <p>PRIMERA CALIBRACIÓN</p>
-        <h1>Empecemos por<br />tu estilo.</h1>
-        <span>Evalúa 12 familias de estilo: cuánto te representa cada una y cuánto quieres experimentar. Es un punto de partida; las recomendaciones seguirán ajustándose con lo que guardes y rechaces.</span>
+        <p>ANTES DE EMPEZAR</p>
+        <h1>Queremos<br />conocerte.</h1>
+        <span>Tu estilo vive en lo que eliges, lo que repites y lo que todavía quieres probar. Recorre 12 familias para contarnos qué te representa hoy. No es una etiqueta: es el inicio de un diálogo que seguirá cambiando contigo.</span>
         <div className="style-onboarding-scale-preview"><i>FAMILIAR</i><b /><i>EXPERIMENTAL</i></div>
-        <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>COMENZAR</span><b>→</b></button>
+        <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR</span><b>→</b></button>
       </div>}
 
       {stage === "audience" && <div className="style-onboarding-audience">
