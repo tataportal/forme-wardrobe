@@ -16,7 +16,7 @@ import { classifyGarment, formeBasics, Garment, starterGarments } from "./garmen
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
 type ClosetMode = "browse" | "upload";
-type StudioLibraryFilter = "all" | "personal" | "forme" | "footwear" | "accessories";
+type StudioLibraryFilter = "all" | "outerwear" | "tops" | "bottoms" | "footwear" | "accessories";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
@@ -1730,13 +1730,17 @@ export default function Home() {
     const fallbackBasics = sharedBasics.filter((item) => !categories.has(item.category));
     return [...personalGarments, ...fallbackBasics];
   }, [demoMode, personalGarments, sharedBasics]);
-  const studioGarments = garments.filter((item) => {
-    if (studioLibraryFilter === "personal") return item.collection !== "forme";
-    if (studioLibraryFilter === "forme") return item.collection === "forme";
+  const matchesStudioLibraryFilter = (item: Garment) => {
+    if (studioLibraryFilter === "outerwear") return item.category === "Outerwear" || item.category === "Tailoring";
+    if (studioLibraryFilter === "tops") return item.category === "Tops";
+    if (studioLibraryFilter === "bottoms") return item.category === "Bottoms";
     if (studioLibraryFilter === "footwear") return item.category === "Footwear";
     if (studioLibraryFilter === "accessories") return item.category === "Accessories";
     return true;
-  });
+  };
+  const studioPersonalGarments = personalGarments.filter(matchesStudioLibraryFilter);
+  const studioBasicGarments = sharedBasics.filter(matchesStudioLibraryFilter);
+  const studioGarments = [...studioPersonalGarments, ...studioBasicGarments];
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
   const iterationBaseCount = canvasPieces.filter((piece) => {
@@ -3056,8 +3060,9 @@ export default function Home() {
               <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
                 {([
                   ["all", "Todo"],
-                  ...(demoMode ? [] : [["personal", "Mío"]]),
-                  ["forme", "FORME"],
+                  ["outerwear", "Abrigos"],
+                  ["tops", "Tops"],
+                  ["bottoms", "Pantalones"],
                   ["footwear", "Calzado"],
                   ["accessories", "Accesorios"],
                 ] as [StudioLibraryFilter, string][]).map(([value, label]) => <button type="button" className={studioLibraryFilter === value ? "active" : ""} onClick={() => setStudioLibraryFilter(value)} key={value}>{label}</button>)}
@@ -3078,15 +3083,29 @@ export default function Home() {
                   <button onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
                 </div>
               </>}
-
-              <div className="tray-heading"><h3>PIEZAS</h3><p>TOCA PARA AÑADIR</p></div>
-              <div className="sticker-tray">
-                {studioGarments.map((item) => (
-                  <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
-                    <img src={imageSrc(item.image)} alt="" loading="lazy" />
-                    <span>{translateGarmentName(item.name)}</span>
-                  </button>
-                ))}
+              <div className="sticker-tray-groups">
+                {!demoMode && <section className="sticker-tray-section">
+                  <div className="tray-heading"><h3>MIS PRENDAS</h3><p>{studioPersonalGarments.length}</p></div>
+                  {studioPersonalGarments.length > 0
+                    ? <div className="sticker-tray">{studioPersonalGarments.map((item) => (
+                      <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                        <img src={imageSrc(item.image)} alt="" loading="lazy" />
+                        <span>{translateGarmentName(item.name)}</span>
+                      </button>
+                    ))}</div>
+                    : <p className="sticker-tray-empty">No tienes prendas en esta categoría.</p>}
+                </section>}
+                <section className="sticker-tray-section forme-basics-section">
+                  <div className="tray-heading"><h3>BÁSICOS FORME</h3><p>{studioBasicGarments.length}</p></div>
+                  {studioBasicGarments.length > 0
+                    ? <div className="sticker-tray">{studioBasicGarments.map((item) => (
+                      <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                        <img src={imageSrc(item.image)} alt="" loading="lazy" />
+                        <span>{translateGarmentName(item.name)}</span>
+                      </button>
+                    ))}</div>
+                    : <p className="sticker-tray-empty">No hay básicos en esta categoría.</p>}
+                </section>
               </div>
 
               <div className="library-utilities">
