@@ -14,13 +14,13 @@ async function render() {
   );
 }
 
-test("server-renders the FORME wardrobe", async () => {
+test("server-renders the FORMÉ wardrobe", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>FORME — Tu armario visual<\/title>/i);
+  assert.match(html, /<title>FORMÉ — Tu armario visual<\/title>/i);
   assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
   assert.match(html, />Mi closet</);
   assert.match(html, />Looks guardados</);
@@ -54,7 +54,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(auth, /crypto\.subtle\.verify/);
   assert.match(worker, /readNativeSession/);
   assert.doesNotMatch(page, /entry-gate/);
-  assert.match(page, /Básicos FORME/);
+  assert.match(page, /Básicos Formé/);
   assert.match(page, /visiblePersonalGarments/);
   assert.match(page, /visibleFormeBasics/);
   assert.match(page, /＋ Agregar/);
@@ -89,10 +89,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Mira doce familias/);
   assert.match(page, /\/api\/style-profile/);
   assert.match(page, /function stylePreferenceScore/);
-  assert.match(page, /BÁSICOS FORME/);
+  assert.match(page, /BÁSICOS FORMÉ/);
   assert.match(page, /studioPersonalGarments/);
   assert.match(page, /studioBasicGarments/);
-  assert.doesNotMatch(page, /\["forme", "FORME"\]/);
+  assert.doesNotMatch(page, /\["forme", "FORMÉ"\]/);
   assert.match(page, /function buildLookIterations/);
   assert.match(page, /const iterationProfiles = \[/);
   assert.match(page, /MEZCLAR/);

@@ -1,8 +1,8 @@
-# FORME — Flujo de producto, aplicación y funciones
+# Formé — Flujo de producto, aplicación y funciones
 
-## Qué es FORME
+## Qué es Formé
 
-FORME es un armario visual y asistente personal de styling. Permite:
+Formé es un armario visual y asistente personal de styling. Permite:
 
 - Digitalizar prendas reales.
 - Convertir fotos caseras en imágenes limpias de catálogo.
@@ -29,7 +29,7 @@ No existe una landing intermedia.
 
 La persona entra directamente a un closet de prueba con:
 
-- Básicos FORME.
+- Básicos Formé.
 - Prendas, calzado y accesorios compartidos.
 - Looks de demostración.
 - Acceso al Canvas.
@@ -131,7 +131,7 @@ Es la colección privada del usuario. Incluye:
 - Acceso a la ficha de cada prenda.
 - Botón para añadir directamente al Canvas.
 
-### Básicos FORME
+### Básicos Formé
 
 Aparecen después de las prendas personales como una biblioteca compartida.
 
@@ -140,7 +140,7 @@ Sirven para:
 - Probar el producto antes de subir fotos.
 - Completar provisionalmente un outfit.
 - Crear combinaciones con básicos transversales.
-- Diferenciar claramente qué pertenece al usuario y qué pertenece a FORME.
+- Diferenciar claramente qué pertenece al usuario y qué pertenece a Formé.
 
 No son un tab independiente.
 
@@ -429,7 +429,7 @@ Más adelante debe incorporar clima, calendario y nivel de formalidad de cada ev
 
 ## 13. Aprendizaje continuo
 
-FORME aprende de:
+Formé aprende de:
 
 - Test inicial.
 - Likes y rechazos.

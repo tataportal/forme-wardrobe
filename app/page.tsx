@@ -200,7 +200,7 @@ const demoLooksStorageKey = "forme-demo-looks-v1";
 const demoWeekStorageKey = "forme-demo-week-v1";
 const calibrationStorageKey = "forme-style-calibration-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
-const operationalSiteUrl = "https://forme.frensonly.club/";
+const operationalSiteUrl = "https://forme.gallery/";
 const currentOutfitId = "current-look";
 const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
@@ -1297,7 +1297,7 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   context.fillStyle = "#11110f";
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
-  context.fillText("FORME® / LOOK GUARDADO", 72, 92);
+  context.fillText("FORMÉ® / LOOK GUARDADO", 72, 92);
   context.font = "400 72px Georgia, serif";
   context.letterSpacing = "-2px";
   context.fillText(look.name, 72, 185, width - 144);
@@ -1342,7 +1342,7 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   context.fillText("Vístete con lo que ya tienes.", 72, 1738);
   context.font = "600 19px Arial, sans-serif";
   context.letterSpacing = "4px";
-  context.fillText(`${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}  ·  FORME.FRENSONLY.CLUB`, 72, 1793);
+  context.fillText(`${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}  ·  FORME.GALLERY`, 72, 1793);
   context.fillStyle = "#e83b25";
   context.fillRect(72, 1840, 128, 8);
 
@@ -1424,7 +1424,7 @@ function TasteCalibrationDeck() {
 
   return <section className="taste-calibration">
     <div className="calibration-heading">
-      <div><p>CALIBRACIÓN DE ESTILO</p><h2>Enséñale tu gusto a FORME</h2><span>Desliza como Tinder. Ninguna respuesta es un “nunca” salvo que lo indiques.</span></div>
+      <div><p>CALIBRACIÓN DE ESTILO</p><h2>Enséñale tu gusto a Formé</h2><span>Desliza como Tinder. Ninguna respuesta es un “nunca” salvo que lo indiques.</span></div>
       <strong>{Math.min(cardIndex + 1, deck.length)} / {deck.length}</strong>
     </div>
 
@@ -1685,7 +1685,7 @@ function ClosetGarmentGrid({
         {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
         <button className="card-studio-add" onClick={() => onAdd(item)}>AÑADIR AL CANVAS <span>＋</span></button>
       </div>
-      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORME · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
+      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORMÉ · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
     </article>)}
     {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>LIMPIAR FILTROS</button></div>}
   </div>;
@@ -1742,7 +1742,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
       <header className="style-onboarding-header">
         <div className="style-onboarding-nav-start">
           {stage === "intro"
-            ? <strong>FORME®</strong>
+            ? <strong>FORMÉ®</strong>
             : <button type="button" onClick={goBack}>← VOLVER</button>}
         </div>
         <strong className="style-onboarding-nav-title">CALIBRACIÓN</strong>
@@ -1849,7 +1849,7 @@ export default function Home() {
   const [selectedPlanDate, setSelectedPlanDate] = useState("");
   const [planningWeek, setPlanningWeek] = useState(false);
   const [activeOutfitId, setActiveOutfitId] = useState<string | null>(null);
-  const [activeLookName, setActiveLookName] = useState("Demo FORME");
+  const [activeLookName, setActiveLookName] = useState("Demo Formé");
   const [styleCode, setStyleCode] = useState<StyleCode>("casual");
   const [styleMoment, setStyleMoment] = useState<StyleMoment>("day");
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
@@ -2966,8 +2966,8 @@ export default function Home() {
         try {
           await navigator.share({
             files: [file],
-            title: `${look.name} · FORME`,
-            text: "Mi look en FORME",
+            title: `${look.name} · Formé`,
+            text: "Mi look en Formé",
           });
           setShareNotice("Look listo. Elige Instagram o Stories en el menú de compartir.");
           return;
@@ -3091,7 +3091,7 @@ export default function Home() {
 
   if (isStaticDemo) {
     return <main className="static-redirect" aria-live="polite">
-      <p>ABRIENDO FORME</p>
+      <p>ABRIENDO FORMÉ</p>
       <h1>Tu armario continúa en la app operativa.</h1>
       <a href={operationalSiteUrl}>CONTINUAR →</a>
     </main>;
@@ -3130,12 +3130,12 @@ export default function Home() {
               <i><b style={{ width: `${styleProfile?.exploration ?? 35}%` }} /></i>
               <small>Define cuánto se alejan las sugerencias de lo que ya usas.</small>
             </div>
-            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONTARLE A FORME QUÉ ME GUSTA"}</span><b>→</b></button>
+            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONTARLE A FORMÉ QUÉ ME GUSTA"}</span><b>→</b></button>
           </section>
         </aside>
       </div>}
       <header className="topbar">
-        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORME<span>®</span></button>
+        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORMÉ<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
           <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
           <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
@@ -3174,7 +3174,7 @@ export default function Home() {
                       : <div className="closet-empty-personal"><p>{demoMode ? "Inicia sesión para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "CONTINUAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
                   </section>
                   <section className="closet-group forme-group">
-                    <div className="closet-group-heading"><div><p>BIBLIOTECA COMPARTIDA</p><h3>Básicos FORME</h3></div><span>{sharedBasics.length}</span></div>
+                    <div className="closet-group-heading"><div><p>BIBLIOTECA COMPARTIDA</p><h3>Básicos Formé</h3></div><span>{sharedBasics.length}</span></div>
                     <ClosetGarmentGrid garments={visibleFormeBasics} emptyLabel="NO HAY BÁSICOS CON ESTOS FILTROS" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
                   </section>
                 </div>
@@ -3212,7 +3212,7 @@ export default function Home() {
                 <div className="style-wheel-copy">
                   <p>ASISTENTE DE STYLING</p>
                   <h2>¿Para qué te estás vistiendo?</h2>
-                  <span>{demoMode ? "Prueba cinco direcciones usando los básicos compartidos. Cuando inicies sesión, el análisis cambia a tus propias prendas." : `FORME está leyendo ${assistantGarments.length} prendas por contexto, color, material, acabado y proporción. Cada nueva búsqueda evita las combinaciones que ya viste o guardaste.`}</span>
+                  <span>{demoMode ? "Prueba cinco direcciones usando los básicos compartidos. Cuando inicies sesión, el análisis cambia a tus propias prendas." : `Formé está leyendo ${assistantGarments.length} prendas por contexto, color, material, acabado y proporción. Cada nueva búsqueda evita las combinaciones que ya viste o guardaste.`}</span>
                 </div>
                 <div className="style-wheel-controls">
                   <fieldset className="option-four">
@@ -3407,7 +3407,7 @@ export default function Home() {
             </button>
 
             <aside className={`look-controls garment-library-panel ${libraryOpen ? "panel-open" : "panel-closed"}`} aria-label="Prendas y categorías">
-              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORME" : "ARMARIO"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
+              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORMÉ" : "ARMARIO"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
               <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
                 {([
                   ["all", "Todo"],
@@ -3447,7 +3447,7 @@ export default function Home() {
                     : <p className="sticker-tray-empty">No tienes prendas en esta categoría.</p>}
                 </section>}
                 <section className="sticker-tray-section forme-basics-section">
-                  <div className="tray-heading"><h3>BÁSICOS FORME</h3><p>{studioBasicGarments.length}</p></div>
+                  <div className="tray-heading"><h3>BÁSICOS FORMÉ</h3><p>{studioBasicGarments.length}</p></div>
                   {studioBasicGarments.length > 0
                     ? <div className="sticker-tray">{studioBasicGarments.map((item) => (
                       <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>

@@ -1,4 +1,4 @@
-# FORME — Virtual Wardrobe
+# Formé — Virtual Wardrobe
 
 A mobile-first editorial wardrobe for turning clothing photos into a clean visual archive and composing new outfits.
 
