@@ -1580,24 +1580,41 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
   return <div className="style-onboarding-backdrop" role="dialog" aria-modal="true" aria-label="Calibrar mi estilo">
     <section className={`style-onboarding stage-${stage}`}>
       <header className="style-onboarding-header">
-        <strong>FORME® / CALIBRACIÓN</strong>
-        <span>{stage === "families" ? `${String(familyIndex + 1).padStart(2, "0")} / ${styleFamilyMeta.length}` : "TU PERFIL DE ESTILO"}</span>
-        {dismissible && <button type="button" onClick={onClose} aria-label="Cerrar calibración">×</button>}
+        <div className="style-onboarding-nav-start">
+          {stage === "intro"
+            ? <strong>FORME®</strong>
+            : <button type="button" onClick={goBack}>← VOLVER</button>}
+        </div>
+        <strong className="style-onboarding-nav-title">CALIBRACIÓN</strong>
+        <div className="style-onboarding-nav-end">
+          {stage === "intro"
+            ? <button className="style-skip-intro" type="button" onClick={() => setStage("audience")}>SALTAR INTRO</button>
+            : <span>{stage === "families" ? `${String(familyIndex + 1).padStart(2, "0")} DE ${styleFamilyMeta.length}` : stage === "result" ? "LECTURA" : "INICIO"}</span>}
+          {dismissible && <button className="style-close" type="button" onClick={onClose} aria-label="Cerrar calibración">×</button>}
+        </div>
       </header>
 
       {stage === "intro" && <div className="style-onboarding-intro">
-        <p>ANTES DE EMPEZAR</p>
-        <h1>Queremos<br />conocerte.</h1>
-        <span>Tu estilo vive en lo que eliges, lo que repites y lo que todavía quieres probar. Recorre 12 familias para contarnos qué te representa hoy. No es una etiqueta: es el inicio de un diálogo que seguirá cambiando contigo.</span>
-        <div className="style-onboarding-scale-preview"><i>FAMILIAR</i><b /><i>EXPERIMENTAL</i></div>
-        <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR</span><b>→</b></button>
+        <div className="style-intro-visual" aria-hidden="true">
+          <img src={asset("/onboarding/style-families/hombre/12-vanguardista.webp")} alt="" />
+          <img src={asset("/onboarding/style-families/mujer/09-romantico.webp")} alt="" />
+          <img src={asset("/onboarding/style-families/hombre/06-streetwear.webp")} alt="" />
+        </div>
+        <div className="style-intro-copy">
+          <p>UN PRIMER RETRATO</p>
+          <h1>Queremos<br />conocerte.</h1>
+          <span>Tu estilo no es una etiqueta. Vive en lo que eliges, repites y todavía quieres probar. Mira doce familias y dinos cuánto se parece cada una a ti.</span>
+        </div>
+        <div className="style-intro-footer">
+          <p><span>12 FAMILIAS</span><span>NINGUNA RESPUESTA ES DEFINITIVA</span></p>
+          <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR A ELEGIR</span><b>→</b></button>
+        </div>
       </div>}
 
       {stage === "audience" && <div className="style-onboarding-audience">
-        <button className="style-back" type="button" onClick={goBack}>← VOLVER</button>
         <p>PUNTO DE PARTIDA</p>
-        <h1>¿Qué versión quieres evaluar?</h1>
-        <span>Esto solo define las prendas que verás en las cards; no intenta definir tu identidad ni limita lo que podrás usar después.</span>
+        <h1>¿Qué looks quieres ver primero?</h1>
+        <span>Elige un punto de partida para estas doce familias. Después podrás mezclar libremente prendas de cualquier sección.</span>
         <div className="style-audience-options">
           {(["hombre", "mujer"] as StyleAudience[]).map((option) => <button key={option} type="button" className={audience === option ? "active" : ""} onClick={() => setAudience(option)}>
             <small>12 FAMILIAS</small><strong>{option === "hombre" ? "Hombre" : "Mujer"}</strong><b>{audience === option ? "✓" : "→"}</b>
@@ -1608,7 +1625,6 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
 
       {stage === "families" && family && rating && <div className="style-family-stage">
         <div className="style-family-copy">
-          <button className="style-back" type="button" onClick={goBack}>← VOLVER</button>
           <p>FAMILIA {String(familyIndex + 1).padStart(2, "0")}</p>
           <h1>{family.label}</h1>
           <span>{family.description}</span>
@@ -1618,25 +1634,24 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
           <img src={asset(`/onboarding/style-families/${audience}/${family.file}`)} alt={`Look de estilo ${family.label}`} />
         </div>
         <div className="style-rating-panel">
-          <div className="style-rating-value"><span>¿CUÁNTO TE REPRESENTA?</span><strong>{rating.blocked ? "NO MOSTRAR" : `${rating.affinity}%`}</strong></div>
+          <div className="style-rating-value"><span>¿CUÁNTO SE PARECE A TI?</span><strong>{rating.blocked ? "FUERA" : `${rating.affinity}%`}</strong></div>
           <input type="range" min="0" max="100" step="5" value={rating.blocked ? 0 : rating.affinity} disabled={rating.blocked} onChange={(event) => updateRating({ affinity: Number(event.target.value), blocked: false })} aria-label={`Afinidad con ${family.label}`} />
-          <div className="style-rating-labels"><span>NO ES LO MÍO</span><span>ME LO PONDRÍA</span></div>
+          <div className="style-rating-labels"><span>NADA</span><span>MUCHO</span></div>
           {(rating.affinity <= 25 || rating.blocked) && <div className="style-feedback-reasons">
-            <p>¿QUÉ NO TE CIERRA?</p>
+            <p>¿QUÉ CAMBIARÍAS?</p>
             <div>{(Object.keys(styleFeedbackLabels) as StyleFeedbackReason[]).map((reason) => <button type="button" key={reason} className={rating.reason === reason ? "active" : ""} onClick={() => updateRating({ reason })}>{styleFeedbackLabels[reason]}</button>)}</div>
           </div>}
           <div className="style-rating-actions">
-            <button type="button" className={rating.blocked ? "blocked" : ""} onClick={() => updateRating({ blocked: !rating.blocked, affinity: rating.blocked ? 50 : 0 })}>{rating.blocked ? "VOLVER A EVALUAR" : "NO MOSTRAR"}</button>
-            <button className="style-primary-action" type="button" onClick={continueFamily}><span>{familyIndex + 1 === styleFamilyMeta.length ? "VER MI PERFIL" : "SIGUIENTE"}</span><b>→</b></button>
+            <button type="button" className={rating.blocked ? "blocked" : ""} onClick={() => updateRating({ blocked: !rating.blocked, affinity: rating.blocked ? 50 : 0 })}>{rating.blocked ? "VOLVER A INCLUIR" : "NO RECOMENDAR"}</button>
+            <button className="style-primary-action" type="button" onClick={continueFamily}><span>{familyIndex + 1 === styleFamilyMeta.length ? "VER MI LECTURA" : "SIGUIENTE FAMILIA"}</span><b>→</b></button>
           </div>
         </div>
       </div>}
 
       {stage === "result" && <div className="style-onboarding-result">
-        <button className="style-back" type="button" onClick={goBack}>← REVISAR</button>
         <p>PRIMERA LECTURA</p>
         <h1>Tu estilo empieza acá.</h1>
-        <span>Estas son tus afinidades más altas. Se irán ajustando con los looks que guardes, descartes y realmente uses.</span>
+        <span>Esto no es una definición. Es una primera lectura que se irá afinando con los looks que guardes, descartes y realmente uses.</span>
         <div className="style-result-ranking">
           {rankedFamilies.map((item, index) => <article key={item.id}><span>0{index + 1}</span><strong>{item.label}</strong><b>{item.affinity}%</b></article>)}
         </div>

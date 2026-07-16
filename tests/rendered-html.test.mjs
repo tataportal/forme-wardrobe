@@ -73,8 +73,11 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /GUARDAR COMO LOOK/);
   assert.match(page, /type StyleFamilyId = "classic"/);
   assert.match(page, /function StyleOnboarding/);
+  assert.match(page, /SALTAR INTRO/);
+  assert.match(page, /EMPEZAR A ELEGIR/);
+  assert.match(page, /SIGUIENTE FAMILIA/);
   assert.match(page, /Queremos/);
-  assert.match(page, /Recorre 12 familias/);
+  assert.match(page, /Mira doce familias/);
   assert.match(page, /\/api\/style-profile/);
   assert.match(page, /function stylePreferenceScore/);
   assert.match(page, /BÁSICOS FORME/);
