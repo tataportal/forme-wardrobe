@@ -71,6 +71,13 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /recommendationHistory/);
   assert.match(page, /function saveStylingRecommendation/);
   assert.match(page, /GUARDAR COMO LOOK/);
+  assert.match(page, /type CalibrationAudience = "masculine" \| "feminine" \| "mixed"/);
+  assert.match(page, /function buildCalibrationDeck/);
+  assert.match(page, /function TasteCalibrationDeck/);
+  assert.match(page, /Enséñale tu gusto a FORME/);
+  assert.match(page, /¿Qué no funcionó\?/);
+  assert.match(page, /NUNCA RECOMENDAR ALGO ASÍ/);
+  assert.match(page, /forme-style-calibration-v1/);
   assert.match(page, /function buildLookIterations/);
   assert.match(page, /const iterationProfiles = \[/);
   assert.match(page, /MEZCLAR/);
@@ -94,6 +101,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
+  assert.match(css, /\.taste-card/);
+  assert.match(css, /\.calibration-feedback/);
   assert.match(css, /\.iteration-drawer/);
   assert.match(css, /\.week-workspace/);
   assert.match(css, /\.insights-dashboard/);
