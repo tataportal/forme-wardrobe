@@ -88,6 +88,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /const iterationProfiles = \[/);
   assert.match(page, /MEZCLAR/);
   assert.match(page, /function openLookIteration/);
+  assert.match(page, /function stepLookIteration/);
+  assert.match(page, /className="mix-canvas-navigator"/);
+  assert.match(page, /GUARDAR SELECCIÓN/);
   assert.match(page, /function duplicateCurrentOutfit/);
   assert.match(page, /function recommendationOuterPlacement/);
   assert.match(page, /function recommendationTopPlacement/);
@@ -140,7 +143,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.style-wheel/);
   assert.match(css, /\.style-onboarding-backdrop/);
   assert.match(css, /\.style-family-card/);
-  assert.match(css, /\.iteration-drawer/);
+  assert.match(css, /\.mix-canvas-navigator/);
   assert.match(css, /\.week-workspace/);
   assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);

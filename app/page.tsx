@@ -1861,6 +1861,7 @@ export default function Home() {
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
+  const [activeIterationIndex, setActiveIterationIndex] = useState(-1);
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -1923,10 +1924,7 @@ export default function Home() {
   const studioGarments = [...studioPersonalGarments, ...studioBasicGarments];
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
-  const iterationBaseCount = canvasPieces.filter((piece) => {
-    const category = garmentById.get(piece.garmentId)?.category;
-    return category === "Tops" || category === "Bottoms";
-  }).length;
+  const activeLookIteration = activeIterationIndex >= 0 ? lookIterations[activeIterationIndex] : undefined;
   const canIterate = canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Tops")
     && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
@@ -2719,20 +2717,32 @@ export default function Home() {
       return;
     }
     setLookIterations(next);
+    openLookIteration(next[0], 0);
     setLibraryOpen(false);
     setSavedLooksOpen(false);
     setWardrobeError("");
   }
 
-  function openLookIteration(iteration: LookIteration) {
+  function openLookIteration(iteration: LookIteration, index = lookIterations.findIndex((item) => item.id === iteration.id)) {
     setCanvasPieces(iteration.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
     setSelectedId("");
     setActiveOutfitId(null);
     setActiveLookName(iteration.title);
+    setActiveIterationIndex(Math.max(0, index));
     setSaved(false);
-    setLookIterations([]);
     setSavedLooksOpen(false);
     setWardrobeError("");
+  }
+
+  function stepLookIteration(direction: -1 | 1) {
+    if (!lookIterations.length) return;
+    const nextIndex = (activeIterationIndex + direction + lookIterations.length) % lookIterations.length;
+    openLookIteration(lookIterations[nextIndex], nextIndex);
+  }
+
+  function closeLookIterations() {
+    setLookIterations([]);
+    setActiveIterationIndex(-1);
   }
 
   function openStylingRecommendation(recommendation: StylingRecommendation) {
@@ -2742,6 +2752,7 @@ export default function Home() {
     setActiveLookName(recommendation.name);
     setSaved(false);
     setLookIterations([]);
+    setActiveIterationIndex(-1);
     setLibraryOpen(false);
     setSavedLooksOpen(false);
     setWardrobeError("");
@@ -2785,6 +2796,7 @@ export default function Home() {
     setActiveLookName(look.name);
     setSaved(true);
     setLookIterations([]);
+    setActiveIterationIndex(-1);
     setLibraryOpen(false);
     setSavedLooksOpen(false);
     openStudio(view === "studio" ? studioReturnPanel : wardrobePanel);
@@ -3036,6 +3048,7 @@ export default function Home() {
       setActiveOutfitId(outfitId);
       setActiveLookName(lookName);
       setLookIterations([]);
+      setActiveIterationIndex(-1);
       setSaved(true);
       setLibraryOpen(false);
       setSavedLooksOpen(true);
@@ -3374,17 +3387,16 @@ export default function Home() {
                     );
                   })}
                 </div>
-                {lookIterations.length > 0 && (
-                  <section className="iteration-drawer" aria-label="Cinco variaciones del look">
-                    <header><div><span>MEZCLAR LOOK</span><strong>5 variaciones · {iterationBaseCount} piezas fijas</strong></div><button type="button" onClick={() => setLookIterations([])} aria-label="Cerrar variaciones">×</button></header>
-                    <div className="iteration-list">
-                      {lookIterations.map((iteration, index) => (
-                        <button type="button" className="iteration-card" onClick={() => openLookIteration(iteration)} key={iteration.id}>
-                          <LookPreview look={{ id: iteration.id, name: iteration.title, items: iteration.items }} garmentById={garmentById} />
-                          <span>0{index + 1}</span><strong>{iteration.title}</strong><small>{iteration.detail}</small>
-                        </button>
-                      ))}
+                {activeLookIteration && (
+                  <section className="mix-canvas-navigator" aria-label="Navegar cinco variaciones del look" aria-live="polite">
+                    <button type="button" className="mix-step previous" onClick={() => stepLookIteration(-1)} aria-label="Ver mezcla anterior">←</button>
+                    <div className="mix-current-look">
+                      <div className="mix-current-heading"><span>MEZCLA {String(activeIterationIndex + 1).padStart(2, "0")} / {String(lookIterations.length).padStart(2, "0")}</span><button type="button" onClick={closeLookIterations} aria-label="Cerrar mezclas">×</button></div>
+                      <strong>{activeLookIteration.title}</strong>
+                      <small>{activeLookIteration.detail}</small>
+                      <div className="mix-progress" aria-hidden="true">{lookIterations.map((iteration, index) => <i className={index === activeIterationIndex ? "active" : ""} key={iteration.id} />)}</div>
                     </div>
+                    <button type="button" className="mix-step next" onClick={() => stepLookIteration(1)} aria-label="Ver siguiente mezcla">→</button>
                   </section>
                 )}
               </div>
@@ -3448,7 +3460,7 @@ export default function Home() {
               </div>
 
               <div className="library-utilities">
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); setLookIterations([]); }}>VACIAR CANVAS</button>
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); closeLookIterations(); }}>VACIAR CANVAS</button>
               </div>
             </aside>
 
@@ -3471,7 +3483,7 @@ export default function Home() {
             {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
             <nav className="canvas-action-bar" aria-label="Acciones del look">
-              <button className={`save-look-action ${saved ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : saved ? "GUARDADO" : "GUARDAR"}</span><b>{saved ? "✓" : "＋"}</b></button>
+              <button className={`save-look-action ${saved ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : saved ? "GUARDADO" : activeLookIteration ? "GUARDAR SELECCIÓN" : "GUARDAR LOOK"}</span><b>{saved ? "✓" : "＋"}</b></button>
               <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
               <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
               <button className="share-look-action" disabled={canvasPieces.length === 0 || Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName === "Nuevo look" ? "Mi look" : activeLookName, items: canvasPieces })}><span>{sharingLookId ? "PREPARANDO…" : "COMPARTIR"}</span><b>↗</b></button>
