@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "forme-gallery",
+  "account_id": "9b26741155656b971477eb0674099db3",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-07-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "forme-gallery",
+      "database_id": "4ed75f03-1a70-40cc-8aec-d6bd27a6b1f2",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "WARDROBE_MEDIA",
+      "bucket_name": "forme-gallery-media"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vars": {
+    "OPENAI_IMAGE_MODEL": "gpt-image-2",
+    "OPENAI_IMAGE_QUALITY": "low",
+    "FORME_OWNER_EMAIL": "tatayamigos@gmail.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
