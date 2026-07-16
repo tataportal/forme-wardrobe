@@ -1,6 +1,5 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import workerConfig from "./wrangler.json";
 import { sites } from "./build/sites-vite-plugin";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
@@ -25,7 +24,6 @@ export default defineConfig(async () => {
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: workerConfig,
       }),
     ],
   };
