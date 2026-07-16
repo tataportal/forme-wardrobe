@@ -1232,6 +1232,113 @@ function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<
   );
 }
 
+type ShareImage = {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  close: () => void;
+};
+
+async function loadShareImage(sourceUrl: string): Promise<ShareImage> {
+  const response = await fetch(sourceUrl, { cache: "force-cache" });
+  if (!response.ok) throw new Error("No se pudo preparar una de las prendas.");
+  const blob = await response.blob();
+  if (typeof createImageBitmap === "function") {
+    const bitmap = await createImageBitmap(blob);
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("No se pudo preparar una de las prendas."));
+    element.src = objectUrl;
+  });
+  return { source: image, width: image.naturalWidth, height: image.naturalHeight, close: () => URL.revokeObjectURL(objectUrl) };
+}
+
+function storyFileName(name: string) {
+  const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `forme-${slug || "look"}-story.png`;
+}
+
+async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string, Garment>): Promise<Blob> {
+  const width = 1080;
+  const height = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
+
+  context.fillStyle = "#d9d5cc";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "rgba(17,17,15,.13)";
+  for (let x = 46; x < width; x += 28) {
+    for (let y = 46; y < height; y += 28) {
+      context.beginPath();
+      context.arc(x, y, 1.25, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  context.fillStyle = "#11110f";
+  context.font = "600 24px Arial, sans-serif";
+  context.letterSpacing = "5px";
+  context.fillText("FORME® / LOOK GUARDADO", 72, 92);
+  context.font = "400 72px Georgia, serif";
+  context.letterSpacing = "-2px";
+  context.fillText(look.name, 72, 185, width - 144);
+
+  const artboard = { x: 92, y: 266, width: 896, height: 1344 };
+  context.fillStyle = "rgba(248,247,242,.42)";
+  context.fillRect(artboard.x, artboard.y, artboard.width, artboard.height);
+  context.strokeStyle = "rgba(17,17,15,.42)";
+  context.lineWidth = 2;
+  context.strokeRect(artboard.x, artboard.y, artboard.width, artboard.height);
+
+  const previewItems = centeredLookPreviewItems(look, garmentById).sort((a, b) => a.piece.z - b.piece.z);
+  const loaded = await Promise.all(previewItems.map(async ({ piece, garment }) => {
+    const source = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
+    return { piece, image: await loadShareImage(imageSrc(cleanCanvasImage(source))) };
+  }));
+  try {
+    for (const { piece, image } of loaded) {
+      const boxWidth = artboard.width * .76 * piece.scale;
+      const boxHeight = boxWidth * 1.25;
+      const contain = Math.min(boxWidth / image.width, boxHeight / image.height);
+      const drawWidth = image.width * contain;
+      const drawHeight = image.height * contain;
+      const centerX = artboard.x + artboard.width * piece.x / 100;
+      const centerY = artboard.y + artboard.height * piece.y / 100;
+      context.save();
+      context.translate(centerX, centerY);
+      context.rotate(piece.rotation * Math.PI / 180);
+      context.shadowColor = "rgba(17,17,15,.12)";
+      context.shadowBlur = 22;
+      context.shadowOffsetY = 12;
+      context.drawImage(image.source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      context.restore();
+    }
+  } finally {
+    loaded.forEach(({ image }) => image.close());
+  }
+
+  context.fillStyle = "#11110f";
+  context.font = "400 46px Georgia, serif";
+  context.letterSpacing = "-1px";
+  context.fillText("Vístete con lo que ya tienes.", 72, 1738);
+  context.font = "600 19px Arial, sans-serif";
+  context.letterSpacing = "4px";
+  context.fillText(`${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}  ·  FORME.FRENSONLY.CLUB`, 72, 1793);
+  context.fillStyle = "#e83b25";
+  context.fillRect(72, 1840, 128, 8);
+
+  const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!result) throw new Error("No se pudo exportar la historia.");
+  return result;
+}
+
 function TasteCalibrationDeck() {
   const [audience, setAudience] = useState<CalibrationAudience>("masculine");
   const [exploration, setExploration] = useState<ExplorationLevel>("curious");
@@ -1751,6 +1858,8 @@ export default function Home() {
   const [garmentSaved, setGarmentSaved] = useState(false);
   const [garmentSaveError, setGarmentSaveError] = useState("");
   const [savingOutfit, setSavingOutfit] = useState(false);
+  const [sharingLookId, setSharingLookId] = useState<string | null>(null);
+  const [shareNotice, setShareNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
@@ -2762,6 +2871,43 @@ export default function Home() {
     }
   }
 
+  async function shareLook(look: SavedLook) {
+    if (!look.items.length || sharingLookId) return;
+    setSharingLookId(look.id);
+    setShareNotice("");
+    setWardrobeError("");
+    try {
+      const blob = await createInstagramStoryBlob(look, garmentById);
+      const file = new File([blob], storyFileName(look.name), { type: "image/png" });
+      const canUseNativeShare = typeof navigator.share === "function"
+        && (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] }));
+      if (canUseNativeShare) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `${look.name} · FORME`,
+            text: "Mi look en FORME",
+          });
+          setShareNotice("Look listo. Elige Instagram o Stories en el menú de compartir.");
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+        }
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = file.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setShareNotice("Historia guardada. Ábrela desde Instagram Stories.");
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo compartir el look.");
+    } finally {
+      setSharingLookId(null);
+    }
+  }
+
   async function saveCurrentOutfit() {
     if (canvasPieces.length === 0) return;
     const outfitId = activeOutfitId ?? `look-${crypto.randomUUID()}`;
@@ -2963,6 +3109,7 @@ export default function Home() {
                 <div><p>ARCHIVO PERSONAL</p><h2>Looks guardados</h2></div>
                 <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
               </div>
+              {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
                 {savedLooks.map((look) => (
                   <article className="saved-look-card" key={look.id}>
@@ -2972,7 +3119,10 @@ export default function Home() {
                     </button>
                     <div className="saved-look-meta">
                       <div><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></div>
-                      <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
+                      <div className="saved-look-actions">
+                        <button className="share-look" type="button" disabled={Boolean(sharingLookId)} onClick={() => void shareLook(look)} aria-label={`Compartir ${look.name} en Instagram`}>{sharingLookId === look.id ? "PREPARANDO…" : "COMPARTIR ↗"}</button>
+                        <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -3226,11 +3376,13 @@ export default function Home() {
                 : <div className="saved-look-panel-empty"><p>Todavía no guardaste ningún look.</p><small>Arma uno en el canvas y toca Guardar.</small></div>}
             </aside>
 
+            {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
             <nav className="canvas-action-bar" aria-label="Acciones del look">
               <button className={`save-look-action ${saved ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : saved ? "GUARDADO" : "GUARDAR"}</span><b>{saved ? "✓" : "＋"}</b></button>
               <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
               <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
+              <button className="share-look-action" disabled={canvasPieces.length === 0 || Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName === "Nuevo look" ? "Mi look" : activeLookName, items: canvasPieces })}><span>{sharingLookId ? "PREPARANDO…" : "COMPARTIR"}</span><b>↗</b></button>
             </nav>
           </div>
         </section>

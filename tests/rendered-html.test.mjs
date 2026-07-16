@@ -98,6 +98,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /studioReturnPanel/);
   assert.match(page, /openStudio\(view === "studio" \? studioReturnPanel : wardrobePanel\)/);
   assert.match(page, /function centeredLookPreviewItems/);
+  assert.match(page, /function createInstagramStoryBlob/);
+  assert.match(page, /navigator\.share/);
+  assert.match(page, /COMPARTIR ↗/);
+  assert.match(page, /Instagram Stories/);
   assert.match(page, /profile-drawer/);
   assert.match(page, /Recalibrar mi estilo/);
   assert.doesNotMatch(page, /profile-calibrate/);
@@ -115,6 +119,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
+  assert.match(css, /\.share-status-message/);
+  assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css, /\.style-wheel/);
   assert.match(css, /\.style-onboarding-backdrop/);
   assert.match(css, /\.style-family-card/);
