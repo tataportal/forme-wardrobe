@@ -1763,10 +1763,10 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
         <div className="style-intro-copy">
           <p>UN PRIMER RETRATO</p>
           <h1>Queremos<br />conocerte.</h1>
-          <span>Tu estilo no es una etiqueta. Vive en lo que eliges, repites y todavía quieres probar. Mira doce familias y dinos cuánto se parece cada una a ti.</span>
+          <span>No buscamos etiquetarte. Tu estilo vive en lo que eliges, repites y todavía quieres probar. Recorre doce familias para darnos una primera señal.</span>
         </div>
         <div className="style-intro-footer">
-          <p><span>12 FAMILIAS</span><span>NINGUNA RESPUESTA ES DEFINITIVA</span></p>
+          <p><span>12 FAMILIAS</span><span>PUEDES CAMBIARLO DESPUÉS</span></p>
           <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR A ELEGIR</span><b>→</b></button>
         </div>
       </div>}
