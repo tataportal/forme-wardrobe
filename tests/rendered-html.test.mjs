@@ -23,7 +23,9 @@ test("server-renders the FORME wardrobe", async () => {
   assert.match(html, /<title>FORME — Tu armario visual<\/title>/i);
   assert.match(html, /CLOSET DE PRUEBA/);
   assert.match(html, /Mis prendas/);
-  assert.match(html, /Looks guardados/);
+  assert.match(html, />Looks</);
+  assert.match(html, />Semana</);
+  assert.match(html, />Insights</);
   assert.match(html, /Añadir mis prendas/);
   assert.match(html, /CONTINUAR CON GOOGLE|REVISANDO SESIÓN/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
@@ -36,7 +38,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "upload"/);
+  assert.match(page, /type WardrobePanel = "pieces" \| "basics" \| "looks" \| "week" \| "insights" \| "upload"/);
   assert.match(page, /useState\(true\)/);
   assert.match(page, /useState\(formeBasics\)/);
   assert.match(page, /function beginGoogleSignIn/);
@@ -61,24 +63,30 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function buildStylingRecommendations/);
   assert.match(page, /function buildLookIterations/);
   assert.match(page, /const iterationProfiles = \[/);
-  assert.match(page, /ITERAR ESTE LOOK · 5/);
+  assert.match(page, /MEZCLAR/);
   assert.match(page, /function openLookIteration/);
+  assert.match(page, /function duplicateCurrentOutfit/);
   assert.match(page, /function recommendationOuterPlacement/);
   assert.match(page, /function recommendationTopPlacement/);
   assert.match(page, /funnel-neck cape\|cape coat\|poncho/);
   assert.match(page, /\/puffer\//);
   assert.match(page, /function recommendStyle\(\)/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
-  assert.match(page, /setActiveOutfitId\(null\);\s+setActiveLookName\("Nuevo look"\);\s+setSaved\(true\)/);
+  assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| saved/);
   assert.doesNotMatch(page, /Math\.random/);
   assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
   assert.match(worker, /async function deleteOutfit/);
+  assert.match(worker, /async function getWeeklyPlan/);
+  assert.match(worker, /async function saveWeeklyPlanEntry/);
+  assert.match(worker, /\/api\/week/);
   assert.match(worker, /isOwner: Boolean\(ownerEmail && identity\.email === ownerEmail\)/);
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.style-wheel/);
   assert.match(css, /\.iteration-drawer/);
+  assert.match(css, /\.week-workspace/);
+  assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
 });
 

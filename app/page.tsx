@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CSSProperties,
   ChangeEvent,
   DragEvent,
   PointerEvent as ReactPointerEvent,
@@ -13,7 +14,7 @@ import {
 import { classifyGarment, formeBasics, Garment, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
-type WardrobePanel = "pieces" | "basics" | "looks" | "upload";
+type WardrobePanel = "pieces" | "basics" | "looks" | "week" | "insights" | "upload";
 type StudioLibraryFilter = "all" | "personal" | "forme" | "footwear" | "accessories";
 type CanvasPiece = {
   instanceId: string;
@@ -110,6 +111,23 @@ type SavedLook = {
   updatedAt?: string;
 };
 
+type WeeklyOccasion = "daily" | "work" | "dinner" | "event" | "weekend";
+type WeeklyPlanEntry = {
+  date: string;
+  outfitId: string;
+  occasion: WeeklyOccasion;
+  worn: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+type WeekDay = {
+  key: string;
+  shortLabel: string;
+  dayNumber: string;
+  fullLabel: string;
+  isToday: boolean;
+};
+
 type StyleCode = "casual" | "smart" | "formal" | "experimental";
 type StyleMoment = "day" | "night";
 type StyleOccasion = "daily" | "work" | "dinner" | "event";
@@ -139,6 +157,7 @@ const emptyFilters: WardrobeFilters = {
 
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const demoLooksStorageKey = "forme-demo-looks-v1";
+const demoWeekStorageKey = "forme-demo-week-v1";
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 const operationalSiteUrl = "https://forme.frensonly.club/";
 const currentOutfitId = "current-look";
@@ -157,6 +176,7 @@ const uploadStatusLabels: Record<UploadStatus, string> = {
 const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "Smart", formal: "Formal", experimental: "Experimental" };
 const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "Noche" };
 const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
+const weeklyOccasionLabels: Record<WeeklyOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento", weekend: "Fin de semana" };
 const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement" };
 
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
@@ -830,6 +850,47 @@ function buildLookIterations(garments: Garment[], current: CanvasPiece[]): LookI
   });
 }
 
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildWeekDays(anchor: Date): WeekDay[] {
+  const today = localDateKey(anchor);
+  const monday = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+  const weekday = monday.getDay() || 7;
+  monday.setDate(monday.getDate() - weekday + 1);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return {
+      key: localDateKey(date),
+      shortLabel: new Intl.DateTimeFormat("es-PE", { weekday: "short" }).format(date).replace(".", "").toLocaleUpperCase(),
+      dayNumber: String(date.getDate()).padStart(2, "0"),
+      fullLabel: new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long" }).format(date),
+      isToday: localDateKey(date) === today,
+    };
+  });
+}
+
+function countGarments(garments: Garment[], value: (garment: Garment) => string): Array<[string, number]> {
+  const counts = new Map<string, number>();
+  for (const garment of garments) counts.set(value(garment), (counts.get(value(garment)) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function versatilityScore(garment: Garment): number {
+  let score = garment.favorite ? 3 : 0;
+  if (["Black", "White", "Grey", "Blue", "Brown"].includes(garment.colorFamily)) score += 4;
+  if (["Regular", "Relaxed"].includes(garment.silhouette)) score += 3;
+  if (["Matte", "Low sheen"].includes(garment.finish)) score += 2;
+  if (["Tops", "Bottoms", "Footwear"].includes(garment.category)) score += 2;
+  if (["ready", "ghosted"].includes(garment.status)) score += 1;
+  return score;
+}
+
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   return (
     <div className="saved-look-preview" aria-hidden="true">
@@ -854,6 +915,180 @@ function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<
   );
 }
 
+function WeeklyPlanView({
+  weekDays,
+  entries,
+  selectedDate,
+  savedLooks,
+  garmentById,
+  busy,
+  onSelectDate,
+  onAssign,
+  onRemove,
+  onToggleWorn,
+  onOpenLook,
+  onAutoPlan,
+  onCreateLook,
+}: {
+  weekDays: WeekDay[];
+  entries: WeeklyPlanEntry[];
+  selectedDate: string;
+  savedLooks: SavedLook[];
+  garmentById: Map<string, Garment>;
+  busy: boolean;
+  onSelectDate: (date: string) => void;
+  onAssign: (date: string, lookId: string, occasion: WeeklyOccasion) => void;
+  onRemove: (date: string) => void;
+  onToggleWorn: (entry: WeeklyPlanEntry) => void;
+  onOpenLook: (look: SavedLook) => void;
+  onAutoPlan: () => void;
+  onCreateLook: () => void;
+}) {
+  const selectedEntry = entries.find((entry) => entry.date === selectedDate);
+  const selectedLook = selectedEntry ? savedLooks.find((look) => look.id === selectedEntry.outfitId) : undefined;
+  const selectedDay = weekDays.find((day) => day.key === selectedDate) ?? weekDays[0];
+  const plannedCount = weekDays.filter((day) => entries.some((entry) => entry.date === day.key)).length;
+  const [occasion, setOccasion] = useState<WeeklyOccasion>("daily");
+
+  useEffect(() => {
+    setOccasion(selectedEntry?.occasion ?? (selectedDay?.shortLabel === "SÁB" || selectedDay?.shortLabel === "DOM" ? "weekend" : "daily"));
+  }, [selectedEntry?.occasion, selectedDay?.key, selectedDay?.shortLabel]);
+
+  return (
+    <section className="week-view">
+      <div className="app-section-heading week-heading">
+        <div><p>PLAN SEMANAL</p><h2>Viste tu semana</h2><span>Asigna tus looks guardados y vuelve a ellos cuando toque vestirte.</span></div>
+        <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
+      </div>
+
+      <div className="week-strip" role="tablist" aria-label="Días de la semana">
+        {weekDays.map((day) => {
+          const entry = entries.find((item) => item.date === day.key);
+          const look = entry ? savedLooks.find((item) => item.id === entry.outfitId) : undefined;
+          return <button type="button" role="tab" aria-selected={selectedDate === day.key} className={`${selectedDate === day.key ? "active" : ""} ${entry ? "planned" : ""} ${entry?.worn ? "worn" : ""}`} onClick={() => onSelectDate(day.key)} key={day.key}>
+            <span>{day.shortLabel}{day.isToday ? " · HOY" : ""}</span>
+            <strong>{day.dayNumber}</strong>
+            <small>{look ? look.name : "Sin look"}</small>
+          </button>;
+        })}
+      </div>
+
+      <div className="week-workspace">
+        <section className="day-plan-card">
+          <div className="day-plan-header"><span>{selectedDay?.fullLabel.toLocaleUpperCase()}</span>{selectedEntry && <b>{selectedEntry.worn ? "USADO ✓" : weeklyOccasionLabels[selectedEntry.occasion]}</b>}</div>
+          {selectedLook && selectedEntry ? <>
+            <button type="button" className="day-look-preview" onClick={() => onOpenLook(selectedLook)} aria-label={`Abrir ${selectedLook.name} en el canvas`}>
+              <LookPreview look={selectedLook} garmentById={garmentById} />
+              <span>ABRIR EN CANVAS ↗</span>
+            </button>
+            <div className="day-look-meta"><div><p>LOOK DEL DÍA</p><h3>{selectedLook.name}</h3><span>{selectedLook.items.length} piezas · {weeklyOccasionLabels[selectedEntry.occasion]}</span></div><button type="button" onClick={() => onToggleWorn(selectedEntry)}>{selectedEntry.worn ? "DESMARCAR" : "YA LO USÉ ✓"}</button></div>
+            <button className="week-remove" type="button" onClick={() => onRemove(selectedDate)}>QUITAR DEL DÍA</button>
+          </> : <div className="day-plan-empty"><span>＋</span><h3>Este día está libre</h3><p>Elige uno de tus looks guardados para dejarlo listo.</p><button type="button" onClick={onCreateLook}>CREAR UN LOOK EN CANVAS →</button></div>}
+        </section>
+
+        <aside className="week-look-library">
+          <div className="week-library-heading"><div><p>TUS LOOKS</p><h3>Elige uno para {selectedDay?.shortLabel}</h3></div><button type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : "PLANEAR TODO →"}</button></div>
+          <div className="occasion-row" aria-label="Ocasión">
+            {(Object.keys(weeklyOccasionLabels) as WeeklyOccasion[]).map((option) => <button type="button" className={occasion === option ? "active" : ""} onClick={() => setOccasion(option)} key={option}>{weeklyOccasionLabels[option]}</button>)}
+          </div>
+          <div className="week-look-grid">
+            {savedLooks.map((look) => <button type="button" className={selectedEntry?.outfitId === look.id ? "active" : ""} onClick={() => onAssign(selectedDate, look.id, occasion)} disabled={busy} key={look.id}>
+              <LookPreview look={look} garmentById={garmentById} />
+              <span><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></span>
+            </button>)}
+            {savedLooks.length === 0 && <div className="week-library-empty"><p>Guarda tu primer look para empezar a planear.</p><button type="button" onClick={onCreateLook}>IR AL CANVAS →</button></div>}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function WardrobeInsightsView({
+  garments,
+  savedLooks,
+  entries,
+  weekDays,
+  onOpenGarment,
+  onGoToLooks,
+  onGoToPieces,
+}: {
+  garments: Garment[];
+  savedLooks: SavedLook[];
+  entries: WeeklyPlanEntry[];
+  weekDays: WeekDay[];
+  onOpenGarment: (garment: Garment) => void;
+  onGoToLooks: () => void;
+  onGoToPieces: () => void;
+}) {
+  const categoryCounts = countGarments(garments, (garment) => garment.category);
+  const colorCounts = countGarments(garments, (garment) => garment.colorFamily);
+  const materialCounts = countGarments(garments, (garment) => garment.material);
+  const essentialCategories = ["Tops", "Bottoms", "Outerwear", "Footwear", "Accessories"];
+  const presentEssentials = essentialCategories.filter((category) => categoryCounts.some(([name, count]) => name === category && count > 0)).length;
+  const readyCount = garments.filter((garment) => ["ready", "ghosted"].includes(garment.status)).length;
+  const readyRatio = garments.length ? readyCount / garments.length : 0;
+  const wardrobeScore = Math.round(presentEssentials / essentialCategories.length * 65 + readyRatio * 20 + Math.min(savedLooks.length, 3) / 3 * 15);
+  const weekKeys = new Set(weekDays.map((day) => day.key));
+  const plannedEntries = entries.filter((entry) => weekKeys.has(entry.date));
+  const wornEntries = plannedEntries.filter((entry) => entry.worn);
+  const topColorCount = colorCounts[0]?.[1] ?? 0;
+  const dominantColorShare = garments.length ? Math.round(topColorCount / garments.length * 100) : 0;
+  const maxCategoryCount = Math.max(...categoryCounts.map(([, count]) => count), 1);
+  const versatileGarments = [...garments].sort((a, b) => versatilityScore(b) - versatilityScore(a) || a.name.localeCompare(b.name)).slice(0, 4);
+  const missingCategory = essentialCategories.find((category) => !categoryCounts.some(([name, count]) => name === category && count > 0));
+  const insights = [
+    colorCounts.length > 0
+      ? `${translateValue(colorCounts[0][0])} concentra ${dominantColorShare}% de tu paleta. ${dominantColorShare > 45 ? "Úsalo como base y rota acentos para que los looks no se sientan repetidos." : "La paleta está suficientemente repartida para crear contraste sin comprar más."}`
+      : "Añade prendas para construir una lectura real de tu paleta.",
+    missingCategory
+      ? `Tu mayor hueco está en ${translateValue(missingCategory).toLocaleLowerCase()}. Completar esa categoría desbloquea más combinaciones reales.`
+      : "Tienes cobertura en todas las categorías esenciales: ya puedes construir looks completos sin piezas de relleno.",
+    savedLooks.length > 0
+      ? `Tienes ${savedLooks.length} ${savedLooks.length === 1 ? "look guardado" : "looks guardados"}. Planificar la semana hará visible cuáles piezas sí rotas y cuáles se quedan quietas.`
+      : "Aún no hay looks guardados. Empieza con una base simple y usa Mezclar para probar cinco direcciones.",
+  ];
+
+  return (
+    <section className="insights-view">
+      <div className="app-section-heading insights-heading"><div><p>LECTURA DEL ARMARIO</p><h2>Lo que ya tienes</h2><span>Se actualiza con la ficha de cada prenda, tus looks y el plan semanal.</span></div><button type="button" onClick={onGoToPieces}>REVISAR PRENDAS →</button></div>
+      <div className="insights-dashboard">
+        <article className="wardrobe-score-card">
+          <div className="score-ring" style={{ "--score": `${wardrobeScore * 3.6}deg` } as CSSProperties}><span><strong>{wardrobeScore}</strong><small>/100</small></span></div>
+          <div><p>CAPACIDAD DEL ARMARIO</p><h3>{wardrobeScore >= 80 ? "Listo para rotar" : wardrobeScore >= 55 ? "Buena base" : "Todavía construyéndose"}</h3><span>Medimos cobertura de categorías, prendas listas y looks que ya puedes reutilizar.</span></div>
+        </article>
+        <div className="insight-metric-grid">
+          <article><span>PRENDAS</span><strong>{garments.length}</strong><small>{readyCount} listas para Canvas</small></article>
+          <article><span>SEMANA</span><strong>{plannedEntries.length}/7</strong><small>{wornEntries.length} marcadas como usadas</small></article>
+          <article><span>LOOKS</span><strong>{savedLooks.length}</strong><button type="button" onClick={onGoToLooks}>ABRIR ARCHIVO →</button></article>
+        </div>
+      </div>
+
+      <div className="insight-content-grid">
+        <section className="composition-panel">
+          <div className="insight-panel-heading"><p>COMPOSICIÓN</p><h3>Balance por categoría</h3></div>
+          <div className="composition-list">{categoryCounts.map(([category, count]) => <div key={category}><span>{translateValue(category)}</span><i><b style={{ width: `${count / maxCategoryCount * 100}%` }} /></i><strong>{count}</strong></div>)}</div>
+        </section>
+        <section className="palette-panel">
+          <div className="insight-panel-heading"><p>PALETA + MATERIALES</p><h3>Tu lenguaje visual</h3></div>
+          <div className="palette-list">{colorCounts.slice(0, 5).map(([color, count], index) => <span key={color}><i className={`palette-swatch palette-${color.toLocaleLowerCase().replace(/[^a-z]+/g, "-")}`} />{translateValue(color)}<small>{count}</small>{index === 0 && <b>BASE</b>}</span>)}</div>
+          <div className="material-list">{materialCounts.slice(0, 5).map(([material, count]) => <span key={material}>{translateValue(material)} <b>{count}</b></span>)}</div>
+        </section>
+      </div>
+
+      <section className="insight-notes">
+        <div className="insight-panel-heading"><p>INSIGHTS</p><h3>Qué haría ahora</h3></div>
+        <div>{insights.map((insight, index) => <article key={insight}><span>0{index + 1}</span><p>{insight}</p></article>)}</div>
+      </section>
+
+      <section className="versatile-section">
+        <div className="insight-panel-heading"><p>PIEZAS PUENTE</p><h3>Las más fáciles de repetir</h3><span>Neutros, cortes combinables y acabados que conviven con más prendas.</span></div>
+        <div className="versatile-grid">{versatileGarments.map((garment) => <button type="button" onClick={() => onOpenGarment(garment)} key={garment.id}><img src={imageSrc(garment.image)} alt={translateGarmentName(garment.name)} /><span><strong>{translateGarmentName(garment.name)}</strong><small>{translateValue(garment.tone)} · {translateValue(garment.silhouette)}</small></span></button>)}</div>
+      </section>
+    </section>
+  );
+}
+
 export default function Home() {
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
@@ -871,6 +1106,9 @@ export default function Home() {
   const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
   const [canvasPieces, setCanvasPieces] = useState(initialDemoCanvas);
   const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanEntry[]>([]);
+  const [selectedPlanDate, setSelectedPlanDate] = useState("");
+  const [planningWeek, setPlanningWeek] = useState(false);
   const [activeOutfitId, setActiveOutfitId] = useState<string | null>(null);
   const [activeLookName, setActiveLookName] = useState("Demo FORME");
   const [styleCode, setStyleCode] = useState<StyleCode>("casual");
@@ -881,6 +1119,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState("");
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [savedLooksOpen, setSavedLooksOpen] = useState(false);
   const [garmentDraft, setGarmentDraft] = useState<GarmentDraft | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [garmentSaved, setGarmentSaved] = useState(false);
@@ -892,8 +1131,10 @@ export default function Home() {
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
+  const [weekAnchor] = useState(() => new Date());
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
+  const weekDays = useMemo(() => buildWeekDays(weekAnchor), [weekAnchor]);
   const filterOptions = useMemo<FilterOptions>(() => {
     const unique = (key: FilterKey) => Array.from(new Set(garments.map((item) => item[key]))).sort();
     const tonesByColor = garments.reduce<Record<string, string[]>>((result, item) => {
@@ -912,6 +1153,7 @@ export default function Home() {
   }, [garments]);
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
+  const insightGarments = demoMode ? sharedBasics : personalGarments;
   const catalogGarments = wardrobePanel === "basics" || demoMode ? sharedBasics : personalGarments;
   const visible = catalogGarments.filter((item) => matchFilters(item, archiveFilters));
   const studioGarments = garments.filter((item) => {
@@ -940,6 +1182,10 @@ export default function Home() {
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
 
   useEffect(() => {
+    if (!selectedPlanDate && weekDays.length) setSelectedPlanDate(weekDays.find((day) => day.isToday)?.key ?? weekDays[0].key);
+  }, [selectedPlanDate, weekDays]);
+
+  useEffect(() => {
     if (isStaticDemo) window.location.replace(operationalSiteUrl);
   }, []);
 
@@ -958,21 +1204,31 @@ export default function Home() {
           } catch {
             setSavedLooks([]);
           }
+          try {
+            const storedWeek = localStorage.getItem(demoWeekStorageKey);
+            setWeeklyPlan(storedWeek ? JSON.parse(storedWeek) as WeeklyPlanEntry[] : []);
+          } catch {
+            setWeeklyPlan([]);
+          }
           setWardrobeError("");
           return;
         }
         if (!sessionResponse.ok) throw new Error("No se pudo revisar tu sesión.");
         const session = await sessionResponse.json() as { user: WardrobeProfile };
         const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
-        const [wardrobeResponse, outfitsResponse] = await Promise.all([
+        const [wardrobeResponse, outfitsResponse, weekResponse] = await Promise.all([
           batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
           fetch("/api/outfits", { cache: "no-store" }),
+          fetch("/api/week", { cache: "no-store" }),
         ]);
         if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
         const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
         const outfits = outfitsResponse.ok
           ? await outfitsResponse.json() as { outfits: SavedLook[] }
           : { outfits: [] };
+        const week = weekResponse.ok
+          ? await weekResponse.json() as { entries: WeeklyPlanEntry[] }
+          : { entries: [] };
         if (!active) return;
         const baseGarments = session.user.isOwner ? starterGarments : formeBasics;
         const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments);
@@ -986,6 +1242,7 @@ export default function Home() {
         setGarments(loadedGarments);
         setProfile(session.user);
         setSavedLooks(normalizedLooks);
+        setWeeklyPlan(week.entries);
         setWardrobePanel("pieces");
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
         const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
@@ -1153,6 +1410,7 @@ export default function Home() {
     setView("wardrobe");
     setWardrobePanel(panel);
     setLibraryOpen(false);
+    setSavedLooksOpen(false);
   }
 
   async function finalizeCutoutVariant(item: ApiGarment, outputVariant: "closed" | "open"): Promise<ApiGarment> {
@@ -1591,6 +1849,7 @@ export default function Home() {
     }
     setLookIterations(next);
     setLibraryOpen(false);
+    setSavedLooksOpen(false);
     setWardrobeError("");
   }
 
@@ -1601,6 +1860,7 @@ export default function Home() {
     setActiveLookName(iteration.title);
     setSaved(false);
     setLookIterations([]);
+    setSavedLooksOpen(false);
     setWardrobeError("");
   }
 
@@ -1612,6 +1872,7 @@ export default function Home() {
     setSaved(false);
     setLookIterations([]);
     setLibraryOpen(false);
+    setSavedLooksOpen(false);
     setWardrobeError("");
     setView("studio");
   }
@@ -1624,7 +1885,131 @@ export default function Home() {
     setSaved(true);
     setLookIterations([]);
     setLibraryOpen(false);
+    setSavedLooksOpen(false);
     setView("studio");
+  }
+
+  function persistDemoWeek(entries: WeeklyPlanEntry[]) {
+    if (demoMode) localStorage.setItem(demoWeekStorageKey, JSON.stringify(entries));
+  }
+
+  async function assignLookToDate(date: string, outfitId: string, occasion: WeeklyOccasion) {
+    if (!date || planningWeek) return;
+    const nextEntry: WeeklyPlanEntry = { date, outfitId, occasion, worn: false };
+    setPlanningWeek(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const response = await fetch(`/api/week/${encodeURIComponent(date)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(nextEntry),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo planear ese día.");
+      }
+      setWeeklyPlan((entries) => {
+        const next = [...entries.filter((entry) => entry.date !== date), nextEntry].sort((a, b) => a.date.localeCompare(b.date));
+        persistDemoWeek(next);
+        return next;
+      });
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo planear ese día.");
+    } finally {
+      setPlanningWeek(false);
+    }
+  }
+
+  async function removeLookFromDate(date: string) {
+    if (!date || planningWeek) return;
+    setPlanningWeek(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const response = await fetch(`/api/week/${encodeURIComponent(date)}`, { method: "DELETE" });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo liberar ese día.");
+      }
+      setWeeklyPlan((entries) => {
+        const next = entries.filter((entry) => entry.date !== date);
+        persistDemoWeek(next);
+        return next;
+      });
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo liberar ese día.");
+    } finally {
+      setPlanningWeek(false);
+    }
+  }
+
+  async function togglePlannedLookWorn(entry: WeeklyPlanEntry) {
+    if (planningWeek) return;
+    const nextEntry = { ...entry, worn: !entry.worn };
+    setPlanningWeek(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const response = await fetch(`/api/week/${encodeURIComponent(entry.date)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(nextEntry),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo actualizar el día.");
+      }
+      setWeeklyPlan((entries) => {
+        const next = entries.map((item) => item.date === entry.date ? nextEntry : item);
+        persistDemoWeek(next);
+        return next;
+      });
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo actualizar el día.");
+    } finally {
+      setPlanningWeek(false);
+    }
+  }
+
+  async function autoPlanCurrentWeek() {
+    if (!savedLooks.length || planningWeek) {
+      if (!savedLooks.length) {
+        setWardrobeError("Guarda al menos un look antes de planear la semana.");
+        setWardrobePanel("looks");
+      }
+      return;
+    }
+    const occasions: WeeklyOccasion[] = ["work", "work", "daily", "work", "dinner", "weekend", "weekend"];
+    const nextWeek = weekDays.map((day, index) => ({
+      date: day.key,
+      outfitId: savedLooks[index % savedLooks.length].id,
+      occasion: occasions[index],
+      worn: false,
+    }));
+    setPlanningWeek(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const responses = await Promise.all(nextWeek.map((entry) => fetch(`/api/week/${encodeURIComponent(entry.date)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(entry),
+        })));
+        const failed = responses.find((response) => !response.ok);
+        if (failed) throw new Error((await failed.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo completar la semana.");
+      }
+      setWeeklyPlan((entries) => {
+        const weekKeys = new Set(weekDays.map((day) => day.key));
+        const next = [...entries.filter((entry) => !weekKeys.has(entry.date)), ...nextWeek].sort((a, b) => a.date.localeCompare(b.date));
+        persistDemoWeek(next);
+        return next;
+      });
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo completar la semana.");
+    } finally {
+      setPlanningWeek(false);
+    }
+  }
+
+  function createLookFromWeek() {
+    setView("studio");
+    setLibraryOpen(true);
+    setSavedLooksOpen(false);
   }
 
   async function deleteSavedLook(lookId: string) {
@@ -1638,6 +2023,11 @@ export default function Home() {
         const nextLooks = looks.filter((look) => look.id !== lookId);
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
+      });
+      setWeeklyPlan((entries) => {
+        const next = entries.filter((entry) => entry.outfitId !== lookId);
+        persistDemoWeek(next);
+        return next;
       });
       if (activeOutfitId === lookId) {
         setActiveOutfitId(null);
@@ -1671,11 +2061,48 @@ export default function Home() {
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
       });
-      setActiveOutfitId(null);
-      setActiveLookName("Nuevo look");
+      setActiveOutfitId(outfitId);
+      setActiveLookName(lookName);
       setSaved(true);
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
+    } finally {
+      setSavingOutfit(false);
+    }
+  }
+
+  async function duplicateCurrentOutfit() {
+    if (canvasPieces.length === 0 || savingOutfit) return;
+    const outfitId = `look-${crypto.randomUUID()}`;
+    const lookName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
+    const duplicatedPieces = canvasPieces.map((item) => ({ ...item, instanceId: crypto.randomUUID() }));
+    setSavingOutfit(true);
+    setWardrobeError("");
+    try {
+      if (!isStaticDemo && !demoMode) {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: lookName, items: duplicatedPieces }),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo duplicar el look.");
+      }
+      const nextLook: SavedLook = { id: outfitId, name: lookName, items: duplicatedPieces };
+      setSavedLooks((looks) => {
+        const nextLooks = [nextLook, ...looks];
+        if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
+        return nextLooks;
+      });
+      setCanvasPieces(duplicatedPieces);
+      setSelectedId("");
+      setActiveOutfitId(outfitId);
+      setActiveLookName(lookName);
+      setLookIterations([]);
+      setSaved(true);
+      setLibraryOpen(false);
+      setSavedLooksOpen(true);
+    } catch (error) {
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo duplicar el look.");
     } finally {
       setSavingOutfit(false);
     }
@@ -1749,7 +2176,9 @@ export default function Home() {
             <nav className="wardrobe-tabs" aria-label="Mi armario">
               {!demoMode && <button className={wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("pieces")}>Mis prendas</button>}
               <button className={wardrobePanel === "basics" || demoMode && wardrobePanel === "pieces" ? "active" : ""} onClick={() => setWardrobePanel("basics")}>Básicos FORME</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks</button>
+              <button className={wardrobePanel === "week" ? "active" : ""} onClick={() => setWardrobePanel("week")}>Semana</button>
+              <button className={wardrobePanel === "insights" ? "active" : ""} onClick={() => setWardrobePanel("insights")}>Insights</button>
               {demoMode
                 ? <button onClick={beginGoogleSignIn}>＋ Añadir mis prendas</button>
                 : <button className={wardrobePanel === "upload" ? "active" : ""} onClick={() => setWardrobePanel("upload")}>＋ Añadir prenda</button>}
@@ -1853,6 +2282,32 @@ export default function Home() {
                 {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={recommendStyle}>ANALIZAR MI ARMARIO →</button></div>}
               </div>
             </section>
+          ) : wardrobePanel === "week" ? (
+            <WeeklyPlanView
+              weekDays={weekDays}
+              entries={weeklyPlan}
+              selectedDate={selectedPlanDate}
+              savedLooks={savedLooks}
+              garmentById={garmentById}
+              busy={planningWeek}
+              onSelectDate={setSelectedPlanDate}
+              onAssign={(date, lookId, occasion) => void assignLookToDate(date, lookId, occasion)}
+              onRemove={(date) => void removeLookFromDate(date)}
+              onToggleWorn={(entry) => void togglePlannedLookWorn(entry)}
+              onOpenLook={openSavedLook}
+              onAutoPlan={() => void autoPlanCurrentWeek()}
+              onCreateLook={createLookFromWeek}
+            />
+          ) : wardrobePanel === "insights" ? (
+            <WardrobeInsightsView
+              garments={insightGarments}
+              savedLooks={savedLooks}
+              entries={weeklyPlan}
+              weekDays={weekDays}
+              onOpenGarment={(garment) => garment.collection === "forme" ? addAndOpenStudio(garment.id) : openGarmentEditor(garment)}
+              onGoToLooks={() => setWardrobePanel("looks")}
+              onGoToPieces={() => setWardrobePanel(demoMode ? "basics" : "pieces")}
+            />
           ) : (
             <section className="upload-view">
               <div className="upload-heading"><p>NUEVAS PRENDAS</p><h2>Añadir al armario</h2></div>
@@ -1902,37 +2357,39 @@ export default function Home() {
           <div className="section-line"><h2>CANVAS</h2><p>{canvasPieces.length} PIEZAS</p></div>
           <div className="studio-layout">
             <div className="canvas-column">
-              <div className="look-canvas" ref={canvasRef}>
-                <p className="look-date">{activeLookName.toLocaleUpperCase()} / ARRASTRA · PELLIZCA · GIRA</p>
-                <span className="canvas-hint">MANTÉN = ABRIR / CERRAR</span>
-                {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
-                {canvasPieces.map((piece) => {
-                  const garment = garmentById.get(piece.garmentId);
-                  if (!garment) return null;
-                  const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
-                  const canvasImage = cleanCanvasImage(pieceImage);
-                  return (
-                    <div
-                      className={`canvas-piece ${selectedId === piece.instanceId ? "selected" : ""}`}
-                      key={piece.instanceId}
-                      onPointerDown={(event) => startMoving(event, piece.instanceId)}
-                      onPointerMove={movePiece}
-                      onPointerUp={stopMoving}
-                      onPointerCancel={(event) => stopMoving(event, true)}
-                      style={{
-                        left: `${piece.x}%`,
-                        top: `${piece.y}%`,
-                        zIndex: piece.z,
-                        transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
-                      }}
-                    >
-                      <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
-                    </div>
-                  );
-                })}
+              <div className={`look-canvas ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
+                <div className="look-artboard" ref={canvasRef}>
+                  <p className="look-date">{activeLookName.toLocaleUpperCase()} / ARRASTRA · PELLIZCA · GIRA</p>
+                  <span className="canvas-hint">MANTÉN = ABRIR / CERRAR</span>
+                  {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
+                  {canvasPieces.map((piece) => {
+                    const garment = garmentById.get(piece.garmentId);
+                    if (!garment) return null;
+                    const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
+                    const canvasImage = cleanCanvasImage(pieceImage);
+                    return (
+                      <div
+                        className={`canvas-piece ${selectedId === piece.instanceId ? "selected" : ""}`}
+                        key={piece.instanceId}
+                        onPointerDown={(event) => startMoving(event, piece.instanceId)}
+                        onPointerMove={movePiece}
+                        onPointerUp={stopMoving}
+                        onPointerCancel={(event) => stopMoving(event, true)}
+                        style={{
+                          left: `${piece.x}%`,
+                          top: `${piece.y}%`,
+                          zIndex: piece.z,
+                          transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
+                        }}
+                      >
+                        <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
+                      </div>
+                    );
+                  })}
+                </div>
                 {lookIterations.length > 0 && (
                   <section className="iteration-drawer" aria-label="Cinco variaciones del look">
-                    <header><div><span>ITERAR LOOK</span><strong>5 variaciones · {iterationBaseCount} piezas fijas</strong></div><button type="button" onClick={() => setLookIterations([])} aria-label="Cerrar variaciones">×</button></header>
+                    <header><div><span>MEZCLAR LOOK</span><strong>5 variaciones · {iterationBaseCount} piezas fijas</strong></div><button type="button" onClick={() => setLookIterations([])} aria-label="Cerrar variaciones">×</button></header>
                     <div className="iteration-list">
                       {lookIterations.map((iteration, index) => (
                         <button type="button" className="iteration-card" onClick={() => openLookIteration(iteration)} key={iteration.id}>
@@ -1946,11 +2403,11 @@ export default function Home() {
               </div>
             </div>
 
-            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen} aria-label="Abrir armario">
-              <span>ARMARIO</span><b>{libraryOpen ? "×" : "＋"}</b>
+            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""} ${savedLooksOpen ? "concealed" : ""}`} onClick={() => setLibraryOpen((open) => { const next = !open; if (next) setSavedLooksOpen(false); return next; })} aria-expanded={libraryOpen} aria-label="Abrir panel de prendas">
+              <span>PRENDAS</span><b>{libraryOpen ? "×" : "＋"}</b>
             </button>
 
-            <div className={`look-controls ${libraryOpen ? "panel-open" : "panel-closed"}`}>
+            <aside className={`look-controls garment-library-panel ${libraryOpen ? "panel-open" : "panel-closed"}`} aria-label="Prendas y categorías">
               <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORME" : "ARMARIO"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
               <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
                 {([
@@ -1961,20 +2418,22 @@ export default function Home() {
                   ["accessories", "Accesorios"],
                 ] as [StudioLibraryFilter, string][]).map(([value, label]) => <button type="button" className={studioLibraryFilter === value ? "active" : ""} onClick={() => setStudioLibraryFilter(value)} key={value}>{label}</button>)}
               </div>
-              <div className="selected-readout">
-                <p>PIEZA SELECCIONADA</p>
-                <h3>{selectedGarment ? translateGarmentName(selectedGarment.name) : "Toca una prenda"}</h3>
-                <small>{selectedGarment ? translateValue(selectedGarment.category) : "Selecciona una pieza del canvas"}</small>
-                {selectedPiece && <button onClick={() => sendSelected("back")}>ENVIAR ATRÁS ↓</button>}
-              </div>
-              <div className="canvas-tools" aria-label="Controles de la prenda seleccionada">
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(-0.06)} aria-label="Reducir prenda"><span>−</span><em>TAMAÑO</em></button>
-                <button disabled={!selectedPiece} onClick={() => scaleSelected(0.06)} aria-label="Aumentar prenda"><span>＋</span><em>TAMAÑO</em></button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(-8)} aria-label="Girar a la izquierda"><span>↺</span><em>GIRAR</em></button>
-                <button disabled={!selectedPiece} onClick={() => rotateSelected(8)} aria-label="Girar a la derecha"><span>↻</span><em>GIRAR</em></button>
-                <button disabled={!selectedPiece} onClick={() => sendSelected("front")} aria-label="Traer al frente"><span>↑</span><em>FRENTE</em></button>
-                <button disabled={!selectedPiece} onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
-              </div>
+              {selectedPiece && selectedGarment && <>
+                <div className="selected-readout">
+                  <p>PIEZA SELECCIONADA</p>
+                  <h3>{translateGarmentName(selectedGarment.name)}</h3>
+                  <small>{translateValue(selectedGarment.category)}</small>
+                  <button onClick={() => sendSelected("back")}>ENVIAR ATRÁS ↓</button>
+                </div>
+                <div className="canvas-tools" aria-label="Controles de la prenda seleccionada">
+                  <button onClick={() => scaleSelected(-0.06)} aria-label="Reducir prenda"><span>−</span><em>TAMAÑO</em></button>
+                  <button onClick={() => scaleSelected(0.06)} aria-label="Aumentar prenda"><span>＋</span><em>TAMAÑO</em></button>
+                  <button onClick={() => rotateSelected(-8)} aria-label="Girar a la izquierda"><span>↺</span><em>GIRAR</em></button>
+                  <button onClick={() => rotateSelected(8)} aria-label="Girar a la derecha"><span>↻</span><em>GIRAR</em></button>
+                  <button onClick={() => sendSelected("front")} aria-label="Traer al frente"><span>↑</span><em>FRENTE</em></button>
+                  <button onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
+                </div>
+              </>}
 
               <div className="tray-heading"><h3>PIEZAS</h3><p>TOCA PARA AÑADIR</p></div>
               <div className="sticker-tray">
@@ -1986,14 +2445,33 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="studio-actions">
-                <button className="iterate-look" onClick={iterateCurrentLook} disabled={!canIterate}>ITERAR ESTE LOOK · 5 <span>↻</span></button>
-                <button className="shuffle" onClick={() => openWardrobe("looks")}>RECOMENDACIONES <span>→</span></button>
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); setLookIterations([]); }}>VACIAR</button>
+              <div className="library-utilities">
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); setLookIterations([]); }}>VACIAR CANVAS</button>
               </div>
-              {wardrobeError && <div className="panel-error" role="status">{wardrobeError}</div>}
-              <button className={`primary-action ${saved ? "ready" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}>{saved ? "LOOK GUARDADO" : savingOutfit ? "GUARDANDO…" : activeOutfitId ? "GUARDAR CAMBIOS" : "GUARDAR LOOK"}<span>{saved ? "✓" : "＋"}</span></button>
-            </div>
+            </aside>
+
+            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""} ${libraryOpen ? "concealed" : ""}`} onClick={() => setSavedLooksOpen((open) => { const next = !open; if (next) setLibraryOpen(false); return next; })} aria-expanded={savedLooksOpen} aria-label="Abrir looks guardados">
+              <span>LOOKS</span><b>{savedLooksOpen ? "×" : String(savedLooks.length).padStart(2, "0")}</b>
+            </button>
+
+            <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} aria-label="Looks guardados">
+              <div className="floating-panel-header"><span>LOOKS GUARDADOS / {String(savedLooks.length).padStart(2, "0")}</span><button onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks guardados">×</button></div>
+              {savedLooks.length > 0
+                ? <div className="saved-look-panel-list">{savedLooks.map((look) => (
+                  <button type="button" className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} onClick={() => openSavedLook(look)} key={look.id}>
+                    <LookPreview look={look} garmentById={garmentById} />
+                    <span><strong>{look.name}</strong><small>{look.items.length} {look.items.length === 1 ? "PIEZA" : "PIEZAS"}</small></span>
+                  </button>
+                ))}</div>
+                : <div className="saved-look-panel-empty"><p>Todavía no guardaste ningún look.</p><small>Arma uno en el canvas y toca Guardar.</small></div>}
+            </aside>
+
+            {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
+            <nav className="canvas-action-bar" aria-label="Acciones del look">
+              <button className={`save-look-action ${saved ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : saved ? "GUARDADO" : "GUARDAR"}</span><b>{saved ? "✓" : "＋"}</b></button>
+              <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
+              <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
+            </nav>
           </div>
         </section>
       )}

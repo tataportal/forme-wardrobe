@@ -104,3 +104,18 @@ export const outfitItems = sqliteTable("outfit_items", {
   index("outfit_items_outfit_idx").on(table.outfitId),
   index("outfit_items_garment_idx").on(table.garmentClientId),
 ]);
+
+export const weeklyPlanEntries = sqliteTable("weekly_plan_entries", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  planDate: text("plan_date").notNull(),
+  outfitClientId: text("outfit_client_id").notNull(),
+  occasion: text("occasion").notNull().default("daily"),
+  worn: integer("worn", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("weekly_plan_owner_date_unique").on(table.ownerId, table.planDate),
+  index("weekly_plan_owner_idx").on(table.ownerId),
+  index("weekly_plan_outfit_idx").on(table.outfitClientId),
+]);

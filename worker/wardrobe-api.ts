@@ -1198,9 +1198,77 @@ async function deleteOutfit(db: D1Database, ownerId: string, outfitId: string): 
     .first<{ id: string }>();
   if (!existing) return apiError("Look no encontrado.", 404);
   await db.batch([
+    db.prepare("DELETE FROM weekly_plan_entries WHERE owner_id = ? AND outfit_client_id = ?").bind(ownerId, outfitId),
     db.prepare("DELETE FROM outfit_items WHERE outfit_id = ?").bind(existing.id),
     db.prepare("DELETE FROM outfits WHERE id = ? AND owner_id = ?").bind(existing.id, ownerId),
   ]);
+  return new Response(null, { status: 204 });
+}
+
+async function getWeeklyPlan(db: D1Database, ownerId: string): Promise<Response> {
+  const entries = await db.prepare(`
+    SELECT plan_date, outfit_client_id, occasion, worn, created_at, updated_at
+    FROM weekly_plan_entries
+    WHERE owner_id = ?
+    ORDER BY plan_date
+  `).bind(ownerId).all<{
+    plan_date: string;
+    outfit_client_id: string;
+    occasion: string;
+    worn: number;
+    created_at: string;
+    updated_at: string;
+  }>();
+  return json({
+    entries: entries.results.map((entry) => ({
+      date: entry.plan_date,
+      outfitId: entry.outfit_client_id,
+      occasion: entry.occasion,
+      worn: Boolean(entry.worn),
+      createdAt: entry.created_at,
+      updatedAt: entry.updated_at,
+    })),
+  });
+}
+
+async function saveWeeklyPlanEntry(
+  request: Request,
+  db: D1Database,
+  ownerId: string,
+  planDate: string,
+): Promise<Response> {
+  const value = await request.json().catch(() => null) as {
+    outfitId?: unknown;
+    occasion?: unknown;
+    worn?: unknown;
+  } | null;
+  const outfitId = safeClientId(textValue(value?.outfitId));
+  if (!outfitId) return apiError("El look no es válido.", 400);
+  const outfit = await db.prepare("SELECT 1 FROM outfits WHERE owner_id = ? AND client_id = ? LIMIT 1")
+    .bind(ownerId, outfitId)
+    .first();
+  if (!outfit) return apiError("Look no encontrado.", 404);
+  const allowedOccasions = new Set(["daily", "work", "dinner", "event", "weekend"]);
+  const requestedOccasion = textValue(value?.occasion, "daily").toLocaleLowerCase();
+  const occasion = allowedOccasions.has(requestedOccasion) ? requestedOccasion : "daily";
+  const worn = booleanValue(value?.worn);
+  const entryId = crypto.randomUUID();
+  await db.prepare(`
+    INSERT INTO weekly_plan_entries (id, owner_id, plan_date, outfit_client_id, occasion, worn)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(owner_id, plan_date) DO UPDATE SET
+      outfit_client_id = excluded.outfit_client_id,
+      occasion = excluded.occasion,
+      worn = excluded.worn,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(entryId, ownerId, planDate, outfitId, occasion, worn ? 1 : 0).run();
+  return json({ entry: { date: planDate, outfitId, occasion, worn } });
+}
+
+async function deleteWeeklyPlanEntry(db: D1Database, ownerId: string, planDate: string): Promise<Response> {
+  await db.prepare("DELETE FROM weekly_plan_entries WHERE owner_id = ? AND plan_date = ?")
+    .bind(ownerId, planDate)
+    .run();
   return new Response(null, { status: 204 });
 }
 
@@ -1234,6 +1302,7 @@ export async function handleWardrobeApi(
     if (url.pathname === "/api/batches" && request.method === "POST") return createGarmentBatch(request, env, ctx, db, identity);
     if (url.pathname === "/api/batches/status" && request.method === "GET") return reconcileGarmentBatches(env, ctx, db, identity);
     if (url.pathname === "/api/outfits" && request.method === "GET") return getOutfits(db, identity.id);
+    if (url.pathname === "/api/week" && request.method === "GET") return getWeeklyPlan(db, identity.id);
 
     const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)\/(original|generated|generated-open|cutout|open)$/);
     if (mediaMatch && request.method === "GET") {
@@ -1305,6 +1374,13 @@ export async function handleWardrobeApi(
       return request.method === "PUT"
         ? saveOutfit(request, db, identity.id, outfitId)
         : deleteOutfit(db, identity.id, outfitId);
+    }
+    const weekMatch = url.pathname.match(/^\/api\/week\/(\d{4}-\d{2}-\d{2})$/);
+    if (weekMatch && (request.method === "PUT" || request.method === "DELETE")) {
+      const planDate = weekMatch[1];
+      return request.method === "PUT"
+        ? saveWeeklyPlanEntry(request, db, identity.id, planDate)
+        : deleteWeeklyPlanEntry(db, identity.id, planDate);
     }
     return apiError("Ruta no encontrada.", 404);
   } catch (error) {
