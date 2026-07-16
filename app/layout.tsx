@@ -3,7 +3,7 @@ import "./globals.css";
 
 const title = "FORME — Tu armario visual";
 const description = "Organiza tus prendas y crea conjuntos en un canvas visual.";
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://forme.gallery";
 
 export const metadata: Metadata = {
   title,

@@ -1,3 +1,5 @@
+import { readNativeSession } from "./google-auth";
+
 export interface WardrobeEnv {
   DB?: D1Database;
   WARDROBE_MEDIA?: R2Bucket;
@@ -13,6 +15,9 @@ export interface WardrobeEnv {
   OPENAI_IMAGE_QUALITY?: string;
   FORME_OPS_TOKEN?: string;
   FORME_OWNER_EMAIL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  SESSION_SECRET?: string;
 }
 
 export interface WardrobeExecutionContext {
@@ -205,15 +210,24 @@ async function hash(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function identify(request: Request): Promise<Identity | null> {
+async function identify(request: Request, env: WardrobeEnv): Promise<Identity | null> {
   const headers = request.headers;
   let email = headers.get("oai-authenticated-user-email")?.trim().toLocaleLowerCase() ?? "";
   let displayName = decodeHeader(
     headers.get("oai-authenticated-user-full-name"),
     headers.get("oai-authenticated-user-full-name-encoding"),
   ).trim();
-  const avatarUrl = headers.get("oai-authenticated-user-picture")?.trim() || null;
+  let avatarUrl = headers.get("oai-authenticated-user-picture")?.trim() || null;
   const hostname = new URL(request.url).hostname;
+
+  if (!email) {
+    const nativeIdentity = await readNativeSession(request, env.SESSION_SECRET);
+    if (nativeIdentity) {
+      email = nativeIdentity.email;
+      displayName = nativeIdentity.displayName;
+      avatarUrl = nativeIdentity.avatarUrl;
+    }
+  }
 
   if (!email && localHosts.has(hostname)) {
     email = "local@forme.test";
@@ -242,7 +256,7 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
 
 async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: D1Database; identity: Identity } | Response> {
   if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
-  const identity = await identify(request);
+  const identity = await identify(request, env);
   if (!identity) return apiError("Inicia sesión para abrir tu armario.", 401);
   await ensureUser(env.DB, identity);
   return { db: env.DB, identity };

@@ -8,8 +8,10 @@ A mobile-first editorial wardrobe for turning clothing photos into a clean visua
 - photo intake and ghost-mannequin workflow
 - garment filters and favorites
 - interactive three-layer outfit studio
-- R2 upload endpoint for full-stack hosting
-- static demo build for GitHub Pages
+- Google login with signed, secure sessions
+- D1 wardrobe database and R2 media storage
+- Cloudflare Images cutout processing and OpenAI garment generation
+- automatic Cloudflare Workers deployment from GitHub
 
 ## Local development
 
@@ -18,11 +20,30 @@ npm install
 npm run dev
 ```
 
-## Builds
+## Build and deploy
 
 ```bash
 npm run build
-npm run build:pages
+npm run test
+npm run deploy
 ```
 
-The GitHub Pages version keeps uploads in the current browser session. Persistent uploads and real image transformation require the full-stack deployment and an image-generation backend.
+Production runs at `https://forme.gallery` on Cloudflare Workers. Every push to
+the production branch is built and deployed by Cloudflare.
+
+Runtime resources:
+
+- D1 binding: `DB`
+- R2 binding: `WARDROBE_MEDIA`
+- Cloudflare Images binding: `IMAGES`
+
+Runtime secrets are configured in Cloudflare, never committed to GitHub:
+
+- `OPENAI_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `SESSION_SECRET`
+- `FORME_OPS_TOKEN` (optional operations access)
+
+Google OAuth uses `https://forme.gallery/auth/google/callback` as its authorized
+redirect URI.

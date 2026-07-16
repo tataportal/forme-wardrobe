@@ -31,9 +31,10 @@ test("server-renders the FORME wardrobe", async () => {
 });
 
 test("keeps saved looks and styling recommendations connected to the product", async () => {
-  const [page, worker, css] = await Promise.all([
+  const [page, worker, auth, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/google-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
@@ -42,8 +43,16 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /useState\(true\)/);
   assert.match(page, /useState\(formeBasics\)/);
   assert.match(page, /function beginGoogleSignIn/);
-  assert.match(page, /\/signin-with-chatgpt\?return_to=%2F/);
+  assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
+  assert.doesNotMatch(page, /signin-with-chatgpt/);
   assert.match(page, /CONTINUAR CON GOOGLE/);
+  assert.match(auth, /AUTHORIZATION_ENDPOINT/);
+  assert.match(auth, /TOKEN_ENDPOINT/);
+  assert.match(auth, /USERINFO_ENDPOINT/);
+  assert.match(auth, /__Host-forme_session/);
+  assert.match(auth, /SameSite=Lax/);
+  assert.match(auth, /crypto\.subtle\.verify/);
+  assert.match(worker, /readNativeSession/);
   assert.doesNotMatch(page, /entry-gate/);
   assert.match(page, /Básicos FORME/);
   assert.match(page, /visiblePersonalGarments/);

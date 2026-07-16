@@ -2073,7 +2073,7 @@ export default function Home() {
   }
 
   function beginGoogleSignIn() {
-    window.location.assign("/signin-with-chatgpt?return_to=%2F");
+    window.location.assign("/auth/google/start?return_to=%2F");
   }
 
   async function saveStyleCalibration(nextProfile: StyleProfile) {
