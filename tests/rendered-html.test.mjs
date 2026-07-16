@@ -21,7 +21,7 @@ test("server-renders the FORME wardrobe", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>FORME — Tu armario visual<\/title>/i);
-  assert.match(html, /CLOSET DE PRUEBA/);
+  assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
   assert.match(html, />Mi closet</);
   assert.match(html, />Looks guardados</);
   assert.match(html, />Asistente</);
@@ -105,6 +105,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /profile-drawer/);
   assert.match(page, /Recalibrar mi estilo/);
   assert.doesNotMatch(page, /profile-calibrate/);
+  assert.doesNotMatch(page, /className="profile-identity"/);
+  assert.doesNotMatch(page, /className="profile-stats"/);
+  assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /expanded-hitbox/);
   assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| saved/);

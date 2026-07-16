@@ -3057,15 +3057,6 @@ export default function Home() {
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
           <section className="wardrobe-profile">
-            <div className="profile-identity">
-              {demoMode && <span className="profile-avatar demo-avatar">F</span>}
-              <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI CLOSET"}</p><h1>{demoMode ? "FORME" : profile.name}</h1><span>{demoMode ? "Prueba ahora · inicia sesión para subir el tuyo" : profile.handle}</span></div>
-            </div>
-            <div className="profile-stats">
-              <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
-              <p><strong>{sharedBasics.length}</strong><span>Básicos</span></p>
-              <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
-            </div>
             <nav className="wardrobe-tabs" aria-label="Mi closet">
               <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
               <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
@@ -3077,9 +3068,7 @@ export default function Home() {
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
               <div className="catalog-toolbar">
-                <div><p>MI CLOSET</p><h2>Prendas</h2></div>
-                <div>
-                  <span>{visiblePersonalGarments.length + visibleFormeBasics.length} de {personalGarments.length + sharedBasics.length}</span>
+                <div className="catalog-toolbar-actions">
                   <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
                   <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
                 </div>
@@ -3091,7 +3080,6 @@ export default function Home() {
                 </aside>
                 <div className="catalog-results">
                   <section className="closet-group personal-group">
-                    <div className="closet-group-heading"><div><p>TUS PRENDAS</p><h3>Mi colección</h3></div><span>{personalGarments.length}</span></div>
                     {personalGarments.length > 0
                       ? <ClosetGarmentGrid garments={visiblePersonalGarments} emptyLabel="NO HAY PRENDAS CON ESTOS FILTROS" onOpen={openGarmentEditor} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
                       : <div className="closet-empty-personal"><p>{demoMode ? "Inicia sesión para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "CONTINUAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
