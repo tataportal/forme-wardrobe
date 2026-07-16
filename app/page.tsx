@@ -1167,23 +1167,64 @@ function versatilityScore(garment: Garment): number {
   return score;
 }
 
+function centeredLookPreviewItems(look: SavedLook, garmentById: Map<string, Garment>) {
+  const items = look.items.flatMap((piece) => {
+    const garment = garmentById.get(piece.garmentId);
+    if (!garment) return [];
+    return [{ piece: normalizedCanvasPiece(piece, garment), garment }];
+  });
+  if (!items.length) return items;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const { piece } of items) {
+    const radians = piece.rotation * Math.PI / 180;
+    const cosine = Math.abs(Math.cos(radians));
+    const sine = Math.abs(Math.sin(radians));
+    const halfWidth = 38 * piece.scale;
+    const halfHeight = 47.5 * piece.scale;
+    const rotatedHalfWidth = cosine * halfWidth + sine * halfHeight;
+    const rotatedHalfHeight = sine * halfWidth + cosine * halfHeight;
+    const centerY = piece.y * 1.5;
+    minX = Math.min(minX, piece.x - rotatedHalfWidth);
+    maxX = Math.max(maxX, piece.x + rotatedHalfWidth);
+    minY = Math.min(minY, centerY - rotatedHalfHeight);
+    maxY = Math.max(maxY, centerY + rotatedHalfHeight);
+  }
+
+  const boundsWidth = Math.max(1, maxX - minX);
+  const boundsHeight = Math.max(1, maxY - minY);
+  const fit = Math.min(1.15, 88 / boundsWidth, 132 / boundsHeight);
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  return items.map(({ piece, garment }) => ({
+    garment,
+    piece: {
+      ...piece,
+      x: 50 + (piece.x - centerX) * fit,
+      y: 50 + ((piece.y * 1.5 - centerY) * fit) / 1.5,
+      scale: piece.scale * fit,
+    },
+  }));
+}
+
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
+  const previewItems = centeredLookPreviewItems(look, garmentById);
   return (
     <div className="saved-look-preview" aria-hidden="true">
-      {look.items.map((piece) => {
-        const garment = garmentById.get(piece.garmentId);
-        if (!garment) return null;
-        const normalizedPiece = normalizedCanvasPiece(piece, garment);
+      {previewItems.map(({ piece, garment }) => {
         const source = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
         return <img
           key={piece.instanceId}
           src={imageSrc(cleanCanvasImage(source))}
           alt=""
           style={{
-            left: `${normalizedPiece.x}%`,
-            top: `${normalizedPiece.y}%`,
-            zIndex: normalizedPiece.z,
-            transform: `translate(-50%, -50%) rotate(${normalizedPiece.rotation}deg) scale(${normalizedPiece.scale})`,
+            left: `${piece.x}%`,
+            top: `${piece.y}%`,
+            zIndex: piece.z,
+            transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
           }}
         />;
       })}
@@ -1696,6 +1737,8 @@ export default function Home() {
   const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
@@ -1889,6 +1932,15 @@ export default function Home() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [garmentDraft]);
 
+  useEffect(() => {
+    if (!profileOpen) return;
+    const closeProfileOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+    window.addEventListener("keydown", closeProfileOnEscape);
+    return () => window.removeEventListener("keydown", closeProfileOnEscape);
+  }, [profileOpen]);
+
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
   }
@@ -1910,8 +1962,11 @@ export default function Home() {
       if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar tu perfil de estilo.");
       setStyleProfile(result.profile);
       setStyleOnboardingOpen(false);
-      setWardrobePanel("closet");
-      setView("wardrobe");
+      if (styleProfile?.completed) setProfileOpen(true);
+      else {
+        setWardrobePanel("closet");
+        setView("wardrobe");
+      }
       setStylingRecommendations([]);
       setRecommendationHistory([]);
     } catch (error) {
@@ -2030,12 +2085,20 @@ export default function Home() {
     }
   }
 
-  function openWardrobe(panel: WardrobePanel = "closet") {
+  function openWardrobe(panel?: WardrobePanel) {
+    const targetPanel = panel ?? (view === "studio" ? studioReturnPanel : wardrobePanel);
     setView("wardrobe");
-    setWardrobePanel(panel);
+    setWardrobePanel(targetPanel);
     setClosetMode("browse");
     setLibraryOpen(false);
     setSavedLooksOpen(false);
+    setProfileOpen(false);
+  }
+
+  function openStudio(returnPanel: WardrobePanel = wardrobePanel) {
+    setStudioReturnPanel(returnPanel);
+    setProfileOpen(false);
+    setView("studio");
   }
 
   async function finalizeCutoutVariant(item: ApiGarment, outputVariant: "closed" | "open"): Promise<ApiGarment> {
@@ -2300,7 +2363,7 @@ export default function Home() {
     addToCanvas(garmentId);
     setActiveOutfitId(null);
     setActiveLookName("Nuevo look");
-    setView("studio");
+    openStudio("closet");
   }
 
   function startMoving(event: ReactPointerEvent<HTMLDivElement>, instanceId: string) {
@@ -2504,7 +2567,7 @@ export default function Home() {
     setLibraryOpen(false);
     setSavedLooksOpen(false);
     setWardrobeError("");
-    setView("studio");
+    openStudio("assistant");
   }
 
   async function saveStylingRecommendation(recommendation: StylingRecommendation) {
@@ -2546,7 +2609,7 @@ export default function Home() {
     setLookIterations([]);
     setLibraryOpen(false);
     setSavedLooksOpen(false);
-    setView("studio");
+    openStudio(view === "studio" ? studioReturnPanel : wardrobePanel);
   }
 
   function persistDemoWeek(entries: WeeklyPlanEntry[]) {
@@ -2667,7 +2730,7 @@ export default function Home() {
   }
 
   function createLookFromWeek() {
-    setView("studio");
+    openStudio("assistant");
     setLibraryOpen(true);
     setSavedLooksOpen(false);
   }
@@ -2812,34 +2875,50 @@ export default function Home() {
         profile={styleProfile}
         saving={savingStyleProfile}
         dismissible={Boolean(styleProfile?.completed)}
-        onClose={() => setStyleOnboardingOpen(false)}
+        onClose={() => { setStyleOnboardingOpen(false); if (styleProfile?.completed) setProfileOpen(true); }}
         onSave={saveStyleCalibration}
       />}
+      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setProfileOpen(false)}>
+        <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
+          <header><span>MI PERFIL</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
+          <div className="profile-drawer-identity">
+            <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
+            <p>IDENTIDAD</p>
+            <h2>{profile.name}</h2>
+            <small>{profile.handle}</small>
+          </div>
+          <div className="profile-drawer-stats">
+            <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
+            <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
+            <p><strong>{styleProfile?.completed ? "Sí" : "No"}</strong><span>Perfil de estilo</span></p>
+          </div>
+          <button className="profile-style-action" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}>
+            <span>PERFIL DE ESTILO</span><strong>{styleProfile?.completed ? "Recalibrar mi estilo" : "Calibrar mi estilo"}</strong><b>→</b>
+          </button>
+        </aside>
+      </div>}
       <header className="topbar">
-        <button className="wordmark" onClick={() => openWardrobe("closet")} aria-label="Ir al closet">FORME<span>®</span></button>
+        <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORME<span>®</span></button>
         <nav className="zone-nav" aria-label="Secciones principales">
-          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe("closet")}>Armario</button>
-          <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}>Canvas</button>
+          <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
+          <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
         </nav>
         {demoMode
           ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "REVISANDO SESIÓN" : "CONTINUAR CON GOOGLE"}</button>
-          : <button className="avatar" onClick={() => openWardrobe()} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
+          : <button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
       </header>
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
           <section className="wardrobe-profile">
             <div className="profile-identity">
-              {demoMode
-                ? <span className="profile-avatar demo-avatar">F</span>
-                : <span className="profile-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>}
+              {demoMode && <span className="profile-avatar demo-avatar">F</span>}
               <div><p>{demoMode ? "CLOSET DE PRUEBA" : "MI CLOSET"}</p><h1>{demoMode ? "FORME" : profile.name}</h1><span>{demoMode ? "Prueba ahora · inicia sesión para subir el tuyo" : profile.handle}</span></div>
             </div>
             <div className="profile-stats">
               <p><strong>{personalGarments.length}</strong><span>Mis prendas</span></p>
               <p><strong>{sharedBasics.length}</strong><span>Básicos</span></p>
               <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
-              {!demoMode && <button className="profile-calibrate" type="button" onClick={() => setStyleOnboardingOpen(true)}>CALIBRAR ESTILO ↗</button>}
             </div>
             <nav className="wardrobe-tabs" aria-label="Mi closet">
               <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
@@ -3030,20 +3109,23 @@ export default function Home() {
                     if (!garment) return null;
                     const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
                     const canvasImage = cleanCanvasImage(pieceImage);
+                    const expandedHitbox = garment.category === "Accessories" && (piece.scale <= 0.2 || garment.id.includes("sunglasses"));
+                    const pieceStyle = {
+                      left: `${piece.x}%`,
+                      top: `${piece.y}%`,
+                      zIndex: piece.z,
+                      transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
+                      ...(expandedHitbox ? { "--piece-hitbox-inset": `-${24 / Math.max(piece.scale, 0.08)}px` } : {}),
+                    } as CSSProperties;
                     return (
                       <div
-                        className={`canvas-piece ${selectedId === piece.instanceId ? "selected" : ""}`}
+                        className={`canvas-piece ${expandedHitbox ? "expanded-hitbox" : ""} ${selectedId === piece.instanceId ? "selected" : ""}`}
                         key={piece.instanceId}
                         onPointerDown={(event) => startMoving(event, piece.instanceId)}
                         onPointerMove={movePiece}
                         onPointerUp={stopMoving}
                         onPointerCancel={(event) => stopMoving(event, true)}
-                        style={{
-                          left: `${piece.x}%`,
-                          top: `${piece.y}%`,
-                          zIndex: piece.z,
-                          transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
-                        }}
+                        style={pieceStyle}
                       >
                         <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
                       </div>
@@ -3221,8 +3303,8 @@ export default function Home() {
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe("closet")}><span>▦</span>Armario</button>
-        <button className={view === "studio" ? "active" : ""} onClick={() => setView("studio")}><span>◫</span>Canvas</button>
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}><span>▦</span>Armario</button>
+        <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}><span>◫</span>Canvas</button>
       </nav>
     </main>
   );

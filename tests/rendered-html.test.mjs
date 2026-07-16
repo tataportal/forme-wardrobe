@@ -95,6 +95,13 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /\/puffer\//);
   assert.match(page, /function recommendStyle\(\)/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
+  assert.match(page, /studioReturnPanel/);
+  assert.match(page, /openStudio\(view === "studio" \? studioReturnPanel : wardrobePanel\)/);
+  assert.match(page, /function centeredLookPreviewItems/);
+  assert.match(page, /profile-drawer/);
+  assert.match(page, /Recalibrar mi estilo/);
+  assert.doesNotMatch(page, /profile-calibrate/);
+  assert.match(page, /expanded-hitbox/);
   assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| saved/);
   assert.doesNotMatch(page, /Math\.random/);
@@ -106,6 +113,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /isOwner: Boolean\(ownerEmail && identity\.email === ownerEmail\)/);
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
+  assert.match(css, /\.profile-drawer-backdrop/);
+  assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
   assert.match(css, /\.style-wheel/);
   assert.match(css, /\.style-onboarding-backdrop/);
   assert.match(css, /\.style-family-card/);
