@@ -83,7 +83,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /GUARDAR COMO LOOK/);
   assert.match(page, /type StyleFamilyId = "classic"/);
   assert.match(page, /function StyleOnboarding/);
-  assert.match(page, /SALTAR INTRO/);
+  assert.match(page, /SALTAR POR AHORA/);
+  assert.match(page, /skipCalibration/);
+  assert.match(page, /completed: true, ratings: \[\]/);
   assert.match(page, /EMPEZAR A ELEGIR/);
   assert.match(page, /SIGUIENTE FAMILIA/);
   assert.match(page, /Queremos/);
@@ -141,6 +143,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /\/api\/week/);
   assert.match(worker, /isOwner: Boolean\(ownerEmail && identity\.email === ownerEmail\)/);
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
+  assert.match(worker, /unique\.size !== 0 && unique\.size !== styleFamilies\.size/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.profile-style-summary/);

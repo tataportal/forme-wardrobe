@@ -1736,6 +1736,18 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
       setSaveError(error instanceof Error ? error.message : "No se pudo guardar tu perfil.");
     }
   };
+  const skipCalibration = async () => {
+    if (profile?.completed) {
+      onClose();
+      return;
+    }
+    setSaveError("");
+    try {
+      await onSave({ audience, exploration, completed: true, ratings: [] });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo omitir la calibración.");
+    }
+  };
 
   return <div className="style-onboarding-backdrop" role="dialog" aria-modal="true" aria-label="Calibrar mi estilo">
     <section className={`style-onboarding stage-${stage}`}>
@@ -1748,7 +1760,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
         <strong className="style-onboarding-nav-title">CALIBRACIÓN</strong>
         <div className="style-onboarding-nav-end">
           {stage === "intro"
-            ? <button className="style-skip-intro" type="button" onClick={() => setStage("audience")}>SALTAR INTRO</button>
+            ? <button className="style-skip-intro" type="button" disabled={saving} onClick={() => void skipCalibration()}>{saving ? "SALIENDO…" : "SALTAR POR AHORA"}</button>
             : <span>{stage === "families" ? `${String(familyIndex + 1).padStart(2, "0")} DE ${styleFamilyMeta.length}` : stage === "result" ? "LECTURA" : "INICIO"}</span>}
           {dismissible && <button className="style-close" type="button" onClick={onClose} aria-label="Cerrar calibración">×</button>}
         </div>

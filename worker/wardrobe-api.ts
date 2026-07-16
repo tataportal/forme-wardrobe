@@ -1374,7 +1374,7 @@ async function saveStyleProfile(request: Request, db: D1Database, ownerId: strin
     const reason = styleFeedbackReasons.has(rawReason) ? rawReason : null;
     unique.set(family, { family, affinity: blocked ? 0 : affinity, blocked, reason });
   }
-  if (completed && unique.size !== styleFamilies.size) return apiError("Califica las 12 familias para terminar.", 400);
+  if (completed && unique.size !== 0 && unique.size !== styleFamilies.size) return apiError("Califica las 12 familias para terminar.", 400);
   const statements = [
     db.prepare(`
       INSERT INTO style_profiles (owner_id, audience, exploration, completed, completed_at)
