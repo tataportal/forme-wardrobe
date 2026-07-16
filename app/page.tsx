@@ -1925,6 +1925,13 @@ export default function Home() {
     : [];
   const profileImage = profile.avatarUrl || asset("/profile/tata.png");
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
+  const profileTopStyles = styleProfile?.completed
+    ? styleFamilyMeta
+      .map((family) => ({ ...family, rating: styleProfile.ratings.find((rating) => rating.family === family.id) }))
+      .filter((family) => family.rating && !family.rating.blocked)
+      .sort((a, b) => (b.rating?.affinity ?? 0) - (a.rating?.affinity ?? 0))
+      .slice(0, 3)
+    : [];
 
   useEffect(() => {
     if (!selectedPlanDate && weekDays.length) setSelectedPlanDate(weekDays.find((day) => day.isToday)?.key ?? weekDays[0].key);
@@ -3026,21 +3033,30 @@ export default function Home() {
       />}
       {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setProfileOpen(false)}>
         <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>MI PERFIL</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
+          <header><span>RESUMEN</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
           <div className="profile-drawer-identity">
             <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
-            <p>IDENTIDAD</p>
-            <h2>{profile.name}</h2>
-            <small>{profile.handle}</small>
+            <div><p>MI CLOSET</p><h2>{profile.name}</h2><small>{profile.handle}</small></div>
           </div>
           <div className="profile-drawer-stats">
             <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
-            <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
-            <p><strong>{styleProfile?.completed ? "Sí" : "No"}</strong><span>Perfil de estilo</span></p>
+            <p><strong>{savedLooks.length}</strong><span>Looks guardados</span></p>
+            <p><strong>{weeklyPlan.length}</strong><span>Días planeados</span></p>
           </div>
-          <button className="profile-style-action" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}>
-            <span>PERFIL DE ESTILO</span><strong>{styleProfile?.completed ? "Recalibrar mi estilo" : "Calibrar mi estilo"}</strong><b>→</b>
-          </button>
+          <section className="profile-style-summary">
+            <p>TU ESTILO</p>
+            <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(" · ") : "Todavía estamos conociéndote."}</h3>
+            <span>{profileTopStyles.length
+              ? "Esta lectura ayuda a decidir qué siluetas, combinaciones y niveles de riesgo aparecen primero en tus recomendaciones."
+              : "Cuéntanos qué te representa para que las recomendaciones empiecen desde ti, no desde una tendencia."}</span>
+            {profileTopStyles.length > 0 && <div className="profile-style-tags">{profileTopStyles.map((family) => <span key={family.id}>{family.label} <b>{family.rating?.affinity}%</b></span>)}</div>}
+            <div className="profile-exploration">
+              <div><span>NIVEL DE EXPLORACIÓN</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
+              <i><b style={{ width: `${styleProfile?.exploration ?? 35}%` }} /></i>
+              <small>Define cuánto se alejan las sugerencias de lo que ya usas.</small>
+            </div>
+            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONTARLE A FORME QUÉ ME GUSTA"}</span><b>→</b></button>
+          </section>
         </aside>
       </div>}
       <header className="topbar">

@@ -103,7 +103,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /COMPARTIR ↗/);
   assert.match(page, /Instagram Stories/);
   assert.match(page, /profile-drawer/);
-  assert.match(page, /Recalibrar mi estilo/);
+  assert.match(page, /AJUSTAR PREFERENCIAS/);
+  assert.match(page, /NIVEL DE EXPLORACIÓN/);
+  assert.match(page, /profileTopStyles/);
+  assert.doesNotMatch(page, />Perfil de estilo</i);
   assert.doesNotMatch(page, /profile-calibrate/);
   assert.doesNotMatch(page, /className="profile-identity"/);
   assert.doesNotMatch(page, /className="profile-stats"/);
@@ -123,6 +126,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.profile-drawer-backdrop/);
+  assert.match(css, /\.profile-style-summary/);
   assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
   assert.match(css, /\.share-status-message/);
   assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
