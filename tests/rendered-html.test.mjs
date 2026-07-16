@@ -114,6 +114,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /className="wardrobe-tab-actions"/);
   assert.doesNotMatch(page, /className="catalog-toolbar"/);
   assert.match(page, /expanded-hitbox/);
+  assert.match(page, /type TransformHandleSession/);
+  assert.match(page, /function startTransformHandle/);
+  assert.match(page, /className="transform-handle rotate-handle"/);
+  assert.match(page, /className="transform-handle scale-handle"/);
   assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| saved/);
   assert.doesNotMatch(page, /Math\.random/);
@@ -128,6 +132,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.profile-style-summary/);
   assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
+  assert.match(css, /\.canvas-selection-box/);
+  assert.match(css, /\.rotate-handle/);
+  assert.match(css, /\.scale-handle/);
   assert.match(css, /\.share-status-message/);
   assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css, /\.style-wheel/);

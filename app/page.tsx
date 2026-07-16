@@ -59,6 +59,18 @@ type PinchSession = {
   startRotation: number;
 };
 
+type TransformHandleSession = {
+  instanceId: string;
+  pointerId: number;
+  mode: "scale" | "rotate";
+  centerX: number;
+  centerY: number;
+  startDistance: number;
+  startAngle: number;
+  startScale: number;
+  startRotation: number;
+};
+
 type WardrobeFilters = {
   category: string;
   colorFamily: string;
@@ -1865,6 +1877,7 @@ export default function Home() {
   const dragSession = useRef<DragSession | null>(null);
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
+  const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
   const [weekAnchor] = useState(() => new Date());
 
@@ -2590,6 +2603,55 @@ export default function Home() {
     }
   }
 
+  function startTransformHandle(event: ReactPointerEvent<HTMLButtonElement>, instanceId: string, mode: "scale" | "rotate") {
+    const piece = canvasPieces.find((item) => item.instanceId === instanceId);
+    const pieceElement = event.currentTarget.closest(".canvas-piece");
+    if (!piece || !(pieceElement instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const rect = pieceElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    transformHandleSession.current = {
+      instanceId,
+      pointerId: event.pointerId,
+      mode,
+      centerX,
+      centerY,
+      startDistance: Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY)),
+      startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
+      startScale: piece.scale,
+      startRotation: piece.rotation,
+    };
+    setSelectedId(instanceId);
+    bringToFront(instanceId);
+    setSaved(false);
+  }
+
+  function moveTransformHandle(event: ReactPointerEvent<HTMLButtonElement>) {
+    const session = transformHandleSession.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (session.mode === "scale") {
+      const distance = Math.hypot(event.clientX - session.centerX, event.clientY - session.centerY);
+      const scale = clamp(session.startScale * (distance / session.startDistance), 0.08, 1.35);
+      setCanvasPieces((items) => items.map((item) => item.instanceId === session.instanceId ? { ...item, scale } : item));
+    } else {
+      const angle = Math.atan2(event.clientY - session.centerY, event.clientX - session.centerX);
+      const rotation = normalizeDegrees(session.startRotation + (angle - session.startAngle) * 180 / Math.PI);
+      setCanvasPieces((items) => items.map((item) => item.instanceId === session.instanceId ? { ...item, rotation } : item));
+    }
+    setSaved(false);
+  }
+
+  function stopTransformHandle(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (transformHandleSession.current?.pointerId === event.pointerId) transformHandleSession.current = null;
+  }
+
   function toggleVariant(instanceId: string) {
     setCanvasPieces((items) => items.map((item) => item.instanceId === instanceId
       ? { ...item, variant: item.variant === "open" ? "closed" : "open" }
@@ -3262,11 +3324,18 @@ export default function Home() {
                     const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
                     const canvasImage = cleanCanvasImage(pieceImage);
                     const expandedHitbox = garment.category === "Accessories" && (piece.scale <= 0.2 || garment.id.includes("sunglasses"));
+                    const safeScale = Math.max(piece.scale, 0.08);
                     const pieceStyle = {
                       left: `${piece.x}%`,
                       top: `${piece.y}%`,
                       zIndex: piece.z,
                       transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
+                      "--piece-outline-width": `${1.5 / safeScale}px`,
+                      "--piece-handle-size": `${30 / safeScale}px`,
+                      "--piece-handle-font": `${14 / safeScale}px`,
+                      "--piece-handle-half": `${-15 / safeScale}px`,
+                      "--piece-rotate-top": `${-48 / safeScale}px`,
+                      "--piece-rotate-line": `${33 / safeScale}px`,
                       ...(expandedHitbox ? { "--piece-hitbox-inset": `-${24 / Math.max(piece.scale, 0.08)}px` } : {}),
                     } as CSSProperties;
                     return (
@@ -3280,6 +3349,27 @@ export default function Home() {
                         style={pieceStyle}
                       >
                         <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
+                        {selectedId === piece.instanceId && <>
+                          <span className="canvas-selection-box" aria-hidden="true" />
+                          <button
+                            type="button"
+                            className="transform-handle rotate-handle"
+                            aria-label={`Rotar ${translateGarmentName(garment.name)}`}
+                            onPointerDown={(event) => startTransformHandle(event, piece.instanceId, "rotate")}
+                            onPointerMove={moveTransformHandle}
+                            onPointerUp={stopTransformHandle}
+                            onPointerCancel={stopTransformHandle}
+                          >↻</button>
+                          <button
+                            type="button"
+                            className="transform-handle scale-handle"
+                            aria-label={`Escalar ${translateGarmentName(garment.name)}`}
+                            onPointerDown={(event) => startTransformHandle(event, piece.instanceId, "scale")}
+                            onPointerMove={moveTransformHandle}
+                            onPointerUp={stopTransformHandle}
+                            onPointerCancel={stopTransformHandle}
+                          >↘</button>
+                        </>}
                       </div>
                     );
                   })}
