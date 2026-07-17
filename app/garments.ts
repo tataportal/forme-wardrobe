@@ -112,7 +112,6 @@ function silhouetteFor(name: string): string {
 
 export function inferGarmentType(name: string, category: GarmentCategory): GarmentType {
   if (/blazer/i.test(name)) return "Blazer";
-  if (category === "Tailoring") return "Suit Jacket";
   if (/hoodie/i.test(name) || (category === "Tops" && /hooded/i.test(name))) return "Hoodie";
   if (/crewneck|sweatshirt/i.test(name)) return "Sweatshirt";
   if (/sweater|open-knit|knit/i.test(name)) return "Sweater";
@@ -124,6 +123,7 @@ export function inferGarmentType(name: string, category: GarmentCategory): Garme
   if (/cape/i.test(name)) return "Cape";
   if (/poncho/i.test(name)) return "Poncho";
   if (/coat|peacoat|trench/i.test(name)) return "Coat";
+  if (category === "Tailoring") return "Suit Jacket";
   if (category === "Outerwear") return "Jacket";
   if (/jeans|denim/i.test(name)) return "Jeans";
   if (/chino/i.test(name)) return "Chinos";
