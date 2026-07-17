@@ -3957,7 +3957,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         <section className="content studio-view">
           <div className="studio-layout">
             <div className="canvas-column">
-              <div className={`look-canvas ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
+              <div className={`look-canvas ${canvasPieces.length === 0 ? "is-empty" : "has-pieces"} ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
                 <div
                   className="look-artboard"
                   ref={canvasRef}
@@ -3967,12 +3967,19 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
                   onPointerCancel={stopMarqueeSelection}
                 >
                   <div className={`snapshot-frame ${selectedGroupIds.length ? "selection-active" : ""}`} ref={snapshotFrameRef} aria-hidden="true">
-                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ESTO SE GUARDARÁ"}</span>
+                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ÁREA DEL LOOK"}</span>
                   </div>
-                  <p className="look-date">{activeLookName.toLocaleUpperCase()}</p>
-                  <span className="canvas-hint desktop-hint">ARRASTRA SOBRE EL FONDO PARA SELECCIONAR VARIAS PRENDAS</span>
-                  <span className="canvas-hint mobile-hint">TOCA UNA PRENDA PARA EDITARLA</span>
-                  {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
+                  {canvasPieces.length > 0 && <>
+                    <p className="look-date">{activeLookName.toLocaleUpperCase()}</p>
+                    <span className="canvas-hint desktop-hint">ARRASTRA PARA SELECCIONAR VARIAS PRENDAS</span>
+                    <span className="canvas-hint mobile-hint">TOCA UNA PRENDA PARA EDITARLA</span>
+                  </>}
+                  {canvasPieces.length === 0 && <div className="empty-canvas">
+                    <span>NUEVO LOOK</span>
+                    <h2>Empieza con una prenda.</h2>
+                    <p>Elige algo de tu closet y construye desde ahí.</p>
+                    {!libraryOpen && <button type="button" onClick={() => setLibraryOpen(true)}>ABRIR PRENDAS →</button>}
+                  </div>}
                   {marqueeRect && <span className="canvas-marquee" aria-hidden="true" style={{ left: marqueeRect.left, top: marqueeRect.top, width: marqueeRect.width, height: marqueeRect.height }} />}
                   {canvasPieces.map((piece) => {
                     const garment = garmentById.get(piece.garmentId);
@@ -4117,9 +4124,9 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
                 </section>
               </div>
 
-              <div className="library-utilities">
+              {canvasPieces.length > 0 && <div className="library-utilities">
                 <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); closeLookIterations(); }}>VACIAR CANVAS</button>
-              </div>
+              </div>}
             </aside>
 
             <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""} ${libraryOpen ? "concealed" : ""}`} onClick={() => setSavedLooksOpen((open) => { const next = !open; if (next) setLibraryOpen(false); return next; })} aria-expanded={savedLooksOpen} aria-label="Abrir looks">
@@ -4140,12 +4147,12 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
 
             {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
-            <nav className="canvas-action-bar" aria-label="Acciones del look">
+            {canvasPieces.length > 0 && <nav className="canvas-action-bar" aria-label="Acciones del look">
               <button className={`save-look-action ${saved && selectedGroupIds.length === 0 ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || (saved && selectedGroupIds.length === 0)} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : selectedGroupIds.length ? `GUARDAR ${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA" : "PIEZAS"}` : saved ? "GUARDADO" : activeLookIteration ? "GUARDAR SELECCIÓN" : "GUARDAR LOOK"}</span><b>{saved && selectedGroupIds.length === 0 ? "✓" : "＋"}</b></button>
               <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
               <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
               <button className="share-look-action" disabled={canvasPieces.length === 0 || Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName === "Nuevo look" ? "Mi look" : activeLookName, items: canvasPieces })}><span>{sharingLookId ? "PREPARANDO…" : "COMPARTIR"}</span><b>↗</b></button>
-            </nav>
+            </nav>}
           </div>
         </section>
       )}

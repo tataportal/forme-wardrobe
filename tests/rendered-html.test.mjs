@@ -206,6 +206,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /savingOutfit \|\| \(saved && selectedGroupIds\.length === 0\)/);
   assert.match(page, /function startMarqueeSelection/);
   assert.match(page, /snapshot-frame/);
+  assert.match(page, /ÁREA DEL LOOK/);
+  assert.match(page, /Empieza con una prenda\./);
+  assert.doesNotMatch(page, /TU CANVAS ESTÁ VACÍO/);
+  assert.doesNotMatch(page, /ESTO SE GUARDARÁ/);
   assert.match(page, /currentSnapshotItems/);
   assert.doesNotMatch(page, /Math\.random/);
   assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
