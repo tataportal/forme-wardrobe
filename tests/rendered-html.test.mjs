@@ -118,6 +118,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /assistantProfileReady/);
   assert.match(page, /assistantClosetReady/);
   assert.match(page, /PUEDO SER MÁS PRECISO/);
+  assert.match(page, /new Set\(assistantGarments\.map\(\(garment\) => garment\.category\)\)/);
   assert.match(page, /assistant-response-copy/);
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
   assert.match(page, /studioReturnPanel/);

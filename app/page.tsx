@@ -1931,7 +1931,7 @@ export default function Home() {
     : [];
   const selectedAssistantPreset = assistantPresets.find((preset) => preset.id === assistantPresetId);
   const assistantProfileReady = Boolean(styleProfile?.ratings.length);
-  const assistantClosetCategories = new Set(personalGarments.map((garment) => garment.category));
+  const assistantClosetCategories = new Set(assistantGarments.map((garment) => garment.category));
   const assistantClosetReady = personalGarments.length >= 8
     && assistantClosetCategories.has("Tops")
     && assistantClosetCategories.has("Bottoms")
