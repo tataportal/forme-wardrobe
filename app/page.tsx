@@ -1696,39 +1696,38 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
             ? <strong>FORMÉ®</strong>
             : <button type="button" onClick={goBack}>← VOLVER</button>}
         </div>
-        <strong className="style-onboarding-nav-title">CALIBRACIÓN</strong>
+        <strong className="style-onboarding-nav-title">TU ESTILO</strong>
         <div className="style-onboarding-nav-end">
           {stage === "intro"
-            ? <button className="style-skip-intro" type="button" disabled={saving} onClick={() => void skipCalibration()}>{saving ? "SALIENDO…" : "SALTAR POR AHORA"}</button>
-            : <span>{stage === "families" ? `${String(familyIndex + 1).padStart(2, "0")} DE ${styleFamilyMeta.length}` : stage === "result" ? "LECTURA" : "INICIO"}</span>}
-          {dismissible && <button className="style-close" type="button" onClick={onClose} aria-label="Cerrar calibración">×</button>}
+            ? <button className="style-skip-intro" type="button" disabled={saving} onClick={() => void skipCalibration()}>{saving ? "SALIENDO…" : "SALTAR"}</button>
+            : null}
+          {dismissible && stage !== "intro" && <button className="style-close" type="button" onClick={onClose} aria-label="Cerrar preferencias de estilo">×</button>}
         </div>
       </header>
 
       {stage === "intro" && <div className="style-onboarding-intro">
         <div className="style-intro-visual" aria-hidden="true">
           <img src={asset("/onboarding/style-families/hombre/12-vanguardista.webp")} alt="" />
-          <img src={asset("/onboarding/style-families/mujer/09-romantico.webp")} alt="" />
-          <img src={asset("/onboarding/style-families/hombre/06-streetwear.webp")} alt="" />
+          <img src={asset("/onboarding/style-families/mujer/11-rebelde.webp")} alt="" />
         </div>
         <div className="style-intro-copy">
-          <p>UN PRIMER RETRATO</p>
+          <p>ANTES DE EMPEZAR</p>
           <h1>Queremos<br />conocerte.</h1>
-          <span>No buscamos etiquetarte. Tu estilo vive en lo que eliges, repites y todavía quieres probar. Recorre doce familias para darnos una primera señal.</span>
+          <span>Dinos qué te atrae, qué prefieres evitar y cuánto quieres experimentar. Formé lo irá afinando contigo.</span>
         </div>
         <div className="style-intro-footer">
-          <p><span>12 FAMILIAS</span><span>PUEDES CAMBIARLO DESPUÉS</span></p>
-          <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR A ELEGIR</span><b>→</b></button>
+          <p><span>PUEDES CAMBIARLO CUANDO QUIERAS</span></p>
+          <button className="style-primary-action" type="button" onClick={() => setStage("audience")}><span>EMPEZAR</span><b>→</b></button>
         </div>
       </div>}
 
       {stage === "audience" && <div className="style-onboarding-audience">
         <p>PUNTO DE PARTIDA</p>
-        <h1>¿Qué looks quieres ver primero?</h1>
-        <span>Elige un punto de partida para estas doce familias. Después podrás mezclar libremente prendas de cualquier sección.</span>
+        <h1>¿Por dónde empezamos?</h1>
+        <span>Elige qué tipo de looks quieres ver primero. Esto no limita las prendas que podrás usar.</span>
         <div className="style-audience-options">
           {(["hombre", "mujer"] as StyleAudience[]).map((option) => <button key={option} type="button" className={audience === option ? "active" : ""} onClick={() => setAudience(option)}>
-            <small>12 FAMILIAS</small><strong>{option === "hombre" ? "Hombre" : "Mujer"}</strong><b>{audience === option ? "✓" : "→"}</b>
+            <small>{option === "hombre" ? "LOOKS MASCULINOS" : "LOOKS FEMENINOS"}</small><strong>{option === "hombre" ? "Hombre" : "Mujer"}</strong><b>{audience === option ? "✓" : "→"}</b>
           </button>)}
         </div>
         <button className="style-primary-action" type="button" onClick={() => setStage("families")}><span>CONTINUAR</span><b>→</b></button>
@@ -1736,7 +1735,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
 
       {stage === "families" && family && rating && <div className="style-family-stage">
         <div className="style-family-copy">
-          <p>FAMILIA {String(familyIndex + 1).padStart(2, "0")}</p>
+          <p>DIRECCIÓN DE ESTILO</p>
           <h1>{family.label}</h1>
           <span>{family.description}</span>
           <div className="style-family-progress" aria-hidden="true"><b style={{ width: `${((familyIndex + 1) / styleFamilyMeta.length) * 100}%` }} /></div>
@@ -1754,13 +1753,13 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
           </div>}
           <div className="style-rating-actions">
             <button type="button" className={rating.blocked ? "blocked" : ""} onClick={() => updateRating({ blocked: !rating.blocked, affinity: rating.blocked ? 50 : 0 })}>{rating.blocked ? "VOLVER A INCLUIR" : "NO RECOMENDAR"}</button>
-            <button className="style-primary-action" type="button" onClick={continueFamily}><span>{familyIndex + 1 === styleFamilyMeta.length ? "VER MI LECTURA" : "SIGUIENTE FAMILIA"}</span><b>→</b></button>
+            <button className="style-primary-action" type="button" onClick={continueFamily}><span>{familyIndex + 1 === styleFamilyMeta.length ? "VER MI LECTURA" : "SIGUIENTE"}</span><b>→</b></button>
           </div>
         </div>
       </div>}
 
       {stage === "result" && <div className="style-onboarding-result">
-        <p>PRIMERA LECTURA</p>
+        <p>TU PUNTO DE PARTIDA</p>
         <h1>Tu estilo empieza acá.</h1>
         <span>Esto no es una definición. Es una primera lectura que se irá afinando con los looks que guardes, descartes y realmente uses.</span>
         <div className="style-result-ranking">
@@ -1834,6 +1833,7 @@ export default function Home() {
   const snapshotFrameRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
   const pointerTracks = useRef(new Map<number, PointerTrack>());
+
   const pinchSession = useRef<PinchSession | null>(null);
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const marqueeSession = useRef<MarqueeSession | null>(null);
