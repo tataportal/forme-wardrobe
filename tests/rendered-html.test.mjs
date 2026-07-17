@@ -206,6 +206,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /ARCHIVO PERSONAL \/ V2/);
   assert.match(page, /routePath === "closet-v2"/);
   assert.match(page, /function autocompleteOptions/);
+  assert.match(page, /garmentTypesByCategory/);
+  assert.match(page, /Sweatshirt: "Polera"/);
+  assert.match(page, /Jacket: "Casaca"/);
   assert.match(page, /const brandOptions = useMemo/);
   assert.match(page, /forme-brand-options/);
   assert.match(page, /forme-color-options/);
@@ -290,6 +293,7 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(worker, /endpoint: "\/v1\/images\/edits"/);
   assert.match(worker, /status = 'awaiting_cutout'/);
   assert.match(worker, /garment\.category === "Outerwear"/);
+  assert.match(worker, /garment_type/);
   assert.match(worker, /\/api\/batches\/status/);
   assert.match(page, /function processingFileFor/);
   assert.match(page, /function whiteStudioCutout/);
@@ -300,4 +304,5 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(schema, /qaStatus/);
   assert.match(schema, /profilePublic/);
   assert.match(schema, /isPublic/);
+  assert.match(schema, /garmentType/);
 });

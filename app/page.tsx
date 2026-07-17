@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { classifyGarment, formeBasics, Garment, starterGarments } from "./garments";
+import { classifyGarment, formeBasics, Garment, garmentTypesByCategory, inferGarmentType, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
@@ -87,6 +87,7 @@ type MarqueeSession = {
 
 type WardrobeFilters = {
   category: string;
+  garmentType: string;
   colorFamily: string;
   tone: string;
   material: string;
@@ -96,7 +97,7 @@ type WardrobeFilters = {
 
 type FilterKey = keyof WardrobeFilters;
 type FilterOptions = Record<FilterKey, string[]> & { tonesByColor: Record<string, string[]> };
-type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "colorFamily" | "tone" | "material" | "finish" | "silhouette"> & {
+type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "colorFamily" | "tone" | "material" | "finish" | "silhouette"> & {
   brand: string;
   tags: string[];
   isPublic: boolean;
@@ -139,6 +140,7 @@ type UploadItem = {
   preview: string;
   name: string;
   category: Garment["category"];
+  garmentType: Garment["garmentType"];
   status: UploadStatus;
   garmentId?: string;
   error?: string;
@@ -235,6 +237,7 @@ type LookIteration = {
 
 const emptyFilters: WardrobeFilters = {
   category: "All",
+  garmentType: "All",
   colorFamily: "All",
   tone: "All",
   material: "All",
@@ -354,7 +357,8 @@ const styleFeedbackLabels: Record<StyleFeedbackReason, string> = {
   specific: "Prenda específica",
 };
 const filterLabels: Array<{ key: FilterKey; label: string }> = [
-  { key: "category", label: "Tipo" },
+  { key: "category", label: "Categoría" },
+  { key: "garmentType", label: "Tipo" },
   { key: "colorFamily", label: "Color" },
   { key: "tone", label: "Tono" },
   { key: "material", label: "Material" },
@@ -429,6 +433,34 @@ const valueTranslations: Record<string, string> = {
   Tailoring: "Sastrería",
   Footwear: "Calzado",
   Accessories: "Accesorios",
+  "T-shirt": "Polo / camiseta",
+  Shirt: "Camisa",
+  Sweater: "Chompa",
+  Sweatshirt: "Polera",
+  Hoodie: "Hoodie",
+  Top: "Top",
+  Jacket: "Casaca",
+  Coat: "Abrigo",
+  Parka: "Parka",
+  Bomber: "Bomber",
+  Cape: "Capa",
+  Poncho: "Poncho",
+  "Suit Jacket": "Saco",
+  Blazer: "Blazer",
+  Jeans: "Jeans",
+  Trousers: "Pantalón",
+  Chinos: "Chinos",
+  Skirt: "Falda",
+  Shorts: "Shorts",
+  Sneakers: "Zapatillas",
+  Shoes: "Zapatos",
+  Boots: "Botas",
+  Heels: "Tacos",
+  Sandals: "Sandalias",
+  Bag: "Bolso",
+  Hat: "Gorro / sombrero",
+  Glasses: "Lentes",
+  Accessory: "Accesorio",
   Black: "Negro",
   Blue: "Azul",
   Brown: "Marrón",
@@ -730,6 +762,7 @@ const apiPayload = (garment: Garment | GarmentDraft) => ({
   name: garment.name.trim() || "Prenda sin nombre",
   brand: garment.brand ?? "",
   category: garment.category,
+  garmentType: garment.garmentType,
   colorFamily: garment.colorFamily,
   tone: garment.tone,
   material: garment.material,
@@ -1007,7 +1040,7 @@ function coreRecommendationSignature(top: Garment, bottom: Garment, outer: Garme
 function savedLookCoreSignature(look: SavedLook, garmentById: Map<string, Garment>): string {
   return look.items
     .map((item) => garmentById.get(item.garmentId))
-    .filter((item): item is Garment => Boolean(item) && ["Tops", "Bottoms", "Outerwear", "Tailoring"].includes(item.category))
+    .filter((item): item is Garment => item !== undefined && ["Tops", "Bottoms", "Outerwear", "Tailoring"].includes(item.category))
     .map((item) => item.id)
     .sort()
     .join(":");
@@ -1786,7 +1819,7 @@ function ClosetGarmentGrid({
         {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
         <button className="card-studio-add" onClick={() => onAdd(item)}>AÑADIR AL CANVAS <span>＋</span></button>
       </div>
-      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORMÉ · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.category)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
+      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORMÉ · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.garmentType)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
     </article>)}
     {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>LIMPIAR FILTROS</button></div>}
   </div>;
@@ -2035,6 +2068,7 @@ export function WardrobeApp({
     }, {});
     return {
       category: unique("category"),
+      garmentType: unique("garmentType"),
       colorFamily: unique("colorFamily"),
       tone: unique("tone"),
       material: unique("material"),
@@ -2091,6 +2125,7 @@ export function WardrobeApp({
   const editorTones = garmentDraft
     ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
     : [];
+  const editorGarmentTypes = garmentDraft ? garmentTypesByCategory[garmentDraft.category] : [];
   const profileImage = profile.avatarUrl || asset("/profile/tata.png");
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
   const profileTopStyles = styleProfile?.completed
@@ -2393,6 +2428,7 @@ export function WardrobeApp({
       name: translateGarmentName(item.name),
       brand: item.brand ?? "",
       category: item.category,
+      garmentType: item.garmentType,
       colorFamily: item.colorFamily,
       tone: item.tone,
       material: item.material,
@@ -2634,6 +2670,7 @@ export function WardrobeApp({
       preview: URL.createObjectURL(next),
       name: next.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
       category: "Outerwear",
+      garmentType: "Jacket",
       status: "ready",
     }));
     setUploadItems((items) => [...items, ...accepted]);
@@ -2674,7 +2711,7 @@ export function WardrobeApp({
       await new Promise((resolve) => setTimeout(resolve, 1200));
       const created = pending.map<Garment>((item) => {
         const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
-        return { id: crypto.randomUUID(), ...custom, ...classifyGarment(custom), image: item.preview, status: "ghosted" };
+        return { id: crypto.randomUUID(), ...custom, ...classifyGarment(custom), garmentType: item.garmentType, image: item.preview, status: "ghosted" };
       });
       setGarments((items) => [...created, ...items]);
       pending.forEach((item) => updateUploadItem(item.id, { status: "done" }));
@@ -2710,6 +2747,7 @@ export function WardrobeApp({
         if (useDiscountedBatch) body.append("processingMode", "batch");
         body.append("name", custom.name);
         body.append("category", item.category);
+        body.append("garmentType", item.garmentType);
         body.append("colorFamily", attributes.colorFamily);
         body.append("tone", attributes.tone);
         body.append("material", attributes.material);
@@ -3791,7 +3829,7 @@ export function WardrobeApp({
                   <div className="closet-v2-specimens">
                     {retroPreviewGarments.map((item, index) => <div key={item.id} style={{ "--slot": index } as CSSProperties}>
                       <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} />
-                      <span>{translateValue(item.category)}</span>
+                      <span>{translateValue(item.garmentType)}</span>
                     </div>)}
                   </div>
                   <i aria-hidden="true" />
@@ -3983,7 +4021,11 @@ export function WardrobeApp({
                         <img className="upload-item-thumb" src={item.preview} alt="" />
                         <div className="upload-item-fields">
                           <label>NOMBRE<input disabled={!editable} value={item.name} onChange={(event) => updateUploadItem(item.id, { name: event.target.value })} placeholder={`Prenda ${index + 1}`} /></label>
-                          <label>TIPO<select disabled={!editable} value={item.category} onChange={(event) => updateUploadItem(item.id, { category: event.target.value as Garment["category"] })}><option value="Outerwear">Abrigos</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option><option value="Footwear">Calzado</option><option value="Accessories">Accesorios</option></select></label>
+                          <label>CATEGORÍA<select disabled={!editable} value={item.category} onChange={(event) => {
+                            const category = event.target.value as Garment["category"];
+                            updateUploadItem(item.id, { category, garmentType: garmentTypesByCategory[category][0] });
+                          }}><option value="Outerwear">Capas</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option><option value="Footwear">Calzado</option><option value="Accessories">Accesorios</option></select></label>
+                          <label>TIPO<select disabled={!editable} value={item.garmentType} onChange={(event) => updateUploadItem(item.id, { garmentType: event.target.value as Garment["garmentType"] })}>{garmentTypesByCategory[item.category].map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                           <span className="upload-item-state">{uploadStatusLabels[item.status]}{item.error ? ` · ${item.error}` : ""}</span>
                         </div>
                         {editable && <button className="remove-upload-item" type="button" onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name || `prenda ${index + 1}`}`}>×</button>}
@@ -4200,7 +4242,7 @@ export function WardrobeApp({
               <div className="garment-editor-visual">
                 <div className="garment-editor-image"><img src={imageSrc(editingGarment.image)} alt={garmentDraft.name} /></div>
                 <div className="garment-tag-preview" aria-label="Etiquetas actuales">
-                  {[garmentDraft.category, garmentDraft.tone, garmentDraft.material, garmentDraft.finish, garmentDraft.silhouette].map((tag) => <span key={tag}>{translateValue(tag)}</span>)}
+                  {[garmentDraft.garmentType, garmentDraft.tone, garmentDraft.material, garmentDraft.finish, garmentDraft.silhouette].map((tag) => <span key={tag}>{translateValue(tag)}</span>)}
                   {garmentDraft.tags.map((tag) => <span key={tag}>#{tag}</span>)}
                 </div>
                 <button className="editor-canvas-add" type="button" onClick={() => { addAndOpenStudio(editingGarment.id); setGarmentDraft(null); }}>AÑADIR AL CANVAS <span>＋</span></button>
@@ -4214,7 +4256,13 @@ export function WardrobeApp({
                 <div className="garment-editor-fields">
                   <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
                   <label>MARCA<input list="forme-brand-options" value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} onBlur={() => normalizeGarmentMetadata("brand", brandOptions)} placeholder="Escribe o elige una marca" autoCapitalize="words" autoComplete="off" spellCheck={false} /></label>
-                  <label>TIPO<select value={garmentDraft.category} onChange={(event) => updateGarmentDraft("category", event.target.value as Garment["category"])}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>CATEGORÍA<select value={garmentDraft.category} onChange={(event) => {
+                    const category = event.target.value as Garment["category"];
+                    setGarmentDraft((current) => current ? { ...current, category, garmentType: garmentTypesByCategory[category][0] } : current);
+                    setGarmentSaved(false);
+                    setGarmentSaveError("");
+                  }}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>TIPO<select value={garmentDraft.garmentType} onChange={(event) => updateGarmentDraft("garmentType", event.target.value as Garment["garmentType"])}>{editorGarmentTypes.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                   <label>COLOR<input list="forme-color-options" value={garmentDraft.colorFamily} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} placeholder="Escribe o elige un color" autoComplete="off" /></label>
                   <label>TONO<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                   <label>MATERIAL<input list="forme-material-options" value={garmentDraft.material} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} placeholder="Escribe o elige un material" autoComplete="off" /></label>

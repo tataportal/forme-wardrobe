@@ -1,5 +1,5 @@
 import { readNativeSession } from "./google-auth";
-import { starterGarments } from "../app/garments";
+import { garmentTypesByCategory, inferGarmentType, starterGarments } from "../app/garments";
 
 export interface WardrobeEnv {
   DB?: D1Database;
@@ -39,6 +39,7 @@ type GarmentRow = {
   name: string;
   brand: string;
   category: string;
+  garment_type: string;
   color_family: string;
   tone: string;
   material: string;
@@ -83,6 +84,7 @@ type GarmentPayload = {
   name: string;
   brand: string;
   category: string;
+  garmentType: string;
   colorFamily: string;
   tone: string;
   material: string;
@@ -121,6 +123,7 @@ type StyleFamilyRatingPayload = {
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
+const garmentTypes = new Set(Object.values(garmentTypesByCategory).flat());
 const styleFamilies = new Set([
   "classic",
   "minimal",
@@ -143,7 +146,7 @@ const staticGarmentMedia = new Map(starterGarments.map((garment) => [garment.id,
 }]));
 
 const garmentColumns = `
-  id, owner_id, client_id, name, brand, category, color_family, tone, material,
+  id, owner_id, client_id, name, brand, category, garment_type, color_family, tone, material,
   finish, silhouette, favorite, is_public, deleted, status, source_image_key, processing_image_key,
   generated_image_key, generated_open_image_key, image_key, open_image_key, quality,
   qa_status, qa_notes, revision, created_at, updated_at
@@ -206,10 +209,17 @@ function payloadFrom(value: unknown, fallback?: Partial<GarmentPayload>): Garmen
   const body = value as Record<string, unknown>;
   const category = textValue(body.category, fallback?.category ?? "Outerwear");
   if (!categories.has(category)) return null;
+  const name = textValue(body.name, fallback?.name ?? "Prenda sin nombre") || "Prenda sin nombre";
+  const allowedTypes = garmentTypesByCategory[category as keyof typeof garmentTypesByCategory];
+  const requestedType = textValue(body.garmentType, fallback?.garmentType ?? "");
+  const garmentType = garmentTypes.has(requestedType) && allowedTypes.some((type) => type === requestedType)
+    ? requestedType
+    : inferGarmentType(name, category as keyof typeof garmentTypesByCategory);
   return {
-    name: textValue(body.name, fallback?.name ?? "Prenda sin nombre") || "Prenda sin nombre",
+    name,
     brand: textValue(body.brand, fallback?.brand ?? ""),
     category,
+    garmentType,
     colorFamily: textValue(body.colorFamily, fallback?.colorFamily ?? "Other") || "Other",
     tone: textValue(body.tone, fallback?.tone ?? "Unclassified") || "Unclassified",
     material: textValue(body.material, fallback?.material ?? "Cotton") || "Cotton",
@@ -382,6 +392,7 @@ function garmentJson(row: GarmentRow, tags: string[] = []) {
     name: row.name,
     brand: row.brand,
     category: row.category,
+    garmentType: row.garment_type || inferGarmentType(row.name, row.category as keyof typeof garmentTypesByCategory),
     colorFamily: row.color_family,
     tone: row.tone,
     material: row.material,
@@ -441,13 +452,14 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
   const statements = [
     db.prepare(`
       INSERT INTO garments (
-        id, owner_id, client_id, name, brand, category, color_family, tone,
+        id, owner_id, client_id, name, brand, category, garment_type, color_family, tone,
         material, finish, silhouette, favorite, is_public, deleted, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
       ON CONFLICT(owner_id, client_id) DO UPDATE SET
         name = excluded.name,
         brand = excluded.brand,
         category = excluded.category,
+        garment_type = excluded.garment_type,
         color_family = excluded.color_family,
         tone = excluded.tone,
         material = excluded.material,
@@ -465,6 +477,7 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
       payload.name,
       payload.brand,
       payload.category,
+      payload.garmentType,
       payload.colorFamily,
       payload.tone,
       payload.material,
@@ -508,6 +521,7 @@ function formPayload(form: FormData): GarmentPayload | null {
     name: form.get("name"),
     brand: form.get("brand"),
     category: form.get("category"),
+    garmentType: form.get("garmentType"),
     colorFamily: form.get("colorFamily"),
     tone: form.get("tone"),
     material: form.get("material"),
@@ -583,9 +597,9 @@ async function uploadGarment(
   try {
     await db.prepare(`
       INSERT INTO garments (
-        id, owner_id, client_id, name, brand, category, color_family, tone,
+        id, owner_id, client_id, name, brand, category, garment_type, color_family, tone,
         material, finish, silhouette, favorite, is_public, status, source_image_key, processing_image_key, quality
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
     `).bind(
       garmentId,
       identity.id,
@@ -593,6 +607,7 @@ async function uploadGarment(
       payload.name,
       payload.brand,
       payload.category,
+      payload.garmentType,
       payload.colorFamily,
       payload.tone,
       payload.material,
@@ -651,6 +666,7 @@ Turn the attached source photo into one premium, photorealistic ghost-mannequin 
 
 GARMENT REFERENCE
 - Catalog category: ${garment.category}.
+- Garment type: ${garment.garment_type || "Unclassified"}.
 - Catalog name: ${garment.name || "Garment"}. This name is metadata only; never render it as new text.
 
 ${construction}
@@ -1017,6 +1033,12 @@ async function internalGarmentOperation(
   }
   const category = textValue(form.get("category"), "Outerwear");
   if (!categories.has(category)) return apiError("El tipo de prenda no es válido.", 400);
+  const name = textValue(form.get("name"), "Prenda sin nombre") || "Prenda sin nombre";
+  const requestedGarmentType = textValue(form.get("garmentType"), "");
+  const allowedTypes = garmentTypesByCategory[category as keyof typeof garmentTypesByCategory];
+  const garmentType = allowedTypes.some((type) => type === requestedGarmentType)
+    ? requestedGarmentType
+    : inferGarmentType(name, category as keyof typeof garmentTypesByCategory);
   const quality = imageQuality(form.get("quality"));
   const presentation = garmentPresentation(form.get("presentation"));
   const existing = await findGarment(env.DB, identity.id, clientId);
@@ -1029,12 +1051,13 @@ async function internalGarmentOperation(
 
   await env.DB.prepare(`
     INSERT INTO garments (
-      id, owner_id, client_id, name, brand, category, color_family, tone,
+      id, owner_id, client_id, name, brand, category, garment_type, color_family, tone,
       material, finish, silhouette, favorite, deleted, status, source_image_key
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'uploaded', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'uploaded', ?)
     ON CONFLICT(owner_id, client_id) DO UPDATE SET
       name = excluded.name,
       category = excluded.category,
+      garment_type = excluded.garment_type,
       color_family = excluded.color_family,
       tone = excluded.tone,
       material = excluded.material,
@@ -1048,9 +1071,10 @@ async function internalGarmentOperation(
     garmentId,
     identity.id,
     clientId,
-    textValue(form.get("name"), existing?.name ?? "Prenda sin nombre") || "Prenda sin nombre",
+    textValue(form.get("name"), existing?.name ?? name) || name,
     existing?.brand ?? "",
     category,
+    garmentType,
     textValue(form.get("colorFamily"), existing?.color_family ?? "Other") || "Other",
     textValue(form.get("tone"), existing?.tone ?? "Unclassified") || "Unclassified",
     textValue(form.get("material"), existing?.material ?? "Textile") || "Textile",

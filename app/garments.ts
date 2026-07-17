@@ -1,4 +1,5 @@
 export type GarmentAttributes = {
+  garmentType: GarmentType;
   colorFamily: string;
   tone: string;
   material: string;
@@ -6,12 +7,30 @@ export type GarmentAttributes = {
   silhouette: string;
 };
 
+export type GarmentCategory = "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories";
+export type GarmentType =
+  | "T-shirt" | "Shirt" | "Sweater" | "Sweatshirt" | "Hoodie" | "Top"
+  | "Jacket" | "Coat" | "Parka" | "Bomber" | "Cape" | "Poncho"
+  | "Suit Jacket" | "Blazer"
+  | "Jeans" | "Trousers" | "Chinos" | "Skirt" | "Shorts"
+  | "Sneakers" | "Shoes" | "Boots" | "Heels" | "Sandals"
+  | "Bag" | "Hat" | "Glasses" | "Accessory";
+
+export const garmentTypesByCategory: Record<GarmentCategory, GarmentType[]> = {
+  Tops: ["T-shirt", "Shirt", "Sweater", "Sweatshirt", "Hoodie", "Top"],
+  Outerwear: ["Jacket", "Coat", "Parka", "Bomber", "Cape", "Poncho"],
+  Tailoring: ["Suit Jacket", "Blazer"],
+  Bottoms: ["Jeans", "Trousers", "Chinos", "Skirt", "Shorts"],
+  Footwear: ["Sneakers", "Shoes", "Boots", "Heels", "Sandals"],
+  Accessories: ["Bag", "Hat", "Glasses", "Accessory"],
+};
+
 export type Garment = GarmentAttributes & {
   id: string;
   name: string;
   brand?: string;
   tags?: string[];
-  category: "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories";
+  category: GarmentCategory;
   collection?: "personal" | "forme";
   color: string;
   image: string;
@@ -91,10 +110,42 @@ function silhouetteFor(name: string): string {
   return "Regular";
 }
 
+export function inferGarmentType(name: string, category: GarmentCategory): GarmentType {
+  if (/blazer/i.test(name)) return "Blazer";
+  if (category === "Tailoring") return "Suit Jacket";
+  if (/hoodie/i.test(name) || (category === "Tops" && /hooded/i.test(name))) return "Hoodie";
+  if (/crewneck|sweatshirt/i.test(name)) return "Sweatshirt";
+  if (/sweater|open-knit|knit/i.test(name)) return "Sweater";
+  if (/tee|t-shirt/i.test(name)) return "T-shirt";
+  if (category === "Tops" && /shirt/i.test(name)) return "Shirt";
+  if (category === "Tops") return "Top";
+  if (/parka/i.test(name)) return "Parka";
+  if (/bomber|ma-1|blouson/i.test(name)) return "Bomber";
+  if (/cape/i.test(name)) return "Cape";
+  if (/poncho/i.test(name)) return "Poncho";
+  if (/coat|peacoat|trench/i.test(name)) return "Coat";
+  if (category === "Outerwear") return "Jacket";
+  if (/jeans|denim/i.test(name)) return "Jeans";
+  if (/chino/i.test(name)) return "Chinos";
+  if (/skirt/i.test(name)) return "Skirt";
+  if (/short/i.test(name)) return "Shorts";
+  if (category === "Bottoms") return "Trousers";
+  if (/sneaker/i.test(name)) return "Sneakers";
+  if (/boot/i.test(name)) return "Boots";
+  if (/pump|heel|stiletto/i.test(name)) return "Heels";
+  if (/sandal/i.test(name)) return "Sandals";
+  if (category === "Footwear") return "Shoes";
+  if (/tote|bag/i.test(name)) return "Bag";
+  if (/cap|beanie|hat/i.test(name)) return "Hat";
+  if (/sunglass|glasses/i.test(name)) return "Glasses";
+  return "Accessory";
+}
+
 export function classifyGarment(item: Pick<Garment, "name" | "category" | "color">): GarmentAttributes {
   const color = colorAttributes(item.color, item.name);
   const material = materialFor(item.name);
   return {
+    garmentType: inferGarmentType(item.name, item.category),
     ...color,
     material,
     finish: finishFor(item.name, material),

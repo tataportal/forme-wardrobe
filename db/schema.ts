@@ -26,6 +26,7 @@ export const garments = sqliteTable("garments", {
   name: text("name").notNull(),
   brand: text("brand").notNull().default(""),
   category: text("category").notNull(),
+  garmentType: text("garment_type").notNull().default(""),
   colorFamily: text("color_family").notNull(),
   tone: text("tone").notNull(),
   material: text("material").notNull(),
@@ -51,6 +52,7 @@ export const garments = sqliteTable("garments", {
   index("garments_owner_idx").on(table.ownerId),
   uniqueIndex("garments_owner_client_unique").on(table.ownerId, table.clientId),
   index("garments_owner_category_idx").on(table.ownerId, table.category),
+  index("garments_owner_type_idx").on(table.ownerId, table.garmentType),
   index("garments_owner_status_idx").on(table.ownerId, table.status),
 ]);
 
