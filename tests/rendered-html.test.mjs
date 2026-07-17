@@ -93,6 +93,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Esencial/);
   assert.match(page, /Capas/);
   assert.match(page, /function buildStylingRecommendations/);
+  assert.match(page, /function garmentMatchesAudience/);
+  assert.match(page, /function lookMatchesAudience/);
+  assert.match(page, /pump\|high heel\|stiletto/);
   assert.match(page, /const strategies: StylingStrategy\[\] = \["balanced", "contrast", "statement", "minimal", "layered"\]/);
   assert.match(page, /excludedSignatures/);
   assert.match(page, /recommendationHistory/);

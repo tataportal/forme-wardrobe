@@ -765,6 +765,22 @@ function searchableGarment(garment: Garment) {
   return `${garment.name} ${garment.material} ${garment.finish} ${garment.tone} ${garment.tags?.join(" ") ?? ""}`.toLocaleLowerCase();
 }
 
+function garmentMatchesAudience(garment: Garment, audience?: StyleAudience): boolean {
+  if (audience !== "hombre") return true;
+  const searchable = searchableGarment(garment);
+  if (garment.category === "Footwear" && /pump|high heel|stiletto|tac[oó]n/.test(searchable)) return false;
+  if (garment.category === "Tops" && /baby tee|bustier|corset/.test(searchable)) return false;
+  if (garment.category === "Bottoms" && /skirt|falda/.test(searchable)) return false;
+  return true;
+}
+
+function lookMatchesAudience(look: SavedLook, garmentById: Map<string, Garment>, audience?: StyleAudience): boolean {
+  return look.items.every((item) => {
+    const garment = garmentById.get(item.garmentId);
+    return !garment || garmentMatchesAudience(garment, audience);
+  });
+}
+
 function contextGarmentScore(garment: Garment, code: StyleCode, moment: StyleMoment, occasion: StyleOccasion) {
   const searchable = searchableGarment(garment);
   let score = 0;
@@ -940,12 +956,13 @@ function buildStylingRecommendations(
   styleProfile?: StyleProfile | null,
   priorityGarmentIds: Set<string> = new Set(),
 ): StylingRecommendation[] {
-  const bottoms = garments.filter((item) => item.category === "Bottoms");
-  const tops = garments.filter((item) => item.category === "Tops");
-  const outerLayers = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
+  const eligibleGarments = garments.filter((item) => garmentMatchesAudience(item, styleProfile?.audience));
+  const bottoms = eligibleGarments.filter((item) => item.category === "Bottoms");
+  const tops = eligibleGarments.filter((item) => item.category === "Tops");
+  const outerLayers = eligibleGarments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
   if (!bottoms.length || !tops.length || !outerLayers.length) return [];
-  const footwear = garments.filter((item) => item.category === "Footwear");
-  const accessories = garments.filter((item) => item.category === "Accessories");
+  const footwear = eligibleGarments.filter((item) => item.category === "Footwear");
+  const accessories = eligibleGarments.filter((item) => item.category === "Accessories");
   const strategies: StylingStrategy[] = ["balanced", "contrast", "statement", "minimal", "layered"];
   const garmentUse = new Map<string, number>();
   const selectedSignatures = new Set<string>();
@@ -3182,9 +3199,10 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   }
 
   async function autoPlanCurrentWeek() {
-    if (!savedLooks.length || planningWeek) {
-      if (!savedLooks.length) {
-        setWardrobeError("Guarda al menos un look antes de planear la semana.");
+    const plannableLooks = savedLooks.filter((look) => lookMatchesAudience(look, garmentById, styleProfile?.audience));
+    if (!plannableLooks.length || planningWeek) {
+      if (!plannableLooks.length) {
+        setWardrobeError(savedLooks.length ? "Tus looks guardados no coinciden con las preferencias de tu perfil." : "Guarda al menos un look antes de planear la semana.");
         setWardrobePanel("looks");
       }
       return;
@@ -3193,11 +3211,11 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     const currentWeekKeys = new Set(weekDays.map((day) => day.key));
     const hasPlannedWeek = weeklyPlan.some((entry) => currentWeekKeys.has(entry.date));
     const currentFirstLookId = weeklyPlan.find((entry) => entry.date === weekDays[0]?.key)?.outfitId;
-    const currentFirstLookIndex = currentFirstLookId ? savedLooks.findIndex((look) => look.id === currentFirstLookId) : -1;
-    const rotationOffset = currentFirstLookIndex >= 0 ? (currentFirstLookIndex + 1) % savedLooks.length : 0;
+    const currentFirstLookIndex = currentFirstLookId ? plannableLooks.findIndex((look) => look.id === currentFirstLookId) : -1;
+    const rotationOffset = currentFirstLookIndex >= 0 ? (currentFirstLookIndex + 1) % plannableLooks.length : 0;
     const nextWeek = weekDays.map((day, index) => ({
       date: day.key,
-      outfitId: savedLooks[(index + rotationOffset) % savedLooks.length].id,
+      outfitId: plannableLooks[(index + rotationOffset) % plannableLooks.length].id,
       occasion: occasions[index],
       worn: false,
     }));
