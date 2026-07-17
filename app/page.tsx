@@ -70,6 +70,21 @@ type TransformHandleSession = {
   startRotation: number;
 };
 
+type MarqueeRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+type MarqueeSession = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  canvasRect: DOMRect;
+  moved: boolean;
+};
+
 type WardrobeFilters = {
   category: string;
   colorFamily: string;
@@ -1802,6 +1817,8 @@ export default function Home() {
   const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
   const [activeIterationIndex, setActiveIterationIndex] = useState(-1);
   const [selectedId, setSelectedId] = useState("");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [saved, setSaved] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [savedLooksOpen, setSavedLooksOpen] = useState(false);
@@ -1814,10 +1831,12 @@ export default function Home() {
   const [shareNotice, setShareNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const snapshotFrameRef = useRef<HTMLDivElement>(null);
   const dragSession = useRef<DragSession | null>(null);
   const pointerTracks = useRef(new Map<number, PointerTrack>());
   const pinchSession = useRef<PinchSession | null>(null);
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
+  const marqueeSession = useRef<MarqueeSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
   const [weekAnchor] = useState(() => new Date());
 
@@ -1863,6 +1882,7 @@ export default function Home() {
   const studioGarments = [...studioPersonalGarments, ...studioBasicGarments];
   const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
+  const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
   const activeLookIteration = activeIterationIndex >= 0 ? lookIterations[activeIterationIndex] : undefined;
   const canIterate = canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Tops")
     && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
@@ -2408,6 +2428,7 @@ export default function Home() {
     const existing = canvasPieces.find((item) => item.garmentId === garmentId);
     if (existing) {
       setSelectedId(existing.instanceId);
+      setSelectedGroupIds([]);
       bringToFront(existing.instanceId);
       setSaved(false);
       return;
@@ -2434,6 +2455,7 @@ export default function Home() {
       }];
     });
     setSelectedId(instanceId);
+    setSelectedGroupIds([]);
     setSaved(false);
   }
 
@@ -2449,6 +2471,8 @@ export default function Home() {
     const piece = canvasPieces.find((item) => item.instanceId === instanceId);
     if (!canvas || !piece) return;
     event.preventDefault();
+    setSelectedGroupIds([]);
+    setMarqueeRect(null);
     event.currentTarget.setPointerCapture(event.pointerId);
     const rect = canvas.getBoundingClientRect();
     const track: PointerTrack = {
@@ -2549,6 +2573,56 @@ export default function Home() {
     }
   }
 
+  function startMarqueeSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || event.pointerType === "touch" || window.innerWidth < 760) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest(".canvas-piece,button")) return;
+    const canvasRect = event.currentTarget.getBoundingClientRect();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    marqueeSession.current = {
+      pointerId: event.pointerId,
+      startX: clamp(event.clientX, canvasRect.left, canvasRect.right),
+      startY: clamp(event.clientY, canvasRect.top, canvasRect.bottom),
+      canvasRect,
+      moved: false,
+    };
+    setSelectedId("");
+    setSelectedGroupIds([]);
+    setMarqueeRect({ left: event.clientX - canvasRect.left, top: event.clientY - canvasRect.top, width: 0, height: 0 });
+  }
+
+  function moveMarqueeSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    const session = marqueeSession.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const currentX = clamp(event.clientX, session.canvasRect.left, session.canvasRect.right);
+    const currentY = clamp(event.clientY, session.canvasRect.top, session.canvasRect.bottom);
+    const left = Math.min(session.startX, currentX);
+    const top = Math.min(session.startY, currentY);
+    const width = Math.abs(currentX - session.startX);
+    const height = Math.abs(currentY - session.startY);
+    if (width > 5 || height > 5) session.moved = true;
+    setMarqueeRect({ left: left - session.canvasRect.left, top: top - session.canvasRect.top, width, height });
+    const right = left + width;
+    const bottom = top + height;
+    const selected = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(".canvas-piece")).flatMap((element) => {
+      const rect = element.getBoundingClientRect();
+      const intersects = rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
+      return intersects && element.dataset.instanceId ? [element.dataset.instanceId] : [];
+    });
+    setSelectedGroupIds(selected);
+  }
+
+  function stopMarqueeSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    const session = marqueeSession.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    if (!session.moved) setSelectedGroupIds([]);
+    marqueeSession.current = null;
+    setMarqueeRect(null);
+  }
+
   function startTransformHandle(event: ReactPointerEvent<HTMLButtonElement>, instanceId: string, mode: "scale" | "rotate") {
     const piece = canvasPieces.find((item) => item.instanceId === instanceId);
     const pieceElement = event.currentTarget.closest(".canvas-piece");
@@ -2634,6 +2708,7 @@ export default function Home() {
   function removePiece(instanceId: string) {
     setCanvasPieces((items) => items.filter((item) => item.instanceId !== instanceId));
     setSelectedId((current) => current === instanceId ? "" : current);
+    setSelectedGroupIds((current) => current.filter((id) => id !== instanceId));
     setSaved(false);
   }
 
@@ -2657,6 +2732,7 @@ export default function Home() {
       }];
     });
     setSelectedId(instanceIdCopy);
+    setSelectedGroupIds([]);
     setSaved(false);
   }
 
@@ -2739,6 +2815,7 @@ export default function Home() {
   function openLookIteration(iteration: LookIteration, index = lookIterations.findIndex((item) => item.id === iteration.id)) {
     setCanvasPieces(iteration.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
     setSelectedId("");
+    setSelectedGroupIds([]);
     setActiveOutfitId(null);
     setActiveLookName(iteration.title);
     setActiveIterationIndex(Math.max(0, index));
@@ -2791,6 +2868,7 @@ export default function Home() {
   function openSavedLook(look: SavedLook) {
     setCanvasPieces(look.items.map((item) => normalizedCanvasPiece({ ...item }, garmentById.get(item.garmentId))));
     setSelectedId("");
+    setSelectedGroupIds([]);
     setActiveOutfitId(look.id);
     setActiveLookName(look.name);
     setSaved(true);
@@ -2990,11 +3068,67 @@ export default function Home() {
     }
   }
 
+  function currentSnapshotItems() {
+    if (typeof window === "undefined" || window.innerWidth < 760) return canvasPieces.map((item) => ({ ...item }));
+    const canvas = canvasRef.current;
+    const frame = snapshotFrameRef.current;
+    if (!canvas || !frame) return canvasPieces.map((item) => ({ ...item }));
+    const frameRect = frame.getBoundingClientRect();
+    if (frameRect.width < 1 || frameRect.height < 1) return canvasPieces.map((item) => ({ ...item }));
+    const elements = new Map(Array.from(canvas.querySelectorAll<HTMLElement>(".canvas-piece")).flatMap((element) => element.dataset.instanceId ? [[element.dataset.instanceId, element] as const] : []));
+    const savingSelection = selectedGroupIds.length > 0;
+    const sourceItems = savingSelection
+      ? canvasPieces.filter((item) => selectedGroupIdSet.has(item.instanceId))
+      : canvasPieces.filter((item) => {
+        const rect = elements.get(item.instanceId)?.getBoundingClientRect();
+        return rect && rect.right >= frameRect.left && rect.left <= frameRect.right && rect.bottom >= frameRect.top && rect.top <= frameRect.bottom;
+      });
+    if (!sourceItems.length) return [];
+
+    if (!savingSelection) {
+      return sourceItems.map((item) => {
+        const rect = elements.get(item.instanceId)?.getBoundingClientRect();
+        if (!rect) return { ...item };
+        return {
+          ...item,
+          x: ((rect.left + rect.width / 2 - frameRect.left) / frameRect.width) * 100,
+          y: ((rect.top + rect.height / 2 - frameRect.top) / frameRect.height) * 100,
+          scale: clamp(item.scale * (elements.get(item.instanceId)?.offsetWidth ?? frameRect.width * .76) / (frameRect.width * .76), .08, 1.35),
+        };
+      });
+    }
+
+    const rects = sourceItems.flatMap((item) => {
+      const rect = elements.get(item.instanceId)?.getBoundingClientRect();
+      return rect ? [{ item, rect }] : [];
+    });
+    if (!rects.length) return sourceItems.map((item) => ({ ...item }));
+    const minX = Math.min(...rects.map(({ rect }) => rect.left));
+    const maxX = Math.max(...rects.map(({ rect }) => rect.right));
+    const minY = Math.min(...rects.map(({ rect }) => rect.top));
+    const maxY = Math.max(...rects.map(({ rect }) => rect.bottom));
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const fit = Math.min(1.15, frameRect.width * .88 / Math.max(1, maxX - minX), frameRect.height * .88 / Math.max(1, maxY - minY));
+    return rects.map(({ item, rect }) => ({
+      ...item,
+      x: 50 + ((rect.left + rect.width / 2 - centerX) * fit / frameRect.width) * 100,
+      y: 50 + ((rect.top + rect.height / 2 - centerY) * fit / frameRect.height) * 100,
+      scale: clamp(item.scale * fit * (elements.get(item.instanceId)?.offsetWidth ?? frameRect.width * .76) / (frameRect.width * .76), .08, 1.35),
+    }));
+  }
+
   async function saveCurrentOutfit() {
     if (canvasPieces.length === 0) return;
-    const outfitId = activeOutfitId ?? `look-${crypto.randomUUID()}`;
+    const itemsToSave = currentSnapshotItems();
+    if (!itemsToSave.length) {
+      setWardrobeError("Pon el look dentro del marco o selecciónalo arrastrando con el mouse.");
+      return;
+    }
+    const savingSelection = selectedGroupIds.length > 0 && typeof window !== "undefined" && window.innerWidth >= 760;
+    const outfitId = savingSelection ? `look-${crypto.randomUUID()}` : activeOutfitId ?? `look-${crypto.randomUUID()}`;
     const fallbackName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
-    const lookName = activeLookName === "Nuevo look" || activeLookName === "Conjunto actual" ? fallbackName : activeLookName;
+    const lookName = savingSelection || activeLookName === "Nuevo look" || activeLookName === "Conjunto actual" ? fallbackName : activeLookName;
     setSavingOutfit(true);
     setWardrobeError("");
     try {
@@ -3002,19 +3136,25 @@ export default function Home() {
         const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: lookName, items: canvasPieces }),
+          body: JSON.stringify({ name: lookName, items: itemsToSave }),
         });
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
       }
-      const nextLook: SavedLook = { id: outfitId, name: lookName, items: canvasPieces.map((item) => ({ ...item })) };
+      const nextLook: SavedLook = { id: outfitId, name: lookName, items: itemsToSave.map((item) => ({ ...item })) };
       setSavedLooks((looks) => {
         const nextLooks = [nextLook, ...looks.filter((look) => look.id !== outfitId)];
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
       });
-      setActiveOutfitId(outfitId);
-      setActiveLookName(lookName);
-      setSaved(true);
+      if (savingSelection) {
+        setSelectedGroupIds([]);
+        setSaved(false);
+        setShareNotice(`${lookName} guardado. Selecciona otra prueba para continuar.`);
+      } else {
+        setActiveOutfitId(outfitId);
+        setActiveLookName(lookName);
+        setSaved(true);
+      }
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
     } finally {
@@ -3046,6 +3186,7 @@ export default function Home() {
       });
       setCanvasPieces(duplicatedPieces);
       setSelectedId("");
+      setSelectedGroupIds([]);
       setActiveOutfitId(outfitId);
       setActiveLookName(lookName);
       setLookIterations([]);
@@ -3354,10 +3495,21 @@ export default function Home() {
           <div className="studio-layout">
             <div className="canvas-column">
               <div className={`look-canvas ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
-                <div className="look-artboard" ref={canvasRef}>
+                <div
+                  className="look-artboard"
+                  ref={canvasRef}
+                  onPointerDown={startMarqueeSelection}
+                  onPointerMove={moveMarqueeSelection}
+                  onPointerUp={stopMarqueeSelection}
+                  onPointerCancel={stopMarqueeSelection}
+                >
+                  <div className={`snapshot-frame ${selectedGroupIds.length ? "selection-active" : ""}`} ref={snapshotFrameRef} aria-hidden="true">
+                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ÁREA DE MINIATURA · 2:3"}</span>
+                  </div>
                   <p className="look-date">{activeLookName.toLocaleUpperCase()} / ARRASTRA · PELLIZCA · GIRA</p>
-                  <span className="canvas-hint">MANTÉN = ABRIR / CERRAR</span>
+                  <span className="canvas-hint">DESKTOP: ARRASTRA SOBRE EL FONDO PARA SELECCIONAR · MANTÉN = ABRIR / CERRAR</span>
                   {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
+                  {marqueeRect && <span className="canvas-marquee" aria-hidden="true" style={{ left: marqueeRect.left, top: marqueeRect.top, width: marqueeRect.width, height: marqueeRect.height }} />}
                   {canvasPieces.map((piece) => {
                     const garment = garmentById.get(piece.garmentId);
                     if (!garment) return null;
@@ -3378,8 +3530,9 @@ export default function Home() {
                     } as CSSProperties;
                     return (
                       <div
-                        className={`canvas-piece ${expandedHitbox ? "expanded-hitbox" : ""} ${selectedId === piece.instanceId ? "selected" : ""}`}
+                        className={`canvas-piece ${expandedHitbox ? "expanded-hitbox" : ""} ${selectedId === piece.instanceId ? "selected" : ""} ${selectedGroupIdSet.has(piece.instanceId) ? "group-selected" : ""}`}
                         key={piece.instanceId}
+                        data-instance-id={piece.instanceId}
                         onPointerDown={(event) => startMoving(event, piece.instanceId)}
                         onPointerMove={movePiece}
                         onPointerUp={stopMoving}
@@ -3501,7 +3654,7 @@ export default function Home() {
               </div>
 
               <div className="library-utilities">
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); closeLookIterations(); }}>VACIAR CANVAS</button>
+                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); closeLookIterations(); }}>VACIAR CANVAS</button>
               </div>
             </aside>
 
@@ -3524,7 +3677,7 @@ export default function Home() {
             {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
             <nav className="canvas-action-bar" aria-label="Acciones del look">
-              <button className={`save-look-action ${saved ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || saved} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : saved ? "GUARDADO" : activeLookIteration ? "GUARDAR SELECCIÓN" : "GUARDAR LOOK"}</span><b>{saved ? "✓" : "＋"}</b></button>
+              <button className={`save-look-action ${saved && selectedGroupIds.length === 0 ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || (saved && selectedGroupIds.length === 0)} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : selectedGroupIds.length ? `GUARDAR ${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA" : "PIEZAS"}` : saved ? "GUARDADO" : activeLookIteration ? "GUARDAR SELECCIÓN" : "GUARDAR LOOK"}</span><b>{saved && selectedGroupIds.length === 0 ? "✓" : "＋"}</b></button>
               <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
               <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
               <button className="share-look-action" disabled={canvasPieces.length === 0 || Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName === "Nuevo look" ? "Mi look" : activeLookName, items: canvasPieces })}><span>{sharingLookId ? "PREPARANDO…" : "COMPARTIR"}</span><b>↗</b></button>
