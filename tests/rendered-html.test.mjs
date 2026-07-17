@@ -123,6 +123,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function openSavedLook\(look: SavedLook\)/);
   assert.match(page, /studioReturnPanel/);
   assert.match(page, /function openSavedLook[\s\S]*?openStudio\("looks"\)/);
+  assert.match(page, /wardrobePanel === "looks"[\s\S]*?<WeeklyPlanView[\s\S]*?wardrobePanel === "assistant"/);
+  assert.match(page, /className="week-strip-preview"/);
+  assert.match(page, /PLANEAR SEMANA/);
+  assert.match(page, /function createLookFromWeek\(\)[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /function centeredLookPreviewItems/);
   assert.match(page, /function createInstagramStoryBlob/);
   assert.match(page, /navigator\.share/);
@@ -186,6 +190,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.style-family-card/);
   assert.match(css, /\.mix-canvas-navigator/);
   assert.match(css, /\.week-workspace/);
+  assert.match(css, /\.week-strip-preview/);
   assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
 });

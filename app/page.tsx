@@ -1483,7 +1483,10 @@ function WeeklyPlanView({
     <section className="week-view">
       <div className="app-section-heading week-heading">
         <div><h2>Tu semana</h2><span>Deja listo qué vas a usar cada día.</span></div>
-        <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
+        <div className="week-heading-actions">
+          <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
+          <button className="week-auto-plan" type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : plannedCount ? "REPLANEAR SEMANA ↻" : "PLANEAR SEMANA →"}</button>
+        </div>
       </div>
 
       <div className="week-strip" role="tablist" aria-label="Días de la semana">
@@ -1491,6 +1494,7 @@ function WeeklyPlanView({
           const entry = entries.find((item) => item.date === day.key);
           const look = entry ? savedLooks.find((item) => item.id === entry.outfitId) : undefined;
           return <button type="button" role="tab" aria-selected={selectedDate === day.key} className={`${selectedDate === day.key ? "active" : ""} ${entry ? "planned" : ""} ${entry?.worn ? "worn" : ""}`} onClick={() => onSelectDate(day.key)} key={day.key}>
+            <div className="week-strip-preview">{look ? <LookPreview look={look} garmentById={garmentById} /> : <span>＋</span>}</div>
             <span>{day.shortLabel}{day.isToday ? " · HOY" : ""}</span>
             <strong>{day.dayNumber}</strong>
             <small>{look ? look.name : "Sin look"}</small>
@@ -1512,7 +1516,7 @@ function WeeklyPlanView({
         </section>
 
         <aside className="week-look-library">
-          <div className="week-library-heading"><div><p>TUS LOOKS</p><h3>Elige uno para {selectedDay?.shortLabel}</h3></div><button type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : "PLANEAR TODO →"}</button></div>
+          <div className="week-library-heading"><div><p>TUS LOOKS</p><h3>Cambia el look de {selectedDay?.shortLabel}</h3></div></div>
           <div className="occasion-row" aria-label="Ocasión">
             {(Object.keys(weeklyOccasionLabels) as WeeklyOccasion[]).map((option) => <button type="button" className={occasion === option ? "active" : ""} onClick={() => setOccasion(option)} key={option}>{weeklyOccasionLabels[option]}</button>)}
           </div>
@@ -3127,7 +3131,7 @@ export default function Home() {
   }
 
   function createLookFromWeek() {
-    openStudio("assistant");
+    openStudio("looks");
     setLibraryOpen(true);
     setSavedLooksOpen(false);
   }
@@ -3519,6 +3523,21 @@ export default function Home() {
                 ))}
                 {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={() => openStudio("looks")}>CREAR UN LOOK →</button></div>}
               </div>
+              <WeeklyPlanView
+                weekDays={weekDays}
+                entries={weeklyPlan}
+                selectedDate={selectedPlanDate}
+                savedLooks={savedLooks}
+                garmentById={garmentById}
+                busy={planningWeek}
+                onSelectDate={setSelectedPlanDate}
+                onAssign={(date, lookId, occasion) => void assignLookToDate(date, lookId, occasion)}
+                onRemove={(date) => void removeLookFromDate(date)}
+                onToggleWorn={(entry) => void togglePlannedLookWorn(entry)}
+                onOpenLook={openSavedLook}
+                onAutoPlan={() => void autoPlanCurrentWeek()}
+                onCreateLook={createLookFromWeek}
+              />
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
@@ -3590,21 +3609,6 @@ export default function Home() {
                 onOpenGarment={(garment) => garment.collection === "forme" ? addAndOpenStudio(garment.id) : openGarmentEditor(garment)}
                 onGoToLooks={() => setWardrobePanel("looks")}
                 onGoToPieces={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}
-              />
-              <WeeklyPlanView
-                weekDays={weekDays}
-                entries={weeklyPlan}
-                selectedDate={selectedPlanDate}
-                savedLooks={savedLooks}
-                garmentById={garmentById}
-                busy={planningWeek}
-                onSelectDate={setSelectedPlanDate}
-                onAssign={(date, lookId, occasion) => void assignLookToDate(date, lookId, occasion)}
-                onRemove={(date) => void removeLookFromDate(date)}
-                onToggleWorn={(entry) => void togglePlannedLookWorn(entry)}
-                onOpenLook={openSavedLook}
-                onAutoPlan={() => void autoPlanCurrentWeek()}
-                onCreateLook={createLookFromWeek}
               />
             </section>
           ) : (
