@@ -97,6 +97,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /excludedSignatures/);
   assert.match(page, /recommendationHistory/);
   assert.match(page, /function saveStylingRecommendation/);
+  assert.match(page, /function generateLooksQuickly/);
+  assert.match(page, /GENERAR LOOKS →/);
   assert.match(page, /GUARDAR COMO LOOK/);
   assert.match(page, /type StyleFamilyId = "classic"/);
   assert.match(page, /function StyleOnboarding/);
@@ -145,6 +147,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /timeZone: "America\/Lima"/);
   assert.match(page, /timeZone: "UTC"/);
   assert.match(page, /PLANEAR SEMANA/);
+  assert.match(page, /REPLANTEAR SEMANA/);
+  assert.match(page, /fetch\("\/api\/week", \{\s*method: "POST"/);
   assert.match(page, /function createLookFromWeek\(\)[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /function centeredLookPreviewItems/);
   assert.match(page, /function createInstagramStoryBlob/);
@@ -183,6 +187,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /async function deleteOutfit/);
   assert.match(worker, /async function getWeeklyPlan/);
   assert.match(worker, /async function saveWeeklyPlanEntry/);
+  assert.match(worker, /async function saveWeeklyPlan/);
+  assert.match(worker, /request\.method === "POST"\) return saveWeeklyPlan/);
   assert.match(worker, /\/api\/week/);
   assert.match(worker, /accountProfileJson/);
   assert.match(worker, /async function getPublicProfile/);
@@ -210,6 +216,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.mix-canvas-navigator/);
   assert.match(css, /\.week-workspace/);
   assert.match(css, /\.week-strip-preview/);
+  assert.match(css, /\.saved-looks-heading-actions/);
   assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
 });

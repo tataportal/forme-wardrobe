@@ -550,7 +550,9 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .saved-looks-heading p,.saved-looks-heading h2,.saved-looks-heading span { margin:0; }
 .saved-looks-heading p { color:var(--muted); font-size:var(--type-kicker); letter-spacing:.16em; }
 .saved-looks-heading h2 { margin-top:5px; font:400 29px/1 Georgia,serif; letter-spacing:-.04em; }
-.saved-looks-heading > span { color:var(--muted); font-size:var(--type-kicker); letter-spacing:.12em; }
+.saved-looks-heading-actions { display:flex; align-items:center; gap:16px; }
+.saved-looks-heading-actions > span { color:var(--muted); font-size:var(--type-kicker); letter-spacing:.12em; white-space:nowrap; }
+.saved-looks-heading-actions > button { min-height:38px; padding:0 12px; border:0; border-radius:100px; background:var(--ink); color:var(--paper); font-size:var(--type-kicker); letter-spacing:.1em; cursor:pointer; }
 .saved-looks-grid { padding-top:16px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:26px 10px; }
 .saved-look-card { min-width:0; }
 .saved-look-open { width:100%; padding:0; border:0; background:transparent; text-align:left; cursor:pointer; position:relative; }
@@ -935,6 +937,10 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .wardrobe-tabs button { font-size:var(--type-kicker); letter-spacing:.075em; }
   .wardrobe-tab-actions { gap:6px; }
   .wardrobe-tab-actions button { min-height:38px; padding:0 8px; font-size:var(--type-kicker); letter-spacing:.075em; }
+  .saved-looks-heading { align-items:center; }
+  .saved-looks-heading-actions { gap:9px; }
+  .saved-looks-heading-actions > span { display:none; }
+  .saved-looks-heading-actions > button { min-height:38px; padding:0 11px; }
   .week-heading { min-height:0; flex-direction:column; align-items:stretch; gap:18px; }
   .week-heading-actions { width:100%; justify-content:space-between; }
   .week-auto-plan { min-height:34px; }

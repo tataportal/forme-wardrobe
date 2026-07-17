@@ -668,7 +668,7 @@ const layerBase = (category: Garment["category"]) => {
   return 5000;
 };
 const defaultPlacement = (garment: Garment) => {
-  if (garment.category === "Footwear") return { x: 50, y: 87, scale: 0.34 };
+  if (garment.category === "Footwear") return { x: 50, y: 86, scale: 0.34 };
   if (garment.category === "Accessories") {
     if (garment.id.includes("sunglasses")) return { x: 50, y: 17.5, scale: 0.14 };
     if (garment.id.includes("tote")) return { x: 74, y: 58, scale: 0.28 };
@@ -676,7 +676,7 @@ const defaultPlacement = (garment: Garment) => {
   }
   if (garment.category === "Bottoms") {
     const scale = garment.silhouette === "Oversized" ? 0.55 : garment.silhouette === "Relaxed" ? 0.57 : 0.59;
-    return { x: 50, y: 66.5, scale };
+    return { x: 50, y: 61.5, scale };
   }
   if (garment.category === "Tops") {
     const scale = garment.silhouette === "Oversized"
@@ -686,15 +686,15 @@ const defaultPlacement = (garment: Garment) => {
         : garment.silhouette === "Relaxed"
           ? 0.46
           : 0.48;
-    return { x: 50, y: garment.silhouette === "Longline" ? 34 : 31.5, scale };
+    return { x: 50, y: garment.silhouette === "Longline" ? 35.5 : 34, scale };
   }
   const outerPreset: Record<string, { y: number; scale: number }> = {
-    Cropped: { y: 30.5, scale: 0.56 },
-    Longline: { y: 38, scale: 0.46 },
-    Oversized: { y: 34, scale: 0.49 },
-    Draped: { y: 34.5, scale: 0.49 },
-    Relaxed: { y: 32.5, scale: 0.51 },
-    Regular: { y: 32, scale: 0.52 },
+    Cropped: { y: 32.75, scale: 0.56 },
+    Longline: { y: 39, scale: 0.46 },
+    Oversized: { y: 36.25, scale: 0.49 },
+    Draped: { y: 36.75, scale: 0.49 },
+    Relaxed: { y: 34.75, scale: 0.51 },
+    Regular: { y: 34.25, scale: 0.52 },
   };
   return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
 };
@@ -728,20 +728,33 @@ function recommendationTopPlacement(top: Garment, outer: Garment) {
 }
 
 function normalizedCanvasPiece(piece: CanvasPiece, garment?: Garment): CanvasPiece {
-  if (garment?.category !== "Bottoms" || piece.scale < 0.66) return piece;
-  return { ...piece, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
+  if (!garment) return piece;
+  let next = piece;
+  if (garment.category === "Bottoms" && piece.scale >= 0.66) {
+    next = { ...next, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
+  }
+  if (Math.abs(piece.rotation) > 0.01) return next;
+  if (garment.category === "Bottoms" && Math.abs(piece.y - 66.5) < 0.05) return { ...next, y: 61.5 };
+  if (garment.category === "Tops" && Math.abs(piece.y - 31.5) < 0.05) return { ...next, y: 34 };
+  if (garment.category === "Footwear" && Math.abs(piece.y - 87) < 0.05) return { ...next, y: 86 };
+  if (garment.category === "Outerwear" || garment.category === "Tailoring") {
+    const legacyY: Record<string, number> = { Cropped: 30.5, Longline: 38, Oversized: 34, Draped: 34.5, Relaxed: 32.5, Regular: 32 };
+    const oldY = legacyY[garment.silhouette] ?? legacyY.Regular;
+    if (Math.abs(piece.y - oldY) < 0.05) return { ...next, y: defaultPlacement(garment).y };
+  }
+  return next;
 }
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.59, rotation: 0, z: 1001 },
-  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
-  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 32.5, scale: 0.51, rotation: 0, z: 3001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 61.5, scale: 0.59, rotation: 0, z: 1001 },
+  { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 34.75, scale: 0.51, rotation: 0, z: 3001 },
 ];
 
 const initialDemoCanvas: CanvasPiece[] = [
-  { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 66.5, scale: 0.59, rotation: 0, z: 1001 },
-  { instanceId: "demo-top", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 31.5, scale: 0.48, rotation: 0, z: 2001 },
-  { instanceId: "demo-shoes", garmentId: "footwear-white-sneakers", variant: "closed", x: 50, y: 87, scale: 0.34, rotation: 0, z: 4001 },
+  { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 61.5, scale: 0.59, rotation: 0, z: 1001 },
+  { instanceId: "demo-top", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
+  { instanceId: "demo-shoes", garmentId: "footwear-white-sneakers", variant: "closed", x: 50, y: 86, scale: 0.34, rotation: 0, z: 4001 },
   { instanceId: "demo-glasses", garmentId: "accessory-black-sunglasses", variant: "closed", x: 50, y: 17.5, scale: 0.14, rotation: 0, z: 5001 },
   { instanceId: "demo-tote", garmentId: "accessory-black-tote", variant: "closed", x: 74, y: 58, scale: 0.28, rotation: 0, z: 5002 },
 ];
@@ -1495,7 +1508,7 @@ function WeeklyPlanView({
         <div><h2>Tu semana</h2><span>Deja listo qué vas a usar cada día.</span></div>
         <div className="week-heading-actions">
           <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
-          <button className="week-auto-plan" type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : plannedCount ? "REPLANEAR SEMANA ↻" : "PLANEAR SEMANA →"}</button>
+          <button className="week-auto-plan" type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : plannedCount ? "REPLANTEAR SEMANA ↻" : "PLANEAR SEMANA →"}</button>
         </div>
       </div>
 
@@ -3001,6 +3014,14 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     if (followup) answerAssistantFollowup(selectedAssistantPreset, followup);
   }
 
+  function generateLooksQuickly() {
+    const preset = assistantPresets.find((item) => item.id === "week");
+    const followup = preset?.options.find((item) => item.id === "week-mixed");
+    if (!preset || !followup) return;
+    answerAssistantFollowup(preset, followup);
+    navigateWardrobeRoute("asistente");
+  }
+
   function iterateCurrentLook() {
     const next = buildLookIterations(garments, canvasPieces);
     if (!next.length) {
@@ -3169,9 +3190,14 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       return;
     }
     const occasions: WeeklyOccasion[] = ["work", "work", "daily", "work", "dinner", "weekend", "weekend"];
+    const currentWeekKeys = new Set(weekDays.map((day) => day.key));
+    const hasPlannedWeek = weeklyPlan.some((entry) => currentWeekKeys.has(entry.date));
+    const currentFirstLookId = weeklyPlan.find((entry) => entry.date === weekDays[0]?.key)?.outfitId;
+    const currentFirstLookIndex = currentFirstLookId ? savedLooks.findIndex((look) => look.id === currentFirstLookId) : -1;
+    const rotationOffset = currentFirstLookIndex >= 0 ? (currentFirstLookIndex + 1) % savedLooks.length : 0;
     const nextWeek = weekDays.map((day, index) => ({
       date: day.key,
-      outfitId: savedLooks[index % savedLooks.length].id,
+      outfitId: savedLooks[(index + rotationOffset) % savedLooks.length].id,
       occasion: occasions[index],
       worn: false,
     }));
@@ -3179,13 +3205,12 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setWardrobeError("");
     try {
       if (!isStaticDemo && !demoMode) {
-        const responses = await Promise.all(nextWeek.map((entry) => fetch(`/api/week/${encodeURIComponent(entry.date)}`, {
-          method: "PUT",
+        const response = await fetch("/api/week", {
+          method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(entry),
-        })));
-        const failed = responses.find((response) => !response.ok);
-        if (failed) throw new Error((await failed.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo completar la semana.");
+          body: JSON.stringify({ entries: nextWeek }),
+        });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo completar la semana.");
       }
       setWeeklyPlan((entries) => {
         const weekKeys = new Set(weekDays.map((day) => day.key));
@@ -3193,6 +3218,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         persistDemoWeek(next);
         return next;
       });
+      setShareNotice(hasPlannedWeek ? "Semana replanteada." : "Tu semana quedó lista.");
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo completar la semana.");
     } finally {
@@ -3615,7 +3641,10 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
             <section className="looks-view">
               <div className="saved-looks-heading">
                 <div><h2>Looks</h2></div>
-                <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
+                <div className="saved-looks-heading-actions">
+                  <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
+                  <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
+                </div>
               </div>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">

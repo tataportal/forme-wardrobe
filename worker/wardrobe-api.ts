@@ -1589,6 +1589,50 @@ async function saveWeeklyPlanEntry(
   return json({ entry: { date: planDate, outfitId, occasion, worn } });
 }
 
+async function saveWeeklyPlan(request: Request, db: D1Database, ownerId: string): Promise<Response> {
+  const value = await request.json().catch(() => null) as { entries?: unknown } | null;
+  if (!value || !Array.isArray(value.entries) || value.entries.length === 0 || value.entries.length > 7) {
+    return apiError("La semana no es válida.", 400);
+  }
+  const allowedOccasions = new Set(["daily", "work", "dinner", "event", "weekend"]);
+  const dates = new Set<string>();
+  const entries: Array<{ date: string; outfitId: string; occasion: string; worn: boolean }> = [];
+  for (const raw of value.entries) {
+    if (!raw || typeof raw !== "object") return apiError("Uno de los días no es válido.", 400);
+    const item = raw as Record<string, unknown>;
+    const date = textValue(item.date);
+    const outfitId = safeClientId(textValue(item.outfitId));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || dates.has(date) || !outfitId) return apiError("Uno de los días no es válido.", 400);
+    dates.add(date);
+    const requestedOccasion = textValue(item.occasion, "daily").toLocaleLowerCase();
+    entries.push({
+      date,
+      outfitId,
+      occasion: allowedOccasions.has(requestedOccasion) ? requestedOccasion : "daily",
+      worn: booleanValue(item.worn),
+    });
+  }
+
+  const outfitIds = [...new Set(entries.map((entry) => entry.outfitId))];
+  const placeholders = outfitIds.map(() => "?").join(", ");
+  const existing = await db.prepare(`SELECT client_id FROM outfits WHERE owner_id = ? AND client_id IN (${placeholders})`)
+    .bind(ownerId, ...outfitIds)
+    .all<{ client_id: string }>();
+  const existingIds = new Set(existing.results.map((row) => row.client_id));
+  if (outfitIds.some((id) => !existingIds.has(id))) return apiError("Uno de los looks ya no está disponible.", 404);
+
+  await db.batch(entries.map((entry) => db.prepare(`
+    INSERT INTO weekly_plan_entries (id, owner_id, plan_date, outfit_client_id, occasion, worn)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(owner_id, plan_date) DO UPDATE SET
+      outfit_client_id = excluded.outfit_client_id,
+      occasion = excluded.occasion,
+      worn = excluded.worn,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(crypto.randomUUID(), ownerId, entry.date, entry.outfitId, entry.occasion, entry.worn ? 1 : 0)));
+  return json({ entries });
+}
+
 async function deleteWeeklyPlanEntry(db: D1Database, ownerId: string, planDate: string): Promise<Response> {
   await db.prepare("DELETE FROM weekly_plan_entries WHERE owner_id = ? AND plan_date = ?")
     .bind(ownerId, planDate)
@@ -1740,6 +1784,7 @@ export async function handleWardrobeApi(
     if (url.pathname === "/api/batches/status" && request.method === "GET") return reconcileGarmentBatches(env, ctx, db, identity);
     if (url.pathname === "/api/outfits" && request.method === "GET") return getOutfits(db, identity.id);
     if (url.pathname === "/api/week" && request.method === "GET") return getWeeklyPlan(db, identity.id);
+    if (url.pathname === "/api/week" && request.method === "POST") return saveWeeklyPlan(request, db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "GET") return getStyleProfile(db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "PUT") return saveStyleProfile(request, db, identity.id);
 
