@@ -3469,7 +3469,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           </div>
           {profilePane === "profile" && <div className="profile-drawer-stats">
             <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
-            <p><strong>{savedLooks.length}</strong><span>Looks guardados</span></p>
+            <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
             <p><strong>{weeklyPlan.length}</strong><span>Días planeados</span></p>
           </div>}
           {profilePane === "settings" && <section className="profile-style-summary">
@@ -3516,7 +3516,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
                 ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
               } : current)} /></label>
               <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR PRENDAS PUBLICADAS</strong><small>{personalGarments.filter((item) => item.isPublic).length} seleccionadas en tu closet.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} seleccionados en Looks guardados.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} seleccionados como públicos.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
               <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>APARECER EN BÚSQUEDAS</strong><small>Permite que otras personas te encuentren dentro de Formé.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
             </div>
             <div className="profile-public-url"><span>forme.gallery/{profileDraft.handle || "@tuusuario"}</span><small>Marca prendas y looks como públicos desde sus fichas.</small></div>
@@ -3552,7 +3552,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           {!demoMode && <section className="wardrobe-profile">
             <nav className="wardrobe-tabs" aria-label="Mi closet">
               <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => navigateWardrobeRoute("closet")}>Mi closet</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => navigateWardrobeRoute("looks")}>Looks guardados</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => navigateWardrobeRoute("looks")}>Looks</button>
               <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => navigateWardrobeRoute("asistente")}>Asistente</button>
             </nav>
             {wardrobePanel === "closet" && closetMode === "browse" && <div className="wardrobe-tab-actions">
@@ -3614,7 +3614,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
               <div className="saved-looks-heading">
-                <div><h2>Looks guardados</h2></div>
+                <div><h2>Looks</h2></div>
                 <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
               </div>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
@@ -3938,12 +3938,12 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
               </div>
             </aside>
 
-            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""} ${libraryOpen ? "concealed" : ""}`} onClick={() => setSavedLooksOpen((open) => { const next = !open; if (next) setLibraryOpen(false); return next; })} aria-expanded={savedLooksOpen} aria-label="Abrir looks guardados">
+            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""} ${libraryOpen ? "concealed" : ""}`} onClick={() => setSavedLooksOpen((open) => { const next = !open; if (next) setLibraryOpen(false); return next; })} aria-expanded={savedLooksOpen} aria-label="Abrir looks">
               <span>LOOKS</span><b>{savedLooksOpen ? "×" : String(savedLooks.length).padStart(2, "0")}</b>
             </button>
 
-            <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} aria-label="Looks guardados">
-              <div className="floating-panel-header"><span>LOOKS GUARDADOS / {String(savedLooks.length).padStart(2, "0")}</span><button onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks guardados">×</button></div>
+            <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} aria-label="Looks">
+              <div className="floating-panel-header"><span>LOOKS / {String(savedLooks.length).padStart(2, "0")}</span><button onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks">×</button></div>
               {savedLooks.length > 0
                 ? <div className="saved-look-panel-list">{savedLooks.map((look) => (
                   <button type="button" className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} onClick={() => openSavedLook(look)} key={look.id}>
