@@ -93,11 +93,11 @@ export default function PublicProfilePage() {
     else await navigator.clipboard.writeText(window.location.href).catch(() => null);
   }
 
-  if (loading) return <main className="public-profile-state"><a href="/">FORMÉ<span>®</span></a><p>ABRIENDO PERFIL…</p></main>;
-  if (!data) return <main className="public-profile-state"><a href="/">FORMÉ<span>®</span></a><h1>No encontramos este perfil.</h1><p>{error}</p><a className="public-profile-home" href="/">VOLVER A FORMÉ →</a></main>;
+  if (loading) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><p>ABRIENDO PERFIL…</p></main>;
+  if (!data) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><h1>No encontramos este perfil.</h1><p>{error}</p><a className="public-profile-home" href="/closet">VOLVER A FORMÉ →</a></main>;
 
   return <main className="public-profile-page">
-    <header className="public-profile-nav"><a href="/">FORMÉ<span>®</span></a><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
+    <header className="public-profile-nav"><a href="/closet">FORMÉ<span>®</span></a><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
     <section className="public-profile-hero">
       <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
       <div className="public-profile-copy">
@@ -126,6 +126,6 @@ export default function PublicProfilePage() {
     </section>}
 
     {data.outfits.length === 0 && data.garments.length === 0 && <section className="public-profile-empty"><p>Este perfil todavía no publicó prendas ni looks.</p></section>}
-    <footer className="public-profile-footer"><a href="/">CREA TU CLOSET EN FORMÉ →</a><span>Tu estilo, leído desde lo que ya tienes.</span></footer>
+    <footer className="public-profile-footer"><a href="/closet">CREA TU CLOSET EN FORMÉ →</a><span>Tu estilo, leído desde lo que ya tienes.</span></footer>
   </main>;
 }

@@ -131,15 +131,8 @@ type WardrobeProfile = {
 };
 type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
-type BillingCycle = "monthly" | "annual";
-type PricingPlan = {
-  id: "free" | "personal" | "club";
-  name: string;
-  monthlyPrice: number;
-  description: string;
-  features: string[];
-  recommended?: boolean;
-};
+export type WardrobeRoute = "closet" | "looks" | "perfil" | "ajustes" | "asistente";
+type ProfilePane = "profile" | "settings";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
 type UploadItem = {
   id: string;
@@ -259,31 +252,6 @@ const currentOutfitId = "current-look";
 const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
 const maxUploadBytes = 20 * 1024 * 1024;
-const annualDiscount = 0.1;
-const pricingPlans: PricingPlan[] = [
-  {
-    id: "free",
-    name: "Libre",
-    monthlyPrice: 0,
-    description: "Para conocer tu closet y empezar a combinar.",
-    features: ["Hasta 15 prendas", "5 looks guardados", "Canvas y básicos Formé", "Perfil compartible"],
-  },
-  {
-    id: "personal",
-    name: "Personal",
-    monthlyPrice: 5.99,
-    description: "Para vestir mejor con lo que ya tienes.",
-    features: ["Hasta 75 prendas", "15 prendas nuevas al mes", "Looks y planificación semanal", "Asistente según tu estilo y closet"],
-    recommended: true,
-  },
-  {
-    id: "club",
-    name: "Club",
-    monthlyPrice: 11.99,
-    description: "Para closets grandes y una lectura más profunda.",
-    features: ["Hasta 250 prendas", "40 prendas nuevas al mes", "3 reprocesos en calidad media", "Prioridad, análisis e insights avanzados"],
-  },
-];
 const uploadStatusLabels: Record<UploadStatus, string> = {
   ready: "LISTA",
   uploading: "SUBIENDO",
@@ -1830,11 +1798,13 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
   </div>;
 }
 
-export default function Home() {
+export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: WardrobeRoute }) {
+  const initialWardrobePanel: WardrobePanel = initialRoute === "looks" ? "looks" : initialRoute === "asistente" ? "assistant" : "closet";
+  const initialProfilePane: ProfilePane = initialRoute === "ajustes" ? "settings" : "profile";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [view, setView] = useState<View>("wardrobe");
-  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>("closet");
+  const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>(initialWardrobePanel);
   const [closetMode, setClosetMode] = useState<ClosetMode>("browse");
   const [studioLibraryFilter, setStudioLibraryFilter] = useState<StudioLibraryFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1871,9 +1841,8 @@ export default function Home() {
   const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [pricingOpen, setPricingOpen] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const [profileOpen, setProfileOpen] = useState(initialRoute === "perfil" || initialRoute === "ajustes");
+  const [profilePane] = useState<ProfilePane>(initialProfilePane);
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [assistantPresetId, setAssistantPresetId] = useState("");
@@ -2050,7 +2019,7 @@ export default function Home() {
         setWeeklyPlan(week.entries);
         setStyleProfile(loadedStyleProfile);
         setStyleOnboardingOpen(!loadedStyleProfile.completed);
-        setWardrobePanel("closet");
+        setWardrobePanel(initialWardrobePanel);
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
         const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
         if (savedLook?.items.length) {
@@ -2111,20 +2080,11 @@ export default function Home() {
     setProfileSaveError("");
     setProfileSaved(false);
     const closeProfileOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileOpen(false);
+      if (event.key === "Escape") window.location.assign("/closet");
     };
     window.addEventListener("keydown", closeProfileOnEscape);
     return () => window.removeEventListener("keydown", closeProfileOnEscape);
   }, [profileOpen]);
-
-  useEffect(() => {
-    if (!pricingOpen) return;
-    const closePricingOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPricingOpen(false);
-    };
-    window.addEventListener("keydown", closePricingOnEscape);
-    return () => window.removeEventListener("keydown", closePricingOnEscape);
-  }, [pricingOpen]);
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
@@ -3435,19 +3395,29 @@ export default function Home() {
         onClose={() => { setStyleOnboardingOpen(false); if (styleProfile?.completed) setProfileOpen(true); }}
         onSave={saveStyleCalibration}
       />}
-      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setProfileOpen(false)}>
+      {demoMode && sessionStatus === "guest" && (initialRoute === "perfil" || initialRoute === "ajustes") && <div className="profile-drawer-backdrop" role="presentation">
+        <aside className="profile-drawer account-gate" role="dialog" aria-modal="true" aria-label="Entrar a mi cuenta">
+          <header><span>{initialRoute === "perfil" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={() => window.location.assign("/closet")} aria-label="Cerrar">×</button></header>
+          <div><p>TU CUENTA</p><h2>Entra para abrir {initialRoute === "perfil" ? "tu perfil" : "tus ajustes"}.</h2><span>Tu closet, looks y preferencias viven en tu cuenta de Formé.</span><button type="button" onClick={beginGoogleSignIn}>ENTRAR CON GOOGLE →</button></div>
+        </aside>
+      </div>}
+      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => { setProfileOpen(false); window.location.assign("/closet"); }}>
         <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>MI PERFIL</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
+          <header><span>{profilePane === "profile" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={() => window.location.assign("/closet")} aria-label="Cerrar perfil">×</button></header>
+          <nav className="account-route-nav" aria-label="Cuenta">
+            <button className={profilePane === "profile" ? "active" : ""} type="button" onClick={() => window.location.assign("/perfil")}>PERFIL</button>
+            <button className={profilePane === "settings" ? "active" : ""} type="button" onClick={() => window.location.assign("/ajustes")}>AJUSTES</button>
+          </nav>
           <div className="profile-drawer-identity">
             <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
             <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
           </div>
-          <div className="profile-drawer-stats">
+          {profilePane === "profile" && <div className="profile-drawer-stats">
             <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
             <p><strong>{savedLooks.length}</strong><span>Looks guardados</span></p>
             <p><strong>{weeklyPlan.length}</strong><span>Días planeados</span></p>
-          </div>
-          <section className="profile-style-summary">
+          </div>}
+          {profilePane === "settings" && <section className="profile-style-summary">
             <p>TU ESTILO</p>
             <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(" · ") : "Todavía estamos conociéndote."}</h3>
             <span>{profileTopStyles.length
@@ -3472,8 +3442,8 @@ export default function Home() {
               <small>Controla cuánto se alejan las sugerencias de lo que ya usas.</small>
             </div>
             <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "REVISAR MI CALIBRACIÓN" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
-          </section>
-          {profileDraft && <section className="profile-social-settings">
+          </section>}
+          {profilePane === "profile" && profileDraft && <section className="profile-social-settings">
             <div className="profile-section-heading">
               <p>PERFIL PÚBLICO</p>
               <h3>Comparte solo lo que quieras.</h3>
@@ -3504,49 +3474,18 @@ export default function Home() {
           </section>}
         </aside>
       </div>}
-      {!demoMode && pricingOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setPricingOpen(false)}>
-        <aside className="pricing-drawer" role="dialog" aria-modal="true" aria-label="Planes de Formé" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>PLANES</span><button type="button" onClick={() => setPricingOpen(false)} aria-label="Cerrar planes">×</button></header>
-          <div className="pricing-intro">
-            <p>FORMÉ BETA</p>
-            <h2>Un plan para cada closet.</h2>
-            <span>Empieza gratis. Sube más prendas cuando Formé ya sea parte de tu rutina.</span>
-          </div>
-          <div className="pricing-cycle" aria-label="Frecuencia de pago">
-            <button type="button" className={billingCycle === "monthly" ? "active" : ""} onClick={() => setBillingCycle("monthly")}>MENSUAL</button>
-            <button type="button" className={billingCycle === "annual" ? "active" : ""} onClick={() => setBillingCycle("annual")}>ANUAL <b>−10%</b></button>
-          </div>
-          <div className="pricing-plan-list">
-            {pricingPlans.map((plan) => {
-              const annualTotal = plan.monthlyPrice * 12 * (1 - annualDiscount);
-              const displayedMonthlyPrice = billingCycle === "annual" ? annualTotal / 12 : plan.monthlyPrice;
-              return <article className={plan.recommended ? "recommended" : ""} key={plan.id}>
-                <div className="pricing-plan-heading">
-                  <div><p>{plan.recommended ? "RECOMENDADO" : plan.id === "free" ? "EMPIEZA AQUÍ" : "MÁS CAPACIDAD"}</p><h3>{plan.name}</h3></div>
-                  <div className="pricing-plan-price"><strong>${displayedMonthlyPrice.toFixed(plan.monthlyPrice === 0 ? 0 : 2)}</strong><span>/ mes</span></div>
-                </div>
-                <p className="pricing-plan-description">{plan.description}</p>
-                <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-                {billingCycle === "annual" && plan.monthlyPrice > 0 && <small>US${annualTotal.toFixed(2)} al año</small>}
-                <button type="button" disabled>{plan.id === "free" ? "INCLUIDO EN BETA" : "PRÓXIMAMENTE"}</button>
-              </article>;
-            })}
-          </div>
-          <p className="pricing-beta-note">Durante la beta no se harán cobros. Estos son los planes recomendados antes de activar pagos.</p>
-        </aside>
-      </div>}
       <header className="topbar">
         <div className="topbar-inner">
-          <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORMÉ<span>®</span></button>
+          <button className="wordmark" onClick={() => window.location.assign("/closet")} aria-label="Volver al closet">FORMÉ<span>®</span></button>
           <nav className="zone-nav" aria-label="Secciones principales">
-            <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}>Armario</button>
+            <button className={view === "wardrobe" ? "active" : ""} onClick={() => window.location.assign("/closet")}>Closet</button>
             <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
           </nav>
           {demoMode
             ? <button className="google-login" aria-label="Entrar con Google" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR"}</button>
             : <div className="topbar-account">
-              <button className="pricing-entry" type="button" onClick={() => { setProfileOpen(false); setPricingOpen(true); }}>PLANES</button>
-              <button className="avatar" onClick={() => { setPricingOpen(false); setProfileOpen(true); }} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
+              <button className="pricing-entry" type="button" onClick={() => window.location.assign("/pricing")}>PLANES</button>
+              <button className="avatar" onClick={() => window.location.assign("/perfil")} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
             </div>}
         </div>
       </header>
@@ -3555,9 +3494,9 @@ export default function Home() {
         <section className="content wardrobe-view">
           {!demoMode && <section className="wardrobe-profile">
             <nav className="wardrobe-tabs" aria-label="Mi closet">
-              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
-              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => setWardrobePanel("assistant")}>Asistente</button>
+              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => window.location.assign("/closet")}>Mi closet</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => window.location.assign("/looks")}>Looks guardados</button>
+              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => window.location.assign("/asistente")}>Asistente</button>
             </nav>
             {wardrobePanel === "closet" && closetMode === "browse" && <div className="wardrobe-tab-actions">
               <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
@@ -3578,6 +3517,7 @@ export default function Home() {
                       <button className="primary" type="button" onClick={openDemoCanvas}>PROBAR EL CANVAS <b>→</b></button>
                       <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
                     </div>
+                    <nav className="guest-public-links" aria-label="Conocer Formé"><a href="/about">QUÉ ES FORMÉ</a><a href="/pricing">PLANES</a></nav>
                   </div>
                   <button className="guest-welcome-preview" type="button" onClick={openDemoCanvas} aria-label="Probar este look en el canvas">
                     <LookPreview look={{ id: "guest-demo", name: "Demo Formé", items: initialDemoCanvas }} garmentById={garmentById} />
@@ -4039,9 +3979,13 @@ export default function Home() {
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => openWardrobe()}><span>▦</span>Armario</button>
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => view === "studio" ? openWardrobe() : window.location.assign("/closet")}><span>▦</span>Closet</button>
         <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}><span>◫</span>Canvas</button>
       </nav>
     </main>
   );
+}
+
+export default function Home() {
+  return <WardrobeApp />;
 }

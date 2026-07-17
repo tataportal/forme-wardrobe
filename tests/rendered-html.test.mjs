@@ -2,17 +2,31 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request(`http://localhost${pathname}`, { headers: { accept: "text/html" } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
 }
+
+test("keeps the main product areas on stable routes", async () => {
+  const routes = ["/about", "/closet", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
+  const responses = await Promise.all(routes.map((route) => render(route)));
+  for (const [index, response] of responses.entries()) {
+    assert.equal(response.status, 200, `${routes[index]} should render`);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  }
+
+  const about = await responses[0].text();
+  const pricing = await responses[3].text();
+  assert.match(about, /Nadie te enseña a leer tu propio closet/);
+  assert.match(pricing, /Un plan para cada closet/);
+});
 
 test("server-renders the FORMÉ wardrobe", async () => {
   const response = await render();
