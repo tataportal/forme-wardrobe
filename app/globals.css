@@ -1308,6 +1308,9 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .closet-v2-copy > span { color:var(--v2-signal); }
 .closet-v2-copy h1 { margin:15px 0 0; font:900 clamp(62px,7vw,112px)/.78 Arial,Helvetica,sans-serif; letter-spacing:-.085em; text-transform:uppercase; }
 .closet-v2-copy > p { max-width:380px; margin:28px 0 0; font-size:15px; line-height:1.45; }
+.closet-v2-entry { width:100%; margin-top:22px; display:flex; flex-wrap:wrap; gap:8px; }
+.closet-v2-entry button { min-height:38px; padding:0 13px; border:1px solid var(--v2-ink); border-radius:8px; background:transparent; color:var(--v2-ink); font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.08em; }
+.closet-v2-entry button:first-child { background:var(--v2-ink); color:var(--v2-panel); }
 .closet-v2-copy > a { margin-top:24px; padding:9px 0 7px; border-bottom:1px solid var(--v2-ink); color:var(--v2-ink); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; letter-spacing:.1em; text-decoration:none; }
 .closet-v2-metrics { width:100%; margin:38px 0 0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .closet-v2-metrics div { padding-top:11px; border-top:1px solid var(--v2-line); display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
@@ -1327,6 +1330,8 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 @keyframes closet-v2-scan { to { transform:translateY(325px); } }
 
 .closet-v2 .wardrobe-catalog { padding:0 0 60px; }
+.closet-v2 .closet-v2-hero + .guest-closet .guest-welcome { display:none; }
+.closet-v2 .closet-v2-hero + .guest-closet .guest-basics { margin-top:0; }
 .closet-v2 .filter-sidebar.open { padding:16px; border:1px solid var(--v2-line); border-radius:16px; background:rgba(238,240,237,.72); box-shadow:inset 0 1px rgba(255,255,255,.7); }
 .closet-v2 .filter-sidebar-header { border-color:var(--v2-line); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .closet-v2 .attribute-filters label,.closet-v2 .reset-filters { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }

@@ -3770,16 +3770,20 @@ export function WardrobeApp({
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              {isRetroCloset && !demoMode && <header className="closet-v2-hero">
+              {isRetroCloset && <header className="closet-v2-hero">
                 <div className="closet-v2-copy">
-                  <span>ARCHIVO PERSONAL / V2</span>
-                  <h1>Mi closet</h1>
-                  <p>Explora, filtra y combina las prendas que ya tienes.</p>
+                  <span>{demoMode ? "ARCHIVO ABIERTO / V2" : "ARCHIVO PERSONAL / V2"}</span>
+                  <h1>{demoMode ? "Closet V2" : "Mi closet"}</h1>
+                  <p>{demoMode ? "Prueba el vestidor con prendas Formé o entra para construir tu propio archivo." : "Explora, filtra y combina las prendas que ya tienes."}</p>
+                  {demoMode && <div className="closet-v2-entry">
+                    <button type="button" onClick={openDemoCanvas}>EXPLORAR CANVAS →</button>
+                    <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
+                  </div>}
                   <a href="/closet">ABRIR VERSIÓN CLÁSICA</a>
                   <dl className="closet-v2-metrics">
-                    <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
-                    <div><dt>Listas</dt><dd>{retroReadyCount}</dd></div>
-                    <div><dt>Favoritas</dt><dd>{retroFavoriteCount}</dd></div>
+                    <div><dt>Prendas</dt><dd>{demoMode ? sharedBasics.length : personalGarments.length}</dd></div>
+                    <div><dt>{demoMode ? "En demo" : "Listas"}</dt><dd>{demoMode ? sharedBasics.length : retroReadyCount}</dd></div>
+                    <div><dt>Favoritas</dt><dd>{demoMode ? 0 : retroFavoriteCount}</dd></div>
                   </dl>
                 </div>
                 <figure className="closet-v2-scanner" aria-label="Vista previa de prendas del closet">
