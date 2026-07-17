@@ -146,6 +146,17 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .profile-social-actions button:last-child.saved { border-color:var(--signal); background:var(--signal); }
 
 .profile-page { width:100%; max-width:1600px; margin:0 auto; padding:18px 16px 72px; }
+.profile-page-loading { min-height:calc(100dvh - 68px); }
+.profile-page-loading-hero { padding:28px 0 54px; display:grid; grid-template-columns:1fr; align-content:start; gap:28px; }
+.profile-page-loading-portrait { width:100%; height:clamp(260px,38dvh,340px); display:block; background:rgba(17,17,15,.08); }
+.profile-page-loading-copy { align-self:center; display:grid; gap:16px; }
+.profile-page-loading-copy > span,.profile-page-loading-copy > strong,.profile-page-loading-stats > span { display:block; background:rgba(17,17,15,.08); }
+.profile-page-loading-copy > span:first-child { width:90px; height:13px; }
+.profile-page-loading-copy > strong { width:min(100%,520px); height:78px; }
+.profile-page-loading-copy > span:nth-child(3) { width:min(82%,430px); height:20px; }
+.profile-page-loading-copy > span:last-child { width:min(70%,330px); height:42px; margin-top:8px; }
+.profile-page-loading-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.profile-page-loading-stats > span { height:58px; }
 .profile-page-hero { padding:28px 0 54px; display:grid; grid-template-columns:1fr; align-content:start; gap:28px; }
 .profile-page-portrait { width:100%; height:clamp(260px,38dvh,340px); margin:0; overflow:hidden; background:var(--canvas-greige); }
 .profile-page-portrait img { width:100%; height:100%; display:block; object-fit:cover; object-position:center 45%; }
@@ -1099,6 +1110,10 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .zone-nav button.active { background:var(--ink); color:var(--paper); }
   .content { padding:0 32px 70px; }
   .profile-page { padding:0 32px 110px; }
+  .profile-page-loading { min-height:calc(100dvh - 74px); }
+  .profile-page-loading-hero { padding:clamp(60px,8vh,104px) 2vw clamp(72px,10vh,120px); grid-template-columns:minmax(320px,.82fr) minmax(400px,1.12fr) minmax(210px,.48fr); align-items:center; gap:clamp(42px,5vw,92px); }
+  .profile-page-loading-portrait { width:min(100%,520px); height:auto; max-height:68dvh; aspect-ratio:4/5; }
+  .profile-page-loading-stats { grid-template-columns:1fr; gap:24px; }
   .profile-page-hero { padding:clamp(60px,8vh,104px) 2vw clamp(72px,10vh,120px); grid-template-columns:minmax(320px,.82fr) minmax(400px,1.12fr) minmax(210px,.48fr); align-items:center; gap:clamp(42px,5vw,92px); }
   .profile-page-portrait { width:min(100%,520px); height:auto; max-height:68dvh; aspect-ratio:4/5; justify-self:start; }
   .profile-page-intro h1 { font-size:clamp(72px,7vw,116px); }

@@ -1943,6 +1943,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const initialWardrobePanel: WardrobePanel = initialRoute === "looks" ? "looks" : initialRoute === "asistente" ? "assistant" : "closet";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
+  const [accountDataReady, setAccountDataReady] = useState(false);
   const [activeRoute, setActiveRoute] = useState<WardrobeRoute>(initialRoute);
   const [view, setView] = useState<View>("wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>(initialWardrobePanel);
@@ -2130,6 +2131,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           sessionAuthenticated = false;
           setDemoMode(true);
           setSessionStatus("guest");
+          setAccountDataReady(true);
           try {
             const storedLooks = localStorage.getItem(demoLooksStorageKey);
             setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
@@ -2184,6 +2186,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         setSavedLooks(normalizedLooks);
         setWeeklyPlan(week.entries);
         setStyleProfile(loadedStyleProfile);
+        setAccountDataReady(true);
         setStyleOnboardingOpen(!loadedStyleProfile.completed);
         setWardrobePanel(initialWardrobePanel);
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
@@ -2205,6 +2208,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         if (!active) return;
         setDemoMode(!sessionAuthenticated);
         setSessionStatus(sessionAuthenticated ? "authenticated" : "guest");
+        setAccountDataReady(true);
         setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
       });
       return () => { active = false; };
@@ -3659,7 +3663,15 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         </div>
       </header>
 
-      {view === "wardrobe" && activeRoute === "perfil" && !demoMode && profileDraft && <section className="profile-page">
+      {view === "wardrobe" && activeRoute === "perfil" && !demoMode && !accountDataReady && <section className="profile-page profile-page-loading" aria-label="Cargando perfil">
+        <div className="profile-page-loading-hero">
+          <span className="profile-page-loading-portrait" />
+          <div className="profile-page-loading-copy"><span /><strong /><span /><span /></div>
+          <div className="profile-page-loading-stats"><span /><span /><span /></div>
+        </div>
+      </section>}
+
+      {view === "wardrobe" && activeRoute === "perfil" && !demoMode && accountDataReady && profileDraft && <section className="profile-page">
         <header className="profile-page-hero">
           <figure className="profile-page-portrait">
             <img src={profileImage} alt={`Retrato de ${profileDraft.name}`} />
