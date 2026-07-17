@@ -178,6 +178,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /className="profile-page"/);
   assert.match(page, /profile-page-loading/);
   assert.match(page, /accountDataReady/);
+  assert.doesNotMatch(page, /Tu closet, tus looks y la forma en que eliges vestirte\./);
   assert.match(page, /Lo que Formé entiende de ti/);
   assert.match(page, /GUARDAR CAMBIOS/);
   assert.match(page, /activeRoute === "perfil"/);

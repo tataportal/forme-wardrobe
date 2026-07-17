@@ -3679,7 +3679,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           <div className="profile-page-intro">
             <span>{profileDraft.handle || "@tuusuario"}</span>
             <h1>{profileDraft.name || "Tu nombre"}</h1>
-            <p>{profileDraft.bio || "Tu closet, tus looks y la forma en que eliges vestirte."}</p>
+            {profileDraft.bio.trim() ? <p>{profileDraft.bio}</p> : null}
             <nav className="profile-page-links" aria-label="Acciones del perfil">
               {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PÁGINA PÚBLICA</button>}
               {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>COMPARTIR</button>}
