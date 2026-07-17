@@ -4209,7 +4209,7 @@ export function WardrobeApp({
               </div>
             </div>
 
-            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""} ${savedLooksOpen ? "concealed" : ""}`} onClick={() => setLibraryOpen((open) => { const next = !open; if (next) setSavedLooksOpen(false); return next; })} aria-expanded={libraryOpen} aria-label="Abrir panel de prendas">
+            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen} aria-label="Abrir panel de prendas">
               <span>PRENDAS</span><b>{libraryOpen ? "×" : "＋"}</b>
             </button>
 
@@ -4255,7 +4255,7 @@ export function WardrobeApp({
               </div>}
             </aside>
 
-            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""} ${libraryOpen ? "concealed" : ""}`} onClick={() => setSavedLooksOpen((open) => { const next = !open; if (next) setLibraryOpen(false); return next; })} aria-expanded={savedLooksOpen} aria-label="Abrir looks">
+            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""}`} onClick={() => setSavedLooksOpen((open) => !open)} aria-expanded={savedLooksOpen} aria-label="Abrir looks">
               <span>LOOKS</span><b>{savedLooksOpen ? "×" : String(savedLooks.length).padStart(2, "0")}</b>
             </button>
 
