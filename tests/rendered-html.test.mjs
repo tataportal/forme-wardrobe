@@ -202,6 +202,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function startTransformHandle/);
   assert.match(page, /className="transform-handle rotate-handle"/);
   assert.match(page, /className="transform-handle scale-handle"/);
+  assert.doesNotMatch(page, /className="canvas-tools"/);
+  assert.doesNotMatch(page, /ENVIAR ATRÁS/);
+  assert.doesNotMatch(page, /aria-label="Reducir prenda"/);
   assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
   assert.match(page, /savingOutfit \|\| \(saved && selectedGroupIds\.length === 0\)/);
   assert.match(page, /function startMarqueeSelection/);

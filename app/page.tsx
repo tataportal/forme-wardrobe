@@ -2072,8 +2072,6 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const studioPersonalGarments = personalGarments.filter(matchesStudioLibraryFilter);
   const studioBasicGarments = sharedBasics.filter(matchesStudioLibraryFilter);
   const studioGarments = [...studioPersonalGarments, ...studioBasicGarments];
-  const selectedPiece = canvasPieces.find((item) => item.instanceId === selectedId);
-  const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
   const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
   const activeLookIteration = activeIterationIndex >= 0 ? lookIterations[activeIterationIndex] : undefined;
   const canIterate = canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Tops")
@@ -3052,32 +3050,6 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setSaved(false);
   }
 
-  function updateSelected(patch: Partial<CanvasPiece>) {
-    if (!selectedId) return;
-    setCanvasPieces((items) => items.map((item) => item.instanceId === selectedId ? { ...item, ...patch } : item));
-    setSaved(false);
-  }
-
-  function scaleSelected(delta: number) {
-    if (!selectedPiece) return;
-    updateSelected({ scale: clamp(selectedPiece.scale + delta, 0.24, 1.15) });
-  }
-
-  function rotateSelected(delta: number) {
-    if (!selectedPiece) return;
-    updateSelected({ rotation: selectedPiece.rotation + delta });
-  }
-
-  function sendSelected(direction: "front" | "back") {
-    if (!selectedPiece || !selectedGarment) return;
-    const base = layerBase(selectedGarment.category);
-    const levels = canvasPieces.filter((item) => {
-      const garment = garmentById.get(item.garmentId);
-      return garment && layerBase(garment.category) === base;
-    }).map((item) => item.z);
-    updateSelected({ z: direction === "front" ? Math.max(base, ...levels) + 1 : Math.max(base, Math.min(...levels) - 1) });
-  }
-
   function removePiece(instanceId: string) {
     setCanvasPieces((items) => items.filter((item) => item.instanceId !== instanceId));
     setSelectedId((current) => current === instanceId ? "" : current);
@@ -3107,10 +3079,6 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setSelectedId(instanceIdCopy);
     setSelectedGroupIds([]);
     setSaved(false);
-  }
-
-  function removeSelected() {
-    if (selectedId) removePiece(selectedId);
   }
 
   function answerAssistantFollowup(preset: AssistantPreset, followup: AssistantFollowup) {
@@ -4083,22 +4051,6 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
                   ["accessories", "Accesorios"],
                 ] as [StudioLibraryFilter, string][]).map(([value, label]) => <button type="button" className={studioLibraryFilter === value ? "active" : ""} onClick={() => setStudioLibraryFilter(value)} key={value}>{label}</button>)}
               </div>
-              {selectedPiece && selectedGarment && <>
-                <div className="selected-readout">
-                  <p>PIEZA SELECCIONADA</p>
-                  <h3>{translateGarmentName(selectedGarment.name)}</h3>
-                  <small>{translateValue(selectedGarment.category)}</small>
-                  <button onClick={() => sendSelected("back")}>ENVIAR ATRÁS ↓</button>
-                </div>
-                <div className="canvas-tools" aria-label="Controles de la prenda seleccionada">
-                  <button onClick={() => scaleSelected(-0.06)} aria-label="Reducir prenda"><span>−</span><em>TAMAÑO</em></button>
-                  <button onClick={() => scaleSelected(0.06)} aria-label="Aumentar prenda"><span>＋</span><em>TAMAÑO</em></button>
-                  <button onClick={() => rotateSelected(-8)} aria-label="Girar a la izquierda"><span>↺</span><em>GIRAR</em></button>
-                  <button onClick={() => rotateSelected(8)} aria-label="Girar a la derecha"><span>↻</span><em>GIRAR</em></button>
-                  <button onClick={() => sendSelected("front")} aria-label="Traer al frente"><span>↑</span><em>FRENTE</em></button>
-                  <button onClick={removeSelected} className="remove-tool" aria-label="Quitar prenda"><span>×</span><em>QUITAR</em></button>
-                </div>
-              </>}
               <div className="sticker-tray-groups">
                 {!demoMode && <section className="sticker-tray-section">
                   <div className="tray-heading"><h3>MIS PRENDAS</h3><p>{studioPersonalGarments.length}</p></div>
