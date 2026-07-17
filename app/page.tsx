@@ -131,6 +131,15 @@ type WardrobeProfile = {
 };
 type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
+type BillingCycle = "monthly" | "annual";
+type PricingPlan = {
+  id: "free" | "personal" | "club";
+  name: string;
+  monthlyPrice: number;
+  description: string;
+  features: string[];
+  recommended?: boolean;
+};
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
 type UploadItem = {
   id: string;
@@ -250,6 +259,31 @@ const currentOutfitId = "current-look";
 const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
 const maxUploadBytes = 20 * 1024 * 1024;
+const annualDiscount = 0.1;
+const pricingPlans: PricingPlan[] = [
+  {
+    id: "free",
+    name: "Libre",
+    monthlyPrice: 0,
+    description: "Para conocer tu closet y empezar a combinar.",
+    features: ["Hasta 15 prendas", "5 looks guardados", "Canvas y básicos Formé", "Perfil compartible"],
+  },
+  {
+    id: "personal",
+    name: "Personal",
+    monthlyPrice: 5.99,
+    description: "Para vestir mejor con lo que ya tienes.",
+    features: ["Hasta 75 prendas", "15 prendas nuevas al mes", "Looks y planificación semanal", "Asistente según tu estilo y closet"],
+    recommended: true,
+  },
+  {
+    id: "club",
+    name: "Club",
+    monthlyPrice: 11.99,
+    description: "Para closets grandes y una lectura más profunda.",
+    features: ["Hasta 250 prendas", "40 prendas nuevas al mes", "3 reprocesos en calidad media", "Prioridad, análisis e insights avanzados"],
+  },
+];
 const uploadStatusLabels: Record<UploadStatus, string> = {
   ready: "LISTA",
   uploading: "SUBIENDO",
@@ -1838,6 +1872,8 @@ export default function Home() {
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [assistantPresetId, setAssistantPresetId] = useState("");
@@ -2080,6 +2116,15 @@ export default function Home() {
     window.addEventListener("keydown", closeProfileOnEscape);
     return () => window.removeEventListener("keydown", closeProfileOnEscape);
   }, [profileOpen]);
+
+  useEffect(() => {
+    if (!pricingOpen) return;
+    const closePricingOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPricingOpen(false);
+    };
+    window.addEventListener("keydown", closePricingOnEscape);
+    return () => window.removeEventListener("keydown", closePricingOnEscape);
+  }, [pricingOpen]);
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
@@ -3449,6 +3494,37 @@ export default function Home() {
           </section>}
         </aside>
       </div>}
+      {!demoMode && pricingOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setPricingOpen(false)}>
+        <aside className="pricing-drawer" role="dialog" aria-modal="true" aria-label="Planes de Formé" onPointerDown={(event) => event.stopPropagation()}>
+          <header><span>PLANES</span><button type="button" onClick={() => setPricingOpen(false)} aria-label="Cerrar planes">×</button></header>
+          <div className="pricing-intro">
+            <p>FORMÉ BETA</p>
+            <h2>Un plan para cada closet.</h2>
+            <span>Empieza gratis. Sube más prendas cuando Formé ya sea parte de tu rutina.</span>
+          </div>
+          <div className="pricing-cycle" aria-label="Frecuencia de pago">
+            <button type="button" className={billingCycle === "monthly" ? "active" : ""} onClick={() => setBillingCycle("monthly")}>MENSUAL</button>
+            <button type="button" className={billingCycle === "annual" ? "active" : ""} onClick={() => setBillingCycle("annual")}>ANUAL <b>−10%</b></button>
+          </div>
+          <div className="pricing-plan-list">
+            {pricingPlans.map((plan) => {
+              const annualTotal = plan.monthlyPrice * 12 * (1 - annualDiscount);
+              const displayedMonthlyPrice = billingCycle === "annual" ? annualTotal / 12 : plan.monthlyPrice;
+              return <article className={plan.recommended ? "recommended" : ""} key={plan.id}>
+                <div className="pricing-plan-heading">
+                  <div><p>{plan.recommended ? "RECOMENDADO" : plan.id === "free" ? "EMPIEZA AQUÍ" : "MÁS CAPACIDAD"}</p><h3>{plan.name}</h3></div>
+                  <div className="pricing-plan-price"><strong>${displayedMonthlyPrice.toFixed(plan.monthlyPrice === 0 ? 0 : 2)}</strong><span>/ mes</span></div>
+                </div>
+                <p className="pricing-plan-description">{plan.description}</p>
+                <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                {billingCycle === "annual" && plan.monthlyPrice > 0 && <small>US${annualTotal.toFixed(2)} al año</small>}
+                <button type="button" disabled>{plan.id === "free" ? "INCLUIDO EN BETA" : "PRÓXIMAMENTE"}</button>
+              </article>;
+            })}
+          </div>
+          <p className="pricing-beta-note">Durante la beta no se harán cobros. Estos son los planes recomendados antes de activar pagos.</p>
+        </aside>
+      </div>}
       <header className="topbar">
         <div className="topbar-inner">
           <button className="wordmark" onClick={() => openWardrobe()} aria-label="Volver al armario">FORMÉ<span>®</span></button>
@@ -3458,7 +3534,10 @@ export default function Home() {
           </nav>
           {demoMode
             ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR CON GOOGLE"}</button>
-            : <button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
+            : <div className="topbar-account">
+              <button className="pricing-entry" type="button" onClick={() => { setProfileOpen(false); setPricingOpen(true); }}>PLANES</button>
+              <button className="avatar" onClick={() => { setPricingOpen(false); setProfileOpen(true); }} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
+            </div>}
         </div>
       </header>
 
