@@ -707,9 +707,11 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 @media (min-width:760px) {
   .canvas-piece.selected { cursor:move; }
   .canvas-selection-box { display:block; position:absolute; inset:0; z-index:10; border:var(--piece-outline-width) solid var(--signal); pointer-events:none; }
-  .transform-handle { position:absolute; z-index:12; width:var(--piece-handle-size); height:var(--piece-handle-size); padding:0; border:var(--piece-outline-width) solid var(--ink); border-radius:50%; background:var(--panel); display:grid; place-items:center; color:var(--ink); font:var(--piece-handle-font)/1 Arial,sans-serif; touch-action:none; user-select:none; box-shadow:0 3px 10px rgba(17,17,15,.16); }
-  .rotate-handle { left:50%; top:var(--piece-rotate-top); transform:translateX(-50%); cursor:grab; }
-  .rotate-handle::after { content:""; position:absolute; left:50%; top:100%; width:var(--piece-outline-width); height:var(--piece-rotate-line); background:var(--signal); transform:translateX(-50%); pointer-events:none; }
+  .transform-handle { position:absolute; z-index:12; width:var(--piece-handle-size); height:var(--piece-handle-size); padding:0; border:var(--piece-outline-width) solid var(--ink); border-radius:50%; background:var(--panel); display:grid; place-items:center; color:var(--ink); touch-action:none; user-select:none; box-shadow:0 3px 10px rgba(17,17,15,.16); }
+  .transform-handle svg { width:var(--piece-handle-icon); height:var(--piece-handle-icon); overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .duplicate-handle { left:var(--piece-handle-half); top:var(--piece-handle-half); cursor:copy; }
+  .delete-handle { right:var(--piece-handle-half); top:var(--piece-handle-half); cursor:pointer; }
+  .rotate-handle { left:var(--piece-handle-half); bottom:var(--piece-handle-half); cursor:grab; }
   .scale-handle { right:var(--piece-handle-half); bottom:var(--piece-handle-half); cursor:nwse-resize; }
   .transform-handle:active { background:var(--signal); color:var(--paper); cursor:grabbing; }
   .style-onboarding-header { height:68px; min-height:68px; padding:0 28px; grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr); }

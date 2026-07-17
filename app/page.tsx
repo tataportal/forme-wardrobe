@@ -2641,6 +2641,29 @@ export default function Home() {
     setSaved(false);
   }
 
+  function duplicatePiece(instanceId: string) {
+    const source = canvasPieces.find((item) => item.instanceId === instanceId);
+    if (!source) return;
+    const instanceIdCopy = crypto.randomUUID();
+    setCanvasPieces((items) => {
+      const garment = garmentById.get(source.garmentId);
+      const base = garment ? layerBase(garment.category) : source.z;
+      const top = Math.max(base, ...items.filter((item) => {
+        const itemGarment = garmentById.get(item.garmentId);
+        return garment && itemGarment && layerBase(itemGarment.category) === base;
+      }).map((item) => item.z)) + 1;
+      return [...items, {
+        ...source,
+        instanceId: instanceIdCopy,
+        x: clamp(source.x + 4, 4, 96),
+        y: clamp(source.y + 4, 4, 96),
+        z: top,
+      }];
+    });
+    setSelectedId(instanceIdCopy);
+    setSaved(false);
+  }
+
   function removeSelected() {
     if (selectedId) removePiece(selectedId);
   }
@@ -3352,11 +3375,9 @@ export default function Home() {
                       zIndex: piece.z,
                       transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       "--piece-outline-width": `${1.5 / safeScale}px`,
-                      "--piece-handle-size": `${30 / safeScale}px`,
-                      "--piece-handle-font": `${14 / safeScale}px`,
-                      "--piece-handle-half": `${-15 / safeScale}px`,
-                      "--piece-rotate-top": `${-48 / safeScale}px`,
-                      "--piece-rotate-line": `${33 / safeScale}px`,
+                      "--piece-handle-size": `${38 / safeScale}px`,
+                      "--piece-handle-icon": `${17 / safeScale}px`,
+                      "--piece-handle-half": `${-19 / safeScale}px`,
                       ...(expandedHitbox ? { "--piece-hitbox-inset": `-${24 / Math.max(piece.scale, 0.08)}px` } : {}),
                     } as CSSProperties;
                     return (
@@ -3374,13 +3395,29 @@ export default function Home() {
                           <span className="canvas-selection-box" aria-hidden="true" />
                           <button
                             type="button"
+                            className="transform-handle duplicate-handle"
+                            aria-label={`Duplicar ${translateGarmentName(garment.name)}`}
+                            title="Duplicar"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => { event.stopPropagation(); duplicatePiece(piece.instanceId); }}
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1" /><path d="M16 8V5H5v11h3" /></svg></button>
+                          <button
+                            type="button"
+                            className="transform-handle delete-handle"
+                            aria-label={`Borrar ${translateGarmentName(garment.name)}`}
+                            title="Borrar"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => { event.stopPropagation(); removePiece(piece.instanceId); }}
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M8 10v7M12 10v7M16 10v7M7 7l1 14h8l1-14" /></svg></button>
+                          <button
+                            type="button"
                             className="transform-handle rotate-handle"
                             aria-label={`Rotar ${translateGarmentName(garment.name)}`}
                             onPointerDown={(event) => startTransformHandle(event, piece.instanceId, "rotate")}
                             onPointerMove={moveTransformHandle}
                             onPointerUp={stopTransformHandle}
                             onPointerCancel={stopTransformHandle}
-                          >↻</button>
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V3M5 3h5M5.5 3.5A9 9 0 1 1 3 13" /><path d="m3 13-2-2m2 2 2-2" /></svg></button>
                           <button
                             type="button"
                             className="transform-handle scale-handle"
@@ -3389,7 +3426,7 @@ export default function Home() {
                             onPointerMove={moveTransformHandle}
                             onPointerUp={stopTransformHandle}
                             onPointerCancel={stopTransformHandle}
-                          >↘</button>
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M10 7h7v7M14 17H7v-7" /></svg></button>
                         </>}
                       </div>
                     );
