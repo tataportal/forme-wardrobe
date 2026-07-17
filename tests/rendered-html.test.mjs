@@ -43,7 +43,9 @@ test("server-renders the FORMÉ wardrobe", async () => {
   assert.match(html, /<title>FORMÉ — Tu armario visual<\/title>/i);
   assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
   assert.match(html, /Vístete con lo que ya tienes/);
-  assert.match(html, /PROBAR EL CANVAS/);
+  assert.match(html, /CLOSET DIGITAL · ASISTENTE DE ESTILO/);
+  assert.match(html, /EXPLORAR EL VESTIDOR/);
+  assert.match(html, /ENTRAR Y SUBIR PRENDAS/);
   assert.match(html, /Juega con básicos Formé/);
   assert.match(html, /class="topbar-inner"/);
   assert.doesNotMatch(html, /＋ Agregar/);
@@ -240,6 +242,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.week-workspace/);
   assert.match(css, /\.week-strip-preview/);
   assert.match(css, /\.saved-looks-heading-actions/);
+  assert.match(css, /\.guest-entry-choices/);
+  assert.doesNotMatch(page, /guest-welcome-flow/);
   assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
   assert.match(css, /padding:52px 16px calc\(150px \+ env\(safe-area-inset-bottom\)\)/);

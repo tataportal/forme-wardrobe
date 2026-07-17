@@ -3752,24 +3752,20 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
               {demoMode ? <div className="guest-closet">
                 <section className="guest-welcome">
                   <div className="guest-welcome-copy">
-                    <p>UN CLOSET QUE TE CONOCE</p>
+                    <p>CLOSET DIGITAL · ASISTENTE DE ESTILO</p>
                     <h1>Vístete con lo que ya tienes.</h1>
-                    <span>Fotografía tus prendas. Formé las limpia y organiza para que puedas combinar, guardar looks y entender mejor tu estilo.</span>
-                    <div className="guest-welcome-actions">
-                      <button className="primary" type="button" onClick={openDemoCanvas}>PROBAR EL CANVAS <b>→</b></button>
-                      <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
+                    <span className="guest-welcome-summary">Formé digitaliza tus prendas para que puedas combinarlas, guardar looks y recibir recomendaciones según tu estilo.</span>
+                    <small className="guest-choice-label">¿QUÉ QUIERES HACER?</small>
+                    <div className="guest-entry-choices">
+                      <button className="primary" type="button" onClick={openDemoCanvas}><span><strong>EXPLORAR EL VESTIDOR</strong><small>Prueba con prendas Formé, sin crear una cuenta.</small></span><b>→</b></button>
+                      <button type="button" onClick={beginGoogleSignIn}><span><strong>ENTRAR Y SUBIR PRENDAS</strong><small>Crea tu closet con tus propias fotos.</small></span><b>→</b></button>
                     </div>
                     <nav className="guest-public-links" aria-label="Conocer Formé"><a href="/about">QUÉ ES FORMÉ</a><a href="/pricing">PLANES</a></nav>
                   </div>
                   <button className="guest-welcome-preview" type="button" onClick={openDemoCanvas} aria-label="Probar este look en el canvas">
                     <LookPreview look={{ id: "guest-demo", name: "Demo Formé", items: initialDemoCanvas }} garmentById={garmentById} />
-                    <span>DEMO · MUEVE CADA PIEZA ↗</span>
+                    <span>VESTIDOR DE PRUEBA · MUEVE CADA PIEZA ↗</span>
                   </button>
-                  <div className="guest-welcome-flow" aria-label="Cómo funciona Formé">
-                    <p><b>01</b><span><strong>Fotografía</strong> tus prendas como estén.</span></p>
-                    <p><b>02</b><span><strong>Combina</strong> piezas como cutouts.</span></p>
-                    <p><b>03</b><span><strong>Afina</strong> recomendaciones con lo que eliges.</span></p>
-                  </div>
                 </section>
                 <section className="guest-basics forme-group">
                   <div className="guest-basics-heading">
