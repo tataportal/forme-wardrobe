@@ -4110,16 +4110,9 @@ export function WardrobeApp({
                   <div className={`snapshot-frame ${selectedGroupIds.length ? "selection-active" : ""}`} ref={snapshotFrameRef} aria-hidden="true">
                     <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ÁREA DEL LOOK"}</span>
                   </div>
-                  {canvasPieces.length > 0 && <>
-                    <p className="look-date">{activeLookName.toLocaleUpperCase()}</p>
-                    <span className="canvas-hint desktop-hint">ARRASTRA PARA SELECCIONAR VARIAS PRENDAS</span>
-                    <span className="canvas-hint mobile-hint">TOCA UNA PRENDA PARA EDITARLA</span>
-                  </>}
                   {canvasPieces.length === 0 && <div className="empty-canvas">
-                    <span>NUEVO LOOK</span>
                     <h2>Empieza con una prenda.</h2>
                     <p>Elige algo de tu closet y construye desde ahí.</p>
-                    {!libraryOpen && <button type="button" onClick={() => setLibraryOpen(true)}>ABRIR PRENDAS →</button>}
                   </div>}
                   {marqueeRect && <span className="canvas-marquee" aria-hidden="true" style={{ left: marqueeRect.left, top: marqueeRect.top, width: marqueeRect.width, height: marqueeRect.height }} />}
                   {canvasPieces.map((piece) => {
