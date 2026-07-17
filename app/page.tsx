@@ -1939,7 +1939,14 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
   </div>;
 }
 
-export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: WardrobeRoute }) {
+export function WardrobeApp({
+  initialRoute = "closet",
+  closetVariant = "classic",
+}: {
+  initialRoute?: WardrobeRoute;
+  closetVariant?: "classic" | "retro";
+}) {
+  const isRetroCloset = closetVariant === "retro";
   const initialWardrobePanel: WardrobePanel = initialRoute === "looks" ? "looks" : initialRoute === "asistente" ? "assistant" : "closet";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
@@ -2050,6 +2057,9 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   );
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
+  const retroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
+  const retroReadyCount = personalGarments.filter((item) => item.status === "ready" || item.status === "ghosted").length;
+  const retroFavoriteCount = personalGarments.filter((item) => item.favorite).length;
   const insightGarments = demoMode ? sharedBasics : personalGarments;
   const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
   const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
@@ -2230,7 +2240,8 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
 
   useEffect(() => {
     const syncRouteFromHistory = () => {
-      const route = window.location.pathname.replace(/^\//, "") as WardrobeRoute;
+      const routePath = window.location.pathname.replace(/^\//, "");
+      const route = (routePath === "closet-v2" ? "closet" : routePath) as WardrobeRoute;
       if (["closet", "looks", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
     };
     window.addEventListener("popstate", syncRouteFromHistory);
@@ -2547,7 +2558,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       if (!profileOpen) profileReturnRoute.current = routeForPanel(wardrobePanel);
     }
     applyWardrobeRoute(route);
-    const nextPath = `/${route}`;
+    const nextPath = route === "closet" && isRetroCloset ? "/closet-v2" : `/${route}`;
     if (window.location.pathname !== nextPath) window.history.pushState({ formeRoute: route }, "", nextPath);
   }
 
@@ -3596,7 +3607,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   }
 
   return (
-    <main className={`site-shell view-${view}`}>
+    <main className={`site-shell view-${view}${isRetroCloset ? " closet-v2" : ""}`}>
       {!demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -3759,6 +3770,29 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
+              {isRetroCloset && !demoMode && <header className="closet-v2-hero">
+                <div className="closet-v2-copy">
+                  <span>ARCHIVO PERSONAL / V2</span>
+                  <h1>Mi closet</h1>
+                  <p>Explora, filtra y combina las prendas que ya tienes.</p>
+                  <a href="/closet">ABRIR VERSIÓN CLÁSICA</a>
+                  <dl className="closet-v2-metrics">
+                    <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
+                    <div><dt>Listas</dt><dd>{retroReadyCount}</dd></div>
+                    <div><dt>Favoritas</dt><dd>{retroFavoriteCount}</dd></div>
+                  </dl>
+                </div>
+                <figure className="closet-v2-scanner" aria-label="Vista previa de prendas del closet">
+                  <figcaption><span>VISTA DE ARCHIVO</span><strong>{retroPreviewGarments.length} EN FOCO</strong></figcaption>
+                  <div className="closet-v2-specimens">
+                    {retroPreviewGarments.map((item, index) => <div key={item.id} style={{ "--slot": index } as CSSProperties}>
+                      <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} />
+                      <span>{translateValue(item.category)}</span>
+                    </div>)}
+                  </div>
+                  <i aria-hidden="true" />
+                </figure>
+              </header>}
               {demoMode ? <div className="guest-closet">
                 <section className="guest-welcome">
                   <div className="guest-welcome-copy">

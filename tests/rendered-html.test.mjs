@@ -15,7 +15,7 @@ async function render(pathname = "/") {
 }
 
 test("keeps the main product areas on stable routes", async () => {
-  const routes = ["/about", "/closet", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
+  const routes = ["/about", "/closet", "/closet-v2", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
   const responses = await Promise.all(routes.map((route) => render(route)));
   for (const [index, response] of responses.entries()) {
     assert.equal(response.status, 200, `${routes[index]} should render`);
@@ -23,7 +23,7 @@ test("keeps the main product areas on stable routes", async () => {
   }
 
   const about = await responses[0].text();
-  const pricing = await responses[3].text();
+  const pricing = await responses[4].text();
   assert.match(about, /Nadie te enseña a leer tu propio closet/);
   assert.match(pricing, /Un plan para cada closet/);
 
@@ -201,6 +201,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /className="wardrobe-tab-actions"/);
+  assert.match(page, /closetVariant = "classic"/);
+  assert.match(page, /className="closet-v2-hero"/);
+  assert.match(page, /ARCHIVO PERSONAL \/ V2/);
+  assert.match(page, /routePath === "closet-v2"/);
   assert.match(page, /function autocompleteOptions/);
   assert.match(page, /const brandOptions = useMemo/);
   assert.match(page, /forme-brand-options/);
@@ -242,6 +246,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(worker, /unique\.size !== 0 && unique\.size !== styleFamilies\.size/);
   assert.match(css, /\.saved-looks-grid/);
+  assert.match(css, /\.closet-v2 \.closet-v2-hero/);
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.profile-style-summary/);
   assert.match(css, /\.profile-page-hero/);
