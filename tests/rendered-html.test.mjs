@@ -26,6 +26,12 @@ test("keeps the main product areas on stable routes", async () => {
   const pricing = await responses[3].text();
   assert.match(about, /Nadie te enseña a leer tu propio closet/);
   assert.match(pricing, /Un plan para cada closet/);
+
+  const pricingSource = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
+  assert.match(pricingSource, /name: "Club", monthlyPrice: 12\.99/);
+  assert.match(pricingSource, /El plan anual se cobra completo una vez al año/);
+  assert.match(pricingSource, /Cobro único de US\$\{annualTotal\.toFixed\(2\)\} por todo el año/);
 });
 
 test("server-renders the FORMÉ wardrobe", async () => {

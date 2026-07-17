@@ -188,6 +188,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .pricing-cycle button.active { background:var(--ink); color:var(--paper); }
 .pricing-cycle b { color:var(--signal); font-weight:500; }
 .pricing-cycle button.active b { color:#ff7967; }
+.pricing-cycle-note { margin:-8px 0 18px; color:var(--muted); font-size:var(--type-meta); line-height:1.4; }
 .pricing-plan-list { display:grid; gap:9px; }
 .pricing-plan-list article { padding:19px; border-radius:16px; background:rgba(255,255,255,.48); }
 .pricing-plan-list article.recommended { background:#171714; color:var(--paper); }
