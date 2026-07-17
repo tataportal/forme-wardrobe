@@ -1979,7 +1979,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
 
 export function WardrobeApp({
   initialRoute = "closet",
-  closetVariant = "classic",
+  closetVariant = "retro",
 }: {
   initialRoute?: WardrobeRoute;
   closetVariant?: "classic" | "retro";
@@ -2603,7 +2603,7 @@ export function WardrobeApp({
       if (!profileOpen) profileReturnRoute.current = routeForPanel(wardrobePanel);
     }
     applyWardrobeRoute(route);
-    const nextPath = route === "closet" && isRetroCloset ? "/closet-v2" : `/${route}`;
+    const nextPath = `/${route}`;
     if (window.location.pathname !== nextPath) window.history.pushState({ formeRoute: route }, "", nextPath);
   }
 
@@ -3819,14 +3819,13 @@ export function WardrobeApp({
             <section className="pieces-section">
               {isRetroCloset && <header className="closet-v2-hero">
                 <div className="closet-v2-copy">
-                  <span>{demoMode ? "ARCHIVO ABIERTO / V2" : "ARCHIVO PERSONAL / V2"}</span>
-                  <h1>{demoMode ? "Closet V2" : "Mi closet"}</h1>
+                  <span>{demoMode ? "ARCHIVO ABIERTO" : "ARCHIVO PERSONAL"}</span>
+                  <h1>{demoMode ? "Closet" : "Mi closet"}</h1>
                   <p>{demoMode ? "Prueba el vestidor con prendas Formé o entra para construir tu propio archivo." : "Explora, filtra y combina las prendas que ya tienes."}</p>
                   {demoMode && <div className="closet-v2-entry">
                     <button type="button" onClick={openDemoCanvas}>EXPLORAR CANVAS →</button>
                     <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
                   </div>}
-                  <a href="/closet">ABRIR VERSIÓN CLÁSICA</a>
                   <dl className="closet-v2-metrics">
                     <div><dt>Prendas</dt><dd>{demoMode ? sharedBasics.length : personalGarments.length}</dd></div>
                     <div><dt>{demoMode ? "En demo" : "Listas"}</dt><dd>{demoMode ? sharedBasics.length : retroReadyCount}</dd></div>

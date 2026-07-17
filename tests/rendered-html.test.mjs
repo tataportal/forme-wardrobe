@@ -27,8 +27,13 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(about, /Nadie te enseña a leer tu propio closet/);
   assert.match(pricing, /Un plan para cada closet/);
 
-  const pricingSource = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
-  const publicProfileSource = await readFile(new URL("../app/[handle]/page.tsx", import.meta.url), "utf8");
+  const [pricingSource, publicProfileSource, closetSource, looksSource, profileSource] = await Promise.all([
+    readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/[handle]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/closet/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/looks/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/perfil/page.tsx", import.meta.url), "utf8"),
+  ]);
   assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
   assert.match(pricingSource, /name: "Club", monthlyPrice: 12\.99/);
   assert.match(pricingSource, /El plan anual se cobra completo una vez al año/);
@@ -36,6 +41,9 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /Este perfil todavía no comparte prendas ni looks\./);
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
+  assert.match(closetSource, /closetVariant="retro"/);
+  assert.match(looksSource, /closetVariant="retro"/);
+  assert.match(profileSource, /closetVariant="retro"/);
 });
 
 test("server-renders the FORMÉ wardrobe", async () => {
@@ -201,9 +209,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /className="wardrobe-tab-actions"/);
-  assert.match(page, /closetVariant = "classic"/);
+  assert.match(page, /closetVariant = "retro"/);
   assert.match(page, /className="closet-v2-hero"/);
-  assert.match(page, /ARCHIVO PERSONAL \/ V2/);
+  assert.match(page, /ARCHIVO PERSONAL/);
+  assert.doesNotMatch(page, /ABRIR VERSIÓN CLÁSICA/);
   assert.match(page, /routePath === "closet-v2"/);
   assert.match(page, /function autocompleteOptions/);
   assert.match(page, /garmentTypesByCategory/);

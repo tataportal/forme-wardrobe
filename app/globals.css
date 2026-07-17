@@ -1311,7 +1311,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .closet-v2-entry { width:100%; margin-top:22px; display:flex; flex-wrap:wrap; gap:8px; }
 .closet-v2-entry button { min-height:38px; padding:0 13px; border:1px solid var(--v2-ink); border-radius:8px; background:transparent; color:var(--v2-ink); font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.08em; }
 .closet-v2-entry button:first-child { background:var(--v2-ink); color:var(--v2-panel); }
-.closet-v2-copy > a { margin-top:24px; padding:9px 0 7px; border-bottom:1px solid var(--v2-ink); color:var(--v2-ink); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; letter-spacing:.1em; text-decoration:none; }
 .closet-v2-metrics { width:100%; margin:38px 0 0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .closet-v2-metrics div { padding-top:11px; border-top:1px solid var(--v2-line); display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .closet-v2-metrics dt { color:rgba(13,15,14,.58); }
