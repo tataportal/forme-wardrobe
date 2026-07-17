@@ -132,7 +132,6 @@ type WardrobeProfile = {
 type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
 export type WardrobeRoute = "closet" | "looks" | "perfil" | "ajustes" | "asistente";
-type ProfilePane = "profile" | "settings";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
 type UploadItem = {
   id: string;
@@ -1942,7 +1941,6 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
 
 export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: WardrobeRoute }) {
   const initialWardrobePanel: WardrobePanel = initialRoute === "looks" ? "looks" : initialRoute === "asistente" ? "assistant" : "closet";
-  const initialProfilePane: ProfilePane = initialRoute === "ajustes" ? "settings" : "profile";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [activeRoute, setActiveRoute] = useState<WardrobeRoute>(initialRoute);
@@ -1985,7 +1983,6 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(initialRoute === "perfil" || initialRoute === "ajustes");
-  const [profilePane, setProfilePane] = useState<ProfilePane>(initialProfilePane);
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [assistantPresetId, setAssistantPresetId] = useState("");
@@ -2529,7 +2526,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   function applyWardrobeRoute(route: WardrobeRoute) {
     setActiveRoute(route);
     if (route === "perfil" || route === "ajustes") {
-      setProfilePane(route === "ajustes" ? "settings" : "profile");
+      if (route === "perfil") setView("wardrobe");
       setProfileOpen(true);
       return;
     }
@@ -3609,25 +3606,16 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           <div><p>TU CUENTA</p><h2>Entra para abrir {activeRoute === "perfil" ? "tu perfil" : "tus ajustes"}.</h2><span>Tu closet, looks y preferencias viven en tu cuenta de Formé.</span><button type="button" onClick={beginGoogleSignIn}>ENTRAR CON GOOGLE →</button></div>
         </aside>
       </div>}
-      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={closeProfileRoute}>
-        <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>{profilePane === "profile" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar perfil">×</button></header>
-          <nav className="account-route-nav" aria-label="Cuenta">
-            <button className={profilePane === "profile" ? "active" : ""} type="button" onClick={() => navigateWardrobeRoute("perfil")}>PERFIL</button>
-            <button className={profilePane === "settings" ? "active" : ""} type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTES</button>
-          </nav>
+      {!demoMode && profileOpen && activeRoute === "ajustes" && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={closeProfileRoute}>
+        <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Ajustes" onPointerDown={(event) => event.stopPropagation()}>
+          <header><span>AJUSTES</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar ajustes">×</button></header>
           <div className="profile-drawer-identity">
             <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
             <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
           </div>
-          {profilePane === "profile" && <div className="profile-drawer-stats">
-            <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
-            <p><strong>{savedLooks.length}</strong><span>Looks</span></p>
-            <p><strong>{weeklyPlan.length}</strong><span>Días planeados</span></p>
-          </div>}
-          {profilePane === "settings" && <section className="profile-style-summary">
+          <section className="profile-style-summary">
             <p>TU ESTILO</p>
-            <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(" · ") : "Todavía estamos conociéndote."}</h3>
+            <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(", ") : "Todavía estamos conociéndote."}</h3>
             <span>{profileTopStyles.length
               ? "Estas son las direcciones que más aparecen en tus recomendaciones."
               : "Elige lo que te representa para recibir recomendaciones más tuyas."}</span>
@@ -3650,36 +3638,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
               <small>Controla cuánto se alejan las sugerencias de lo que ya usas.</small>
             </div>
             <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "REVISAR MI CALIBRACIÓN" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
-          </section>}
-          {profilePane === "profile" && profileDraft && <section className="profile-social-settings">
-            <div className="profile-section-heading">
-              <p>PERFIL PÚBLICO</p>
-              <h3>Comparte solo lo que quieras.</h3>
-              <span>Tu closet sigue siendo privado hasta que tú elijas qué mostrar.</span>
-            </div>
-            <div className="profile-public-fields">
-              <label>NOMBRE PÚBLICO<input value={profileDraft.name} maxLength={60} onChange={(event) => updateProfileDraft("name", event.target.value)} /></label>
-              <label>USUARIO<div className="profile-handle-input"><span>@</span><input value={profileDraft.handle.replace(/^@/, "")} maxLength={30} autoCapitalize="none" spellCheck={false} onChange={(event) => updateProfileDraft("handle", `@${event.target.value.replace(/^@/, "")}`)} /></div></label>
-              <label className="profile-bio-field">BIO<textarea value={profileDraft.bio} maxLength={160} rows={3} placeholder="Una línea sobre tu estilo, tu closet o lo que estás buscando." onChange={(event) => updateProfileDraft("bio", event.target.value)} /></label>
-            </div>
-            <div className="profile-privacy-list">
-              <label><span><strong>PERFIL PÚBLICO</strong><small>Crea una página compartible en Formé.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => setProfileDraft((current) => current ? {
-                ...current,
-                profilePublic: event.target.checked,
-                ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
-              } : current)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR PRENDAS PUBLICADAS</strong><small>{personalGarments.filter((item) => item.isPublic).length} seleccionadas en tu closet.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} seleccionados como públicos.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>APARECER EN BÚSQUEDAS</strong><small>Permite que otras personas te encuentren dentro de Formé.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
-            </div>
-            <div className="profile-public-url"><span>forme.gallery/{profileDraft.handle || "@tuusuario"}</span><small>Marca prendas y looks como públicos desde sus fichas.</small></div>
-            {profileSaveError && <p className="profile-save-error" role="alert">{profileSaveError}</p>}
-            <div className="profile-social-actions">
-              <button type="button" disabled={!profile.profilePublic} onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PERFIL</button>
-              <button type="button" disabled={!profile.profilePublic} onClick={() => void sharePublicProfile()}>COMPARTIR</button>
-              <button className={profileSaved ? "saved" : ""} type="button" disabled={savingProfile} onClick={() => void saveAccountSettings()}>{savingProfile ? "GUARDANDO…" : profileSaved ? "GUARDADO ✓" : "GUARDAR PERFIL"}</button>
-            </div>
-          </section>}
+          </section>
         </aside>
       </div>}
       <header className="topbar">
@@ -3700,7 +3659,78 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         </div>
       </header>
 
-      {view === "wardrobe" && (
+      {view === "wardrobe" && activeRoute === "perfil" && !demoMode && profileDraft && <section className="profile-page">
+        <header className="profile-page-hero">
+          <figure className="profile-page-portrait">
+            <img src={profileImage} alt={`Retrato de ${profileDraft.name}`} />
+          </figure>
+          <div className="profile-page-intro">
+            <span>{profileDraft.handle || "@tuusuario"}</span>
+            <h1>{profileDraft.name || "Tu nombre"}</h1>
+            <p>{profileDraft.bio || "Tu closet, tus looks y la forma en que eliges vestirte."}</p>
+            <nav className="profile-page-links" aria-label="Acciones del perfil">
+              {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PÁGINA PÚBLICA</button>}
+              {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>COMPARTIR</button>}
+              <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTAR ESTILO</button>
+            </nav>
+          </div>
+          <dl className="profile-page-stats">
+            <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
+            <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
+            <div><dt>Días planeados</dt><dd>{weeklyPlan.length}</dd></div>
+          </dl>
+        </header>
+
+        <div className="profile-page-body">
+          <section className="profile-page-editor" aria-labelledby="profile-editor-title">
+            <header>
+              <h2 id="profile-editor-title">Cómo apareces</h2>
+              <p>Decide qué nombre, historia y partes de tu closet quieres compartir.</p>
+            </header>
+            <div className="profile-page-fields">
+              <label>NOMBRE PÚBLICO<input value={profileDraft.name} maxLength={60} onChange={(event) => updateProfileDraft("name", event.target.value)} /></label>
+              <label>USUARIO<div className="profile-handle-input"><span>@</span><input value={profileDraft.handle.replace(/^@/, "")} maxLength={30} autoCapitalize="none" spellCheck={false} onChange={(event) => updateProfileDraft("handle", `@${event.target.value.replace(/^@/, "")}`)} /></div></label>
+              <label className="profile-page-bio">BIO<textarea value={profileDraft.bio} maxLength={160} rows={3} placeholder="Cuéntanos algo sobre tu estilo o tu closet." onChange={(event) => updateProfileDraft("bio", event.target.value)} /></label>
+            </div>
+
+            <div className="profile-page-visibility">
+              <h3>Qué compartes</h3>
+              <label><span><strong>PERFIL PÚBLICO</strong><small>Crea una página que puedas enviar a otras personas.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => setProfileDraft((current) => current ? {
+                ...current,
+                profilePublic: event.target.checked,
+                ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
+              } : current)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>PRENDAS PUBLICADAS</strong><small>{personalGarments.filter((item) => item.isPublic).length} prendas elegidas desde tu closet.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} looks elegidos como públicos.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>APARECER EN BÚSQUEDAS</strong><small>Permite que otras personas te encuentren dentro de Formé.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
+            </div>
+
+            <div className="profile-page-save-row">
+              <div><span>TU PÁGINA</span><strong>forme.gallery/{profileDraft.handle || "@tuusuario"}</strong></div>
+              <button className={profileSaved ? "saved" : ""} type="button" disabled={savingProfile} onClick={() => void saveAccountSettings()}>{savingProfile ? "GUARDANDO…" : profileSaved ? "CAMBIOS GUARDADOS" : "GUARDAR CAMBIOS"}</button>
+            </div>
+            {profileSaveError && <p className="profile-save-error" role="alert">{profileSaveError}</p>}
+          </section>
+
+          <aside className="profile-page-reading" aria-labelledby="profile-reading-title">
+            <header>
+              <h2 id="profile-reading-title">Lo que Formé entiende de ti</h2>
+              <p>Esta lectura cambia con los looks que guardas, descartas y usas.</p>
+            </header>
+            {profileTopStyles.length > 0 ? <ol>
+              {profileTopStyles.map((family) => <li key={family.id}><span>{family.label}</span><strong>{family.rating?.affinity}%</strong></li>)}
+            </ol> : <p className="profile-page-reading-empty">Todavía no tenemos suficiente información sobre tu estilo.</p>}
+            <div className="profile-page-exploration">
+              <span>GANAS DE EXPERIMENTAR</span>
+              <strong>{styleProfile?.exploration ?? 35}%</strong>
+              <p>{(styleProfile?.exploration ?? 35) >= 70 ? "Quieres ver opciones que se alejen de lo habitual." : (styleProfile?.exploration ?? 35) >= 40 ? "Buscas equilibrio entre lo conocido y algo nuevo." : "Prefieres variaciones cercanas a lo que ya funciona."}</p>
+            </div>
+            <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTAR PREFERENCIAS</button>
+          </aside>
+        </div>
+      </section>}
+
+      {view === "wardrobe" && activeRoute !== "perfil" && (
         <section className="content wardrobe-view">
           {!demoMode && <section className="wardrobe-profile">
             <nav className="wardrobe-tabs" aria-label="Mi closet">

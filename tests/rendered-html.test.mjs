@@ -175,6 +175,10 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /COMPARTIR ↗/);
   assert.match(page, /Instagram Stories/);
   assert.match(page, /profile-drawer/);
+  assert.match(page, /className="profile-page"/);
+  assert.match(page, /Lo que Formé entiende de ti/);
+  assert.match(page, /GUARDAR CAMBIOS/);
+  assert.match(page, /activeRoute === "perfil"/);
   assert.match(page, /REVISAR MI CALIBRACIÓN/);
   assert.match(page, /CUÁNTO QUIERES EXPERIMENTAR/);
   assert.match(page, /type="range"/);
@@ -233,7 +237,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.saved-looks-grid/);
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.profile-style-summary/);
-  assert.match(css, /\.profile-social-settings/);
+  assert.match(css, /\.profile-page-hero/);
+  assert.match(css, /\.profile-page-body/);
+  assert.match(css, /\.profile-page-reading/);
   assert.match(css, /\.public-profile-page/);
   assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
   assert.match(css, /\.canvas-selection-box/);
