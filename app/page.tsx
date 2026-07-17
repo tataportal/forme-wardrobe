@@ -341,7 +341,7 @@ const styleFamilyMeta: Array<{ id: StyleFamilyId; label: string; description: st
   { id: "utility", label: "Utilitario", description: "Bolsillos, capas funcionales y materiales resistentes con una intención práctica.", file: "08-utilitario.webp" },
   { id: "romantic", label: "Romántico", description: "Texturas suaves, curvas y detalles delicados que aportan ligereza o contraste.", file: "09-romantico.webp" },
   { id: "bohemian", label: "Bohemio", description: "Capas sueltas, textura y mezcla de materiales con una lectura más orgánica.", file: "10-bohemio.webp" },
-  { id: "rebel", label: "Rebelde", description: "Cuero, oscuridad y piezas con actitud que rompen la pulcritud del conjunto.", file: "11-rebelde.webp" },
+  { id: "rebel", label: "Rebelde", description: "Cuero, oscuridad y piezas con actitud que rompen una composición demasiado pulcra.", file: "11-rebelde.webp" },
   { id: "avant_garde", label: "Vanguardista", description: "Proporciones inesperadas y prendas protagonistas que exploran otra silueta.", file: "12-vanguardista.webp" },
 ];
 const styleFeedbackLabels: Record<StyleFeedbackReason, string> = {
@@ -3483,7 +3483,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     const savingSelection = selectedGroupIds.length > 0 && typeof window !== "undefined" && window.innerWidth >= 760;
     const outfitId = savingSelection ? `look-${crypto.randomUUID()}` : activeOutfitId ?? `look-${crypto.randomUUID()}`;
     const fallbackName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
-    const lookName = savingSelection || activeLookName === "Nuevo look" || activeLookName === "Conjunto actual" ? fallbackName : activeLookName;
+    const lookName = savingSelection || activeLookName === "Nuevo look" || !activeLookName.trim() ? fallbackName : activeLookName;
     setSavingOutfit(true);
     setWardrobeError("");
     try {
@@ -3493,7 +3493,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ name: lookName, items: itemsToSave }),
         });
-        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el conjunto.");
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el look.");
       }
       const nextLook: SavedLook = { id: outfitId, name: lookName, items: itemsToSave.map((item) => ({ ...item })) };
       setSavedLooks((looks) => {
@@ -3511,7 +3511,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         setSaved(true);
       }
     } catch (error) {
-      setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el conjunto.");
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el look.");
     } finally {
       setSavingOutfit(false);
     }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 const title = "FORMÉ — Tu armario visual";
-const description = "Organiza tus prendas y crea conjuntos en un canvas visual.";
+const description = "Organiza tus prendas, crea looks y recibe recomendaciones de estilo.";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://forme.gallery";
 
 export const metadata: Metadata = {

@@ -216,6 +216,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /currentSnapshotItems/);
   assert.doesNotMatch(page, /Math\.random/);
   assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
+  assert.doesNotMatch(page, /conjunto/i);
+  assert.doesNotMatch(worker, /conjunto/i);
+  assert.match(worker, /INSERT INTO outfit_items[\s\S]*?\.bind\(\s*crypto\.randomUUID\(\)/);
   assert.match(worker, /async function deleteOutfit/);
   assert.match(worker, /async function getWeeklyPlan/);
   assert.match(worker, /async function saveWeeklyPlanEntry/);

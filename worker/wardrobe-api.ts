@@ -1318,8 +1318,8 @@ async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
 
 async function saveOutfit(request: Request, db: D1Database, ownerId: string, outfitId: string): Promise<Response> {
   const value = await request.json().catch(() => null) as { name?: unknown; items?: unknown; isPublic?: unknown } | null;
-  if (!value || !Array.isArray(value.items) || value.items.length > 30) return apiError("El conjunto no es válido.", 400);
-  const name = textValue(value.name, "Conjunto sin nombre") || "Conjunto sin nombre";
+  if (!value || !Array.isArray(value.items) || value.items.length > 30) return apiError("El look no es válido.", 400);
+  const name = textValue(value.name, "Look sin nombre") || "Look sin nombre";
   const items: Array<{
     instanceId: string;
     garmentId: string;
@@ -1331,11 +1331,11 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
     z: number;
   }> = [];
   for (const raw of value.items) {
-    if (!raw || typeof raw !== "object") return apiError("Una prenda del conjunto no es válida.", 400);
+    if (!raw || typeof raw !== "object") return apiError("Una prenda del look no es válida.", 400);
     const item = raw as Record<string, unknown>;
     const instanceId = safeClientId(textValue(item.instanceId)) ?? crypto.randomUUID();
     const garmentId = safeClientId(textValue(item.garmentId));
-    if (!garmentId) return apiError("Una prenda del conjunto no es válida.", 400);
+    if (!garmentId) return apiError("Una prenda del look no es válida.", 400);
     items.push({
       instanceId,
       garmentId,
@@ -1367,7 +1367,7 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM outfits WHERE id = ? AND owner_id = ?)
     `).bind(
-      item.instanceId,
+      crypto.randomUUID(),
       serverId,
       item.garmentId,
       item.variant,

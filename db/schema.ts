@@ -92,7 +92,7 @@ export const outfits = sqliteTable("outfits", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: text("client_id").notNull(),
-  name: text("name").notNull().default("Conjunto sin nombre"),
+  name: text("name").notNull().default("Look sin nombre"),
   isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
