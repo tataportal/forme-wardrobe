@@ -702,6 +702,12 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .wardrobe-tabs button { font-size:7.5px; letter-spacing:.075em; }
   .wardrobe-tab-actions { gap:6px; }
   .wardrobe-tab-actions button { min-height:38px; padding:0 8px; font-size:7.5px; letter-spacing:.075em; }
+  .canvas-piece.selected .canvas-selection-box { display:block; position:absolute; inset:0; z-index:10; border:var(--piece-outline-width) solid var(--signal); pointer-events:none; }
+  .canvas-piece.selected .duplicate-handle,.canvas-piece.selected .delete-handle { position:absolute; z-index:12; width:var(--piece-handle-size); height:var(--piece-handle-size); padding:0; border:var(--piece-outline-width) solid var(--ink); border-radius:50%; background:var(--panel); display:grid; place-items:center; color:var(--ink); touch-action:manipulation; user-select:none; box-shadow:0 3px 10px rgba(17,17,15,.16); }
+  .canvas-piece.selected .transform-handle svg { width:var(--piece-handle-icon); height:var(--piece-handle-icon); overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .canvas-piece.selected .duplicate-handle { left:var(--piece-handle-half); top:var(--piece-handle-half); }
+  .canvas-piece.selected .delete-handle { right:var(--piece-handle-half); top:var(--piece-handle-half); }
+  .canvas-piece.selected .duplicate-handle:active,.canvas-piece.selected .delete-handle:active { background:var(--signal); color:var(--paper); }
 }
 
 @media (min-width:760px) {

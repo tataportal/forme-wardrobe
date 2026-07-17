@@ -46,7 +46,6 @@ type PointerTrack = {
   x: number;
   y: number;
   moved: boolean;
-  wasSelected: boolean;
   startedAt: number;
 };
 
@@ -2459,7 +2458,6 @@ export default function Home() {
       x: event.clientX,
       y: event.clientY,
       moved: false,
-      wasSelected: selectedId === instanceId,
       startedAt: event.timeStamp,
     };
     const otherPointer = Array.from(pointerTracks.current.entries()).find(([, pointer]) => pointer.instanceId === instanceId);
@@ -2547,8 +2545,6 @@ export default function Home() {
       const garment = piece ? garmentById.get(piece.garmentId) : undefined;
       if (held && garment?.openImage) {
         toggleVariant(track.instanceId);
-      } else if (track.wasSelected) {
-        removePiece(track.instanceId);
       }
     }
   }
@@ -3375,9 +3371,9 @@ export default function Home() {
                       zIndex: piece.z,
                       transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       "--piece-outline-width": `${1.5 / safeScale}px`,
-                      "--piece-handle-size": `${38 / safeScale}px`,
-                      "--piece-handle-icon": `${17 / safeScale}px`,
-                      "--piece-handle-half": `${-19 / safeScale}px`,
+                      "--piece-handle-size": `${44 / safeScale}px`,
+                      "--piece-handle-icon": `${18 / safeScale}px`,
+                      "--piece-handle-half": `${-22 / safeScale}px`,
                       ...(expandedHitbox ? { "--piece-hitbox-inset": `-${24 / Math.max(piece.scale, 0.08)}px` } : {}),
                     } as CSSProperties;
                     return (
