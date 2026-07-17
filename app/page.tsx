@@ -1450,11 +1450,16 @@ function centeredLookPreviewItems(look: SavedLook, garmentById: Map<string, Garm
   });
   if (!items.length) return items;
 
+  // Frame the outfit from its dressed silhouette. Hats, glasses and bags can sit
+  // outside that silhouette, but they should not make the whole thumbnail shrink.
+  const coreItems = items.filter(({ garment }) => garment.category !== "Accessories");
+  const framingItems = coreItems.length ? coreItems : items;
+
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const { piece } of items) {
+  for (const { piece } of framingItems) {
     const radians = piece.rotation * Math.PI / 180;
     const cosine = Math.abs(Math.cos(radians));
     const sine = Math.abs(Math.sin(radians));
