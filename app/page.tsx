@@ -2376,6 +2376,16 @@ export default function Home() {
     setView("studio");
   }
 
+  function openDemoCanvas() {
+    setCanvasPieces(initialDemoCanvas);
+    setActiveOutfitId(null);
+    setActiveLookName("Demo Formé");
+    setSelectedId("");
+    setSelectedGroupIds([]);
+    setSaved(false);
+    openStudio("closet");
+  }
+
   async function finalizeCutoutVariant(item: ApiGarment, outputVariant: "closed" | "open"): Promise<ApiGarment> {
     const source = outputVariant === "open" ? item.generatedOpenImage : item.generatedImage;
     if (!source) return item;
@@ -3533,7 +3543,7 @@ export default function Home() {
             <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
           </nav>
           {demoMode
-            ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR CON GOOGLE"}</button>
+            ? <button className="google-login" aria-label="Entrar con Google" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR"}</button>
             : <div className="topbar-account">
               <button className="pricing-entry" type="button" onClick={() => { setProfileOpen(false); setPricingOpen(true); }}>PLANES</button>
               <button className="avatar" onClick={() => { setPricingOpen(false); setProfileOpen(true); }} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
@@ -3543,7 +3553,7 @@ export default function Home() {
 
       {view === "wardrobe" && (
         <section className="content wardrobe-view">
-          <section className="wardrobe-profile">
+          {!demoMode && <section className="wardrobe-profile">
             <nav className="wardrobe-tabs" aria-label="Mi closet">
               <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}>Mi closet</button>
               <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => setWardrobePanel("looks")}>Looks guardados</button>
@@ -3553,12 +3563,40 @@ export default function Home() {
               <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
               <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
             </div>}
-          </section>
+          </section>}
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
+              {demoMode ? <div className="guest-closet">
+                <section className="guest-welcome">
+                  <div className="guest-welcome-copy">
+                    <p>UN CLOSET QUE TE CONOCE</p>
+                    <h1>Vístete con lo que ya tienes.</h1>
+                    <span>Fotografía tus prendas. Formé las limpia y organiza para que puedas combinar, guardar looks y entender mejor tu estilo.</span>
+                    <div className="guest-welcome-actions">
+                      <button className="primary" type="button" onClick={openDemoCanvas}>PROBAR EL CANVAS <b>→</b></button>
+                      <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
+                    </div>
+                  </div>
+                  <button className="guest-welcome-preview" type="button" onClick={openDemoCanvas} aria-label="Probar este look en el canvas">
+                    <LookPreview look={{ id: "guest-demo", name: "Demo Formé", items: initialDemoCanvas }} garmentById={garmentById} />
+                    <span>DEMO · MUEVE CADA PIEZA ↗</span>
+                  </button>
+                  <div className="guest-welcome-flow" aria-label="Cómo funciona Formé">
+                    <p><b>01</b><span><strong>Fotografía</strong> tus prendas como estén.</span></p>
+                    <p><b>02</b><span><strong>Combina</strong> piezas como cutouts.</span></p>
+                    <p><b>03</b><span><strong>Afina</strong> recomendaciones con lo que eliges.</span></p>
+                  </div>
+                </section>
+                <section className="guest-basics forme-group">
+                  <div className="guest-basics-heading">
+                    <div><p>DEMO ABIERTO</p><h2>Juega con básicos Formé.</h2><span>Prueba 16 prendas en el canvas sin crear una cuenta.</span></div>
+                    <button type="button" onClick={openDemoCanvas}>ABRIR DEMO →</button>
+                  </div>
+                  <ClosetGarmentGrid garments={sharedBasics} emptyLabel="" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
+                </section>
+              </div> : <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
                 <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
                   <div className="filter-sidebar-header"><strong>Filtros</strong><button onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></div>
                   <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
@@ -3567,14 +3605,14 @@ export default function Home() {
                   <section className="closet-group personal-group">
                     {personalGarments.length > 0
                       ? <ClosetGarmentGrid garments={visiblePersonalGarments} emptyLabel="NO HAY PRENDAS CON ESTOS FILTROS" onOpen={openGarmentEditor} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
-                      : <div className="closet-empty-personal"><p>{demoMode ? "Entra para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "ENTRAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
+                      : <div className="closet-empty-personal"><p>Tu closet todavía está vacío.</p><button type="button" onClick={() => setClosetMode("upload")}>AGREGAR PRIMERA PRENDA →</button></div>}
                   </section>
                   <section className="closet-group forme-group">
                     <div className="closet-group-heading"><div><h3>Básicos Formé</h3></div><span>{sharedBasics.length}</span></div>
                     <ClosetGarmentGrid garments={visibleFormeBasics} emptyLabel="NO HAY BÁSICOS CON ESTOS FILTROS" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
                   </section>
                 </div>
-              </div>
+              </div>}
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">

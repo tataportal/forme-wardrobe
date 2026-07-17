@@ -22,12 +22,12 @@ test("server-renders the FORMÉ wardrobe", async () => {
   const html = await response.text();
   assert.match(html, /<title>FORMÉ — Tu armario visual<\/title>/i);
   assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
-  assert.match(html, />Mi closet</);
-  assert.match(html, />Looks guardados</);
-  assert.match(html, />Asistente</);
+  assert.match(html, /Vístete con lo que ya tienes/);
+  assert.match(html, /PROBAR EL CANVAS/);
+  assert.match(html, /Juega con básicos Formé/);
   assert.match(html, /class="topbar-inner"/);
-  assert.match(html, /＋ Agregar/);
-  assert.match(html, /ENTRAR CON GOOGLE|ENTRANDO…/);
+  assert.doesNotMatch(html, /＋ Agregar/);
+  assert.match(html, /aria-label="Entrar con Google"/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 
@@ -46,7 +46,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function beginGoogleSignIn/);
   assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
   assert.doesNotMatch(page, /signin-with-chatgpt/);
-  assert.match(page, /ENTRAR CON GOOGLE/);
+  assert.match(page, /aria-label="Entrar con Google"/);
   assert.match(auth, /AUTHORIZATION_ENDPOINT/);
   assert.match(auth, /TOKEN_ENDPOINT/);
   assert.match(auth, /USERINFO_ENDPOINT/);
