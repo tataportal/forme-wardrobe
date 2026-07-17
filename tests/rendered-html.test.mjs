@@ -139,6 +139,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function openSavedLook[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /wardrobePanel === "looks"[\s\S]*?<WeeklyPlanView[\s\S]*?wardrobePanel === "assistant"/);
   assert.match(page, /className="week-strip-preview"/);
+  assert.match(page, /timeZone: "America\/Lima"/);
+  assert.match(page, /timeZone: "UTC"/);
   assert.match(page, /PLANEAR SEMANA/);
   assert.match(page, /function createLookFromWeek\(\)[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /function centeredLookPreviewItems/);

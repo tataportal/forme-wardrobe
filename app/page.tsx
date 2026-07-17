@@ -1150,27 +1150,35 @@ function buildLookIterations(garments: Garment[], current: CanvasPiece[]): LookI
   });
 }
 
-function localDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+function utcDateKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function buildWeekDays(anchor: Date): WeekDay[] {
-  const today = localDateKey(anchor);
-  const monday = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
-  const weekday = monday.getDay() || 7;
-  monday.setDate(monday.getDate() - weekday + 1);
+  const limaParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(anchor);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(limaParts.find((item) => item.type === type)?.value ?? 0);
+  const limaToday = new Date(Date.UTC(part("year"), part("month") - 1, part("day"), 12));
+  const today = utcDateKey(limaToday);
+  const monday = new Date(limaToday);
+  const weekday = monday.getUTCDay() || 7;
+  monday.setUTCDate(monday.getUTCDate() - weekday + 1);
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(monday);
-    date.setDate(monday.getDate() + index);
+    date.setUTCDate(monday.getUTCDate() + index);
     return {
-      key: localDateKey(date),
-      shortLabel: new Intl.DateTimeFormat("es-PE", { weekday: "short" }).format(date).replace(".", "").toLocaleUpperCase(),
-      dayNumber: String(date.getDate()).padStart(2, "0"),
-      fullLabel: new Intl.DateTimeFormat("es-PE", { weekday: "long", day: "numeric", month: "long" }).format(date),
-      isToday: localDateKey(date) === today,
+      key: utcDateKey(date),
+      shortLabel: new Intl.DateTimeFormat("es-PE", { timeZone: "UTC", weekday: "short" }).format(date).replace(".", "").toLocaleUpperCase(),
+      dayNumber: String(date.getUTCDate()).padStart(2, "0"),
+      fullLabel: new Intl.DateTimeFormat("es-PE", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(date),
+      isToday: utcDateKey(date) === today,
     };
   });
 }
