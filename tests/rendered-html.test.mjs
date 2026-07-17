@@ -174,6 +174,12 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /className="wardrobe-tab-actions"/);
+  assert.match(page, /function autocompleteOptions/);
+  assert.match(page, /const brandOptions = useMemo/);
+  assert.match(page, /forme-brand-options/);
+  assert.match(page, /forme-color-options/);
+  assert.match(page, /forme-material-options/);
+  assert.match(page, /normalizeGarmentMetadata/);
   assert.doesNotMatch(page, /className="catalog-toolbar"/);
   assert.match(page, /expanded-hitbox/);
   assert.match(page, /type TransformHandleSession/);

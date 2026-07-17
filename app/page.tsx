@@ -361,6 +361,65 @@ const filterLabels: Array<{ key: FilterKey; label: string }> = [
   { key: "silhouette", label: "Corte" },
 ];
 
+const starterBrandSuggestions = [
+  "Balenciaga",
+  "Loewe",
+  "Nike",
+  "Adidas",
+  "Prada",
+  "Uniqlo",
+  "COS",
+  "Zara",
+];
+const starterColorSuggestions = [
+  "Black",
+  "White",
+  "Grey",
+  "Blue",
+  "Brown",
+  "Green",
+  "Red / orange",
+  "Multicolor",
+  "Other",
+];
+const starterMaterialSuggestions = [
+  "Cotton",
+  "Denim",
+  "Leather",
+  "Wool blend",
+  "Technical nylon",
+  "Knit",
+  "Fleece",
+  "Shearling",
+  "Acetate",
+  "Transparent shell",
+];
+
+function autocompleteOptions(values: Array<string | undefined>, starters: string[]) {
+  const options = new Map<string, { value: string; count: number; starterIndex: number }>();
+  values.forEach((rawValue) => {
+    const value = rawValue?.trim();
+    if (!value) return;
+    const key = value.toLocaleLowerCase();
+    const current = options.get(key);
+    options.set(key, current
+      ? { ...current, count: current.count + 1 }
+      : { value, count: 1, starterIndex: Number.MAX_SAFE_INTEGER });
+  });
+  starters.forEach((value, starterIndex) => {
+    const key = value.toLocaleLowerCase();
+    if (!options.has(key)) options.set(key, { value, count: 0, starterIndex });
+  });
+  return Array.from(options.values())
+    .sort((a, b) => b.count - a.count || a.starterIndex - b.starterIndex || a.value.localeCompare(b.value))
+    .map((option) => option.value);
+}
+
+function canonicalAutocompleteValue(value: string, options: string[]) {
+  const trimmed = value.trim();
+  return options.find((option) => option.toLocaleLowerCase() === trimmed.toLocaleLowerCase()) ?? trimmed;
+}
+
 const valueTranslations: Record<string, string> = {
   All: "Todos",
   Outerwear: "Abrigos",
@@ -1934,6 +1993,18 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       tonesByColor,
     };
   }, [garments]);
+  const brandOptions = useMemo(
+    () => autocompleteOptions(garments.map((item) => item.brand), starterBrandSuggestions),
+    [garments],
+  );
+  const colorOptions = useMemo(
+    () => autocompleteOptions(garments.map((item) => item.colorFamily), starterColorSuggestions),
+    [garments],
+  );
+  const materialOptions = useMemo(
+    () => autocompleteOptions(garments.map((item) => item.material), starterMaterialSuggestions),
+    [garments],
+  );
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
   const insightGarments = demoMode ? sharedBasics : personalGarments;
@@ -2289,6 +2360,27 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setGarmentSaveError("");
   }
 
+  function normalizeGarmentMetadata(
+    key: "brand" | "colorFamily" | "material",
+    options: string[],
+    fallback = "",
+  ) {
+    setGarmentDraft((current) => {
+      if (!current) return current;
+      const next = canonicalAutocompleteValue(current[key], options) || fallback;
+      if (key !== "colorFamily") return { ...current, [key]: next };
+      const availableTones = filterOptions.tonesByColor[next] ?? [];
+      const currentToneIsValid = availableTones.some((tone) => tone.toLocaleLowerCase() === current.tone.toLocaleLowerCase());
+      return {
+        ...current,
+        colorFamily: next,
+        tone: availableTones.length > 0 && !currentToneIsValid ? availableTones[0] : current.tone,
+      };
+    });
+    setGarmentSaved(false);
+    setGarmentSaveError("");
+  }
+
   function addDraftTag() {
     const next = tagInput.trim().replace(/^#/, "");
     if (!next || !garmentDraft) return;
@@ -2307,9 +2399,16 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   async function saveGarmentDraft() {
     if (!garmentDraft) return;
     const { id, ...edit } = garmentDraft;
-    const normalized = { ...edit, name: edit.name.trim() || "Prenda sin nombre" };
+    const normalized = {
+      ...edit,
+      name: edit.name.trim() || "Prenda sin nombre",
+      brand: canonicalAutocompleteValue(edit.brand, brandOptions),
+      colorFamily: canonicalAutocompleteValue(edit.colorFamily, colorOptions) || "Other",
+      tone: edit.tone.trim() || "Unclassified",
+      material: canonicalAutocompleteValue(edit.material, materialOptions) || "Other",
+    };
     setGarments((items) => items.map((item) => item.id === id
-      ? { ...item, ...normalized, color: edit.tone }
+      ? { ...item, ...normalized, color: normalized.tone }
       : item));
     setGarmentSaveError("");
     if (isStaticDemo) {
@@ -4037,14 +4136,17 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
                 </div>
                 <div className="garment-editor-fields">
                   <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
-                  <label>MARCA<input value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} placeholder="Sin marca" /></label>
+                  <label>MARCA<input list="forme-brand-options" value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} onBlur={() => normalizeGarmentMetadata("brand", brandOptions)} placeholder="Escribe o elige una marca" autoCapitalize="words" autoComplete="off" spellCheck={false} /></label>
                   <label>TIPO<select value={garmentDraft.category} onChange={(event) => updateGarmentDraft("category", event.target.value as Garment["category"])}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>COLOR<select value={garmentDraft.colorFamily} onChange={(event) => { const next = event.target.value; updateGarmentDraft("colorFamily", next); updateGarmentDraft("tone", filterOptions.tonesByColor[next]?.[0] ?? "Unclassified"); }}>{filterOptions.colorFamily.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>COLOR<input list="forme-color-options" value={garmentDraft.colorFamily} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} placeholder="Escribe o elige un color" autoComplete="off" /></label>
                   <label>TONO<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>MATERIAL<select value={garmentDraft.material} onChange={(event) => updateGarmentDraft("material", event.target.value)}>{filterOptions.material.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>MATERIAL<input list="forme-material-options" value={garmentDraft.material} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} placeholder="Escribe o elige un material" autoComplete="off" /></label>
                   <label>ACABADO<select value={garmentDraft.finish} onChange={(event) => updateGarmentDraft("finish", event.target.value)}>{filterOptions.finish.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                   <label>CORTE<select value={garmentDraft.silhouette} onChange={(event) => updateGarmentDraft("silhouette", event.target.value)}>{filterOptions.silhouette.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                 </div>
+                <datalist id="forme-brand-options">{brandOptions.map((option) => <option value={option} key={option} />)}</datalist>
+                <datalist id="forme-color-options">{colorOptions.map((option) => <option value={option} label={translateValue(option)} key={option} />)}</datalist>
+                <datalist id="forme-material-options">{materialOptions.map((option) => <option value={option} label={translateValue(option)} key={option} />)}</datalist>
 
                 <div className="custom-tag-editor">
                   <div><span>ETIQUETAS</span><small>Agrega tu propia forma de organizarla.</small></div>
