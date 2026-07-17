@@ -41,7 +41,7 @@ test("server-renders the FORMÉ wardrobe", async () => {
   assert.match(html, /Juega con básicos Formé/);
   assert.match(html, /class="topbar-inner"/);
   assert.doesNotMatch(html, /＋ Agregar/);
-  assert.match(html, /aria-label="Entrar con Google"/);
+  assert.match(html, /aria-label="Revisando sesión"/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 
@@ -58,6 +58,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /useState\(true\)/);
   assert.match(page, /useState\(formeBasics\)/);
   assert.match(page, /function beginGoogleSignIn/);
+  assert.match(page, /function navigateWardrobeRoute/);
+  assert.match(page, /window\.history\.pushState/);
+  assert.doesNotMatch(page, /sessionStatus === "checking" \? "ENTRANDO…"/);
   assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
   assert.doesNotMatch(page, /signin-with-chatgpt/);
   assert.match(page, /aria-label="Entrar con Google"/);

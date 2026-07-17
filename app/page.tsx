@@ -1811,6 +1811,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const initialProfilePane: ProfilePane = initialRoute === "ajustes" ? "settings" : "profile";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
+  const [activeRoute, setActiveRoute] = useState<WardrobeRoute>(initialRoute);
   const [view, setView] = useState<View>("wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>(initialWardrobePanel);
   const [closetMode, setClosetMode] = useState<ClosetMode>("browse");
@@ -1850,7 +1851,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(initialRoute === "perfil" || initialRoute === "ajustes");
-  const [profilePane] = useState<ProfilePane>(initialProfilePane);
+  const [profilePane, setProfilePane] = useState<ProfilePane>(initialProfilePane);
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
   const [stylingRecommendations, setStylingRecommendations] = useState<StylingRecommendation[]>([]);
   const [assistantPresetId, setAssistantPresetId] = useState("");
@@ -1882,6 +1883,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const marqueeSession = useRef<MarqueeSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
+  const profileReturnRoute = useRef<"closet" | "looks" | "asistente">(initialWardrobePanel === "looks" ? "looks" : initialWardrobePanel === "assistant" ? "asistente" : "closet");
   const [weekAnchor] = useState(() => new Date());
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
@@ -1970,6 +1972,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
   useEffect(() => {
     if (!isStaticDemo) {
       let active = true;
+      let sessionAuthenticated = false;
       const loadAccount = async () => {
         const sessionResponse = await fetch("/api/session", { cache: "no-store" });
         if (sessionResponse.status === 401 || sessionResponse.status === 403) {
@@ -1993,6 +1996,11 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         }
         if (!sessionResponse.ok) throw new Error("No se pudo revisar tu sesión.");
         const session = await sessionResponse.json() as { user: WardrobeProfile };
+        if (!active) return;
+        sessionAuthenticated = true;
+        setDemoMode(false);
+        setSessionStatus("authenticated");
+        setProfile(session.user);
         const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
         const [wardrobeResponse, outfitsResponse, weekResponse, styleProfileResponse] = await Promise.all([
           batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
@@ -2019,10 +2027,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
           ...look,
           items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
         }));
-        setDemoMode(false);
-        setSessionStatus("authenticated");
         setGarments(loadedGarments);
-        setProfile(session.user);
         setSavedLooks(normalizedLooks);
         setWeeklyPlan(week.entries);
         setStyleProfile(loadedStyleProfile);
@@ -2045,7 +2050,8 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       };
       void loadAccount().catch((error: unknown) => {
         if (!active) return;
-        setSessionStatus("guest");
+        setDemoMode(!sessionAuthenticated);
+        setSessionStatus(sessionAuthenticated ? "authenticated" : "guest");
         setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
       });
       return () => { active = false; };
@@ -2063,6 +2069,15 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     }
   // The initial hydration intentionally runs once; pending cutouts are idempotent and guarded by a ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const syncRouteFromHistory = () => {
+      const route = window.location.pathname.replace(/^\//, "") as WardrobeRoute;
+      if (["closet", "looks", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
+    };
+    window.addEventListener("popstate", syncRouteFromHistory);
+    return () => window.removeEventListener("popstate", syncRouteFromHistory);
   }, []);
 
   useEffect(() => {
@@ -2088,7 +2103,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setProfileSaveError("");
     setProfileSaved(false);
     const closeProfileOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") window.location.assign("/closet");
+      if (event.key === "Escape") closeProfileRoute();
     };
     window.addEventListener("keydown", closeProfileOnEscape);
     return () => window.removeEventListener("keydown", closeProfileOnEscape);
@@ -2336,6 +2351,38 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
     setLibraryOpen(false);
     setSavedLooksOpen(false);
     setProfileOpen(false);
+  }
+
+  function routeForPanel(panel: WardrobePanel): "closet" | "looks" | "asistente" {
+    return panel === "looks" ? "looks" : panel === "assistant" ? "asistente" : "closet";
+  }
+
+  function applyWardrobeRoute(route: WardrobeRoute) {
+    setActiveRoute(route);
+    if (route === "perfil" || route === "ajustes") {
+      setProfilePane(route === "ajustes" ? "settings" : "profile");
+      setProfileOpen(true);
+      return;
+    }
+    setProfileOpen(false);
+    setView("wardrobe");
+    setWardrobePanel(route === "looks" ? "looks" : route === "asistente" ? "assistant" : "closet");
+    if (route === "closet") setClosetMode("browse");
+    setLibraryOpen(false);
+    setSavedLooksOpen(false);
+  }
+
+  function navigateWardrobeRoute(route: WardrobeRoute) {
+    if (route === "perfil" || route === "ajustes") {
+      if (!profileOpen) profileReturnRoute.current = routeForPanel(wardrobePanel);
+    }
+    applyWardrobeRoute(route);
+    const nextPath = `/${route}`;
+    if (window.location.pathname !== nextPath) window.history.pushState({ formeRoute: route }, "", nextPath);
+  }
+
+  function closeProfileRoute() {
+    navigateWardrobeRoute(profileReturnRoute.current);
   }
 
   function openStudio(returnPanel: WardrobePanel = wardrobePanel) {
@@ -3403,18 +3450,18 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         onClose={() => { setStyleOnboardingOpen(false); if (styleProfile?.completed) setProfileOpen(true); }}
         onSave={saveStyleCalibration}
       />}
-      {demoMode && sessionStatus === "guest" && (initialRoute === "perfil" || initialRoute === "ajustes") && <div className="profile-drawer-backdrop" role="presentation">
+      {demoMode && sessionStatus === "guest" && (activeRoute === "perfil" || activeRoute === "ajustes") && <div className="profile-drawer-backdrop" role="presentation">
         <aside className="profile-drawer account-gate" role="dialog" aria-modal="true" aria-label="Entrar a mi cuenta">
-          <header><span>{initialRoute === "perfil" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={() => window.location.assign("/closet")} aria-label="Cerrar">×</button></header>
-          <div><p>TU CUENTA</p><h2>Entra para abrir {initialRoute === "perfil" ? "tu perfil" : "tus ajustes"}.</h2><span>Tu closet, looks y preferencias viven en tu cuenta de Formé.</span><button type="button" onClick={beginGoogleSignIn}>ENTRAR CON GOOGLE →</button></div>
+          <header><span>{activeRoute === "perfil" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar">×</button></header>
+          <div><p>TU CUENTA</p><h2>Entra para abrir {activeRoute === "perfil" ? "tu perfil" : "tus ajustes"}.</h2><span>Tu closet, looks y preferencias viven en tu cuenta de Formé.</span><button type="button" onClick={beginGoogleSignIn}>ENTRAR CON GOOGLE →</button></div>
         </aside>
       </div>}
-      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => { setProfileOpen(false); window.location.assign("/closet"); }}>
+      {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={closeProfileRoute}>
         <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>{profilePane === "profile" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={() => window.location.assign("/closet")} aria-label="Cerrar perfil">×</button></header>
+          <header><span>{profilePane === "profile" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar perfil">×</button></header>
           <nav className="account-route-nav" aria-label="Cuenta">
-            <button className={profilePane === "profile" ? "active" : ""} type="button" onClick={() => window.location.assign("/perfil")}>PERFIL</button>
-            <button className={profilePane === "settings" ? "active" : ""} type="button" onClick={() => window.location.assign("/ajustes")}>AJUSTES</button>
+            <button className={profilePane === "profile" ? "active" : ""} type="button" onClick={() => navigateWardrobeRoute("perfil")}>PERFIL</button>
+            <button className={profilePane === "settings" ? "active" : ""} type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTES</button>
           </nav>
           <div className="profile-drawer-identity">
             <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
@@ -3484,16 +3531,18 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       </div>}
       <header className="topbar">
         <div className="topbar-inner">
-          <button className="wordmark" onClick={() => window.location.assign("/closet")} aria-label="Volver al closet">FORMÉ<span>®</span></button>
+          <button className="wordmark" onClick={() => navigateWardrobeRoute("closet")} aria-label="Volver al closet">FORMÉ<span>®</span></button>
           <nav className="zone-nav" aria-label="Secciones principales">
-            <button className={view === "wardrobe" ? "active" : ""} onClick={() => window.location.assign("/closet")}>Closet</button>
+            <button className={view === "wardrobe" ? "active" : ""} onClick={() => navigateWardrobeRoute("closet")}>Closet</button>
             <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
           </nav>
-          {demoMode
-            ? <button className="google-login" aria-label="Entrar con Google" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR"}</button>
+          {sessionStatus === "checking"
+            ? <span className="session-checking" aria-label="Revisando sesión" />
+            : demoMode
+            ? <button className="google-login" aria-label="Entrar con Google" onClick={beginGoogleSignIn}><span>G</span>ENTRAR</button>
             : <div className="topbar-account">
               <button className="pricing-entry" type="button" onClick={() => window.location.assign("/pricing")}>PLANES</button>
-              <button className="avatar" onClick={() => window.location.assign("/perfil")} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
+              <button className="avatar" onClick={() => navigateWardrobeRoute("perfil")} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
             </div>}
         </div>
       </header>
@@ -3502,9 +3551,9 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         <section className="content wardrobe-view">
           {!demoMode && <section className="wardrobe-profile">
             <nav className="wardrobe-tabs" aria-label="Mi closet">
-              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => window.location.assign("/closet")}>Mi closet</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => window.location.assign("/looks")}>Looks guardados</button>
-              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => window.location.assign("/asistente")}>Asistente</button>
+              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => navigateWardrobeRoute("closet")}>Mi closet</button>
+              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => navigateWardrobeRoute("looks")}>Looks guardados</button>
+              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => navigateWardrobeRoute("asistente")}>Asistente</button>
             </nav>
             {wardrobePanel === "closet" && closetMode === "browse" && <div className="wardrobe-tab-actions">
               <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
@@ -3987,7 +4036,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       )}
 
       <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => view === "studio" ? openWardrobe() : window.location.assign("/closet")}><span>▦</span>Closet</button>
+        <button className={view === "wardrobe" ? "active" : ""} onClick={() => view === "studio" ? openWardrobe() : navigateWardrobeRoute("closet")}><span>▦</span>Closet</button>
         <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}><span>◫</span>Canvas</button>
       </nav>
     </main>

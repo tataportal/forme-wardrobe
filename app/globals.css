@@ -33,6 +33,8 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .google-login { min-height:38px; padding:0 13px 0 8px; border:1px solid var(--ink); border-radius:100px; background:var(--panel); display:flex; align-items:center; gap:9px; font-size:var(--type-kicker); letter-spacing:.11em; cursor:pointer; }
 .google-login span { width:23px; height:23px; border-radius:50%; background:white; display:grid; place-items:center; color:#4285f4; font:700 var(--type-ui)/1 Arial,sans-serif; }
 .google-login:disabled { opacity:.5; cursor:wait; }
+.session-checking { width:38px; height:38px; display:block; border-radius:50%; background:rgba(17,17,15,.08); animation:session-pulse 1s ease-in-out infinite alternate; }
+@keyframes session-pulse { to { opacity:.42; } }
 .demo-avatar { background:var(--ink); color:var(--paper); font:22px/1 Georgia,serif; }
 
 .site-shell { min-height:100vh; padding-bottom:78px; }
