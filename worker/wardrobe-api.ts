@@ -1,4 +1,5 @@
 import { readNativeSession } from "./google-auth";
+import { starterGarments } from "../app/garments";
 
 export interface WardrobeEnv {
   DB?: D1Database;
@@ -44,6 +45,7 @@ type GarmentRow = {
   finish: string;
   silhouette: string;
   favorite: number;
+  is_public: number;
   deleted: number;
   status: string;
   source_image_key: string | null;
@@ -87,7 +89,21 @@ type GarmentPayload = {
   finish: string;
   silhouette: string;
   favorite: boolean;
+  isPublic: boolean;
   tags: string[];
+};
+
+type UserProfileRow = {
+  id: string;
+  email: string;
+  display_name: string;
+  handle: string | null;
+  bio: string;
+  avatar_url: string | null;
+  profile_public: number;
+  discoverable: number;
+  show_closet: number;
+  show_looks: number;
 };
 
 type ImageQuality = "low" | "medium";
@@ -121,10 +137,14 @@ const styleFamilies = new Set([
 ]);
 const styleFeedbackReasons = new Set(["color", "silhouette", "combination", "formality", "expression", "fit", "footwear", "specific"]);
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+const staticGarmentMedia = new Map(starterGarments.map((garment) => [garment.id, {
+  image: garment.image,
+  openImage: garment.openImage,
+}]));
 
 const garmentColumns = `
   id, owner_id, client_id, name, brand, category, color_family, tone, material,
-  finish, silhouette, favorite, deleted, status, source_image_key, processing_image_key,
+  finish, silhouette, favorite, is_public, deleted, status, source_image_key, processing_image_key,
   generated_image_key, generated_open_image_key, image_key, open_image_key, quality,
   qa_status, qa_notes, revision, created_at, updated_at
 `;
@@ -164,6 +184,12 @@ function safeClientId(value: string): string | null {
   return /^[a-zA-Z0-9_-]{1,100}$/.test(id) ? id : null;
 }
 
+function normalizeHandle(value: unknown): string | null {
+  const handle = textValue(value, "").replace(/^@+/, "").toLocaleLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$/.test(handle)) return null;
+  return handle;
+}
+
 function tagsValue(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const unique = new Map<string, string>();
@@ -190,6 +216,7 @@ function payloadFrom(value: unknown, fallback?: Partial<GarmentPayload>): Garmen
     finish: textValue(body.finish, fallback?.finish ?? "Matte") || "Matte",
     silhouette: textValue(body.silhouette, fallback?.silhouette ?? "Regular") || "Regular",
     favorite: body.favorite === undefined ? Boolean(fallback?.favorite) : booleanValue(body.favorite),
+    isPublic: body.isPublic === undefined ? Boolean(fallback?.isPublic) : booleanValue(body.isPublic),
     tags: body.tags === undefined ? fallback?.tags ?? [] : tagsValue(body.tags),
   };
 }
@@ -243,15 +270,24 @@ async function identify(request: Request, env: WardrobeEnv): Promise<Identity | 
 }
 
 async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
+  const existing = await db.prepare("SELECT handle FROM users WHERE id = ? LIMIT 1")
+    .bind(identity.id)
+    .first<{ handle: string | null }>();
+  let handle = existing?.handle || normalizeHandle(identity.email.split("@")[0]) || `forme-${identity.id.slice(-6)}`;
+  if (!existing) {
+    const collision = await db.prepare("SELECT 1 FROM users WHERE handle = ? LIMIT 1").bind(handle).first();
+    if (collision) handle = `${handle.slice(0, 23)}-${identity.id.slice(-5)}`;
+  }
   await db.prepare(`
-    INSERT INTO users (id, email, display_name, avatar_url)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (id, email, display_name, handle, avatar_url)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       email = excluded.email,
-      display_name = excluded.display_name,
+      display_name = CASE WHEN users.display_name = '' THEN excluded.display_name ELSE users.display_name END,
+      handle = COALESCE(users.handle, excluded.handle),
       avatar_url = excluded.avatar_url,
       updated_at = CURRENT_TIMESTAMP
-  `).bind(identity.id, identity.email, identity.displayName, identity.avatarUrl).run();
+  `).bind(identity.id, identity.email, identity.displayName, handle, identity.avatarUrl).run();
 }
 
 async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: D1Database; identity: Identity } | Response> {
@@ -260,6 +296,65 @@ async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: 
   if (!identity) return apiError("Inicia sesión para abrir tu armario.", 401);
   await ensureUser(env.DB, identity);
   return { db: env.DB, identity };
+}
+
+function accountProfileJson(row: UserProfileRow, isOwner = false) {
+  const handle = row.handle || normalizeHandle(row.email.split("@")[0]) || "mi-perfil";
+  return {
+    id: row.id,
+    name: row.display_name || "Mi perfil",
+    handle: `@${handle}`,
+    bio: row.bio || "",
+    avatarUrl: row.avatar_url,
+    profilePublic: Boolean(row.profile_public),
+    discoverable: Boolean(row.discoverable),
+    showCloset: Boolean(row.show_closet),
+    showLooks: Boolean(row.show_looks),
+    isOwner,
+  };
+}
+
+async function readAccountProfile(db: D1Database, ownerId: string): Promise<UserProfileRow> {
+  const row = await db.prepare(`
+    SELECT id, email, display_name, handle, bio, avatar_url,
+      profile_public, discoverable, show_closet, show_looks
+    FROM users WHERE id = ? LIMIT 1
+  `).bind(ownerId).first<UserProfileRow>();
+  if (!row) throw new Error("No se pudo abrir tu perfil.");
+  return row;
+}
+
+async function saveAccountProfile(request: Request, db: D1Database, identity: Identity, isOwner: boolean): Promise<Response> {
+  const value = await request.json().catch(() => null) as Record<string, unknown> | null;
+  if (!value) return apiError("Revisa los datos de tu perfil.", 400);
+  const name = textValue(value.name, "").slice(0, 60);
+  const handle = normalizeHandle(value.handle);
+  const bio = textValue(value.bio, "").slice(0, 240);
+  if (!name) return apiError("Escribe el nombre que quieres mostrar.", 400);
+  if (!handle) return apiError("El usuario debe tener entre 3 y 30 caracteres, sin espacios.", 400);
+  const collision = await db.prepare("SELECT 1 FROM users WHERE handle = ? AND id <> ? LIMIT 1")
+    .bind(handle, identity.id)
+    .first();
+  if (collision) return apiError("Ese @usuario ya está en uso.", 409);
+  const profilePublic = booleanValue(value.profilePublic);
+  const discoverable = profilePublic && booleanValue(value.discoverable);
+  const showCloset = profilePublic && booleanValue(value.showCloset);
+  const showLooks = profilePublic && booleanValue(value.showLooks);
+  await db.prepare(`
+    UPDATE users SET display_name = ?, handle = ?, bio = ?, profile_public = ?,
+      discoverable = ?, show_closet = ?, show_looks = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    name,
+    handle,
+    bio,
+    profilePublic ? 1 : 0,
+    discoverable ? 1 : 0,
+    showCloset ? 1 : 0,
+    showLooks ? 1 : 0,
+    identity.id,
+  ).run();
+  return json({ profile: accountProfileJson(await readAccountProfile(db, identity.id), isOwner) });
 }
 
 function garmentJson(row: GarmentRow, tags: string[] = []) {
@@ -276,6 +371,7 @@ function garmentJson(row: GarmentRow, tags: string[] = []) {
     finish: row.finish,
     silhouette: row.silhouette,
     favorite: Boolean(row.favorite),
+    isPublic: Boolean(row.is_public),
     deleted: Boolean(row.deleted),
     tags,
     status: row.status,
@@ -329,8 +425,8 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
     db.prepare(`
       INSERT INTO garments (
         id, owner_id, client_id, name, brand, category, color_family, tone,
-        material, finish, silhouette, favorite, deleted, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
+        material, finish, silhouette, favorite, is_public, deleted, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
       ON CONFLICT(owner_id, client_id) DO UPDATE SET
         name = excluded.name,
         brand = excluded.brand,
@@ -341,6 +437,7 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
         finish = excluded.finish,
         silhouette = excluded.silhouette,
         favorite = excluded.favorite,
+        is_public = excluded.is_public,
         deleted = 0,
         revision = garments.revision + 1,
         updated_at = CURRENT_TIMESTAMP
@@ -357,6 +454,7 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
       payload.finish,
       payload.silhouette,
       payload.favorite ? 1 : 0,
+      payload.isPublic ? 1 : 0,
     ),
     db.prepare("DELETE FROM garment_tags WHERE garment_id = ?").bind(garmentId),
     ...payload.tags.map((tag) => db.prepare("INSERT INTO garment_tags (garment_id, tag) VALUES (?, ?)").bind(garmentId, tag)),
@@ -399,6 +497,7 @@ function formPayload(form: FormData): GarmentPayload | null {
     finish: form.get("finish"),
     silhouette: form.get("silhouette"),
     favorite: form.get("favorite"),
+    isPublic: form.get("isPublic"),
     tags,
   });
 }
@@ -468,8 +567,8 @@ async function uploadGarment(
     await db.prepare(`
       INSERT INTO garments (
         id, owner_id, client_id, name, brand, category, color_family, tone,
-        material, finish, silhouette, favorite, status, source_image_key, processing_image_key, quality
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
+        material, finish, silhouette, favorite, is_public, status, source_image_key, processing_image_key, quality
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
     `).bind(
       garmentId,
       identity.id,
@@ -483,6 +582,7 @@ async function uploadGarment(
       payload.finish,
       payload.silhouette,
       payload.favorite ? 1 : 0,
+      payload.isPublic ? 1 : 0,
       sourceKey,
       processingKey,
       imageQuality(env.OPENAI_IMAGE_QUALITY),
@@ -813,6 +913,38 @@ async function mediaResponse(env: WardrobeEnv, db: D1Database, ownerId: string, 
   return new Response(object.body, { headers });
 }
 
+async function publicMediaResponse(env: WardrobeEnv, db: D1Database, handle: string, clientId: string, variant: string): Promise<Response> {
+  if (!env.WARDROBE_MEDIA) return new Response("Not found", { status: 404 });
+  const garment = await db.prepare(`
+    SELECT ${garmentColumns.split(",").map((column) => `garments.${column.trim()}`).join(", ")}
+    FROM garments
+    INNER JOIN users ON users.id = garments.owner_id
+    WHERE users.handle = ? AND users.profile_public = 1
+      AND garments.client_id = ? AND garments.deleted = 0
+      AND (
+        (users.show_closet = 1 AND garments.is_public = 1)
+        OR (users.show_looks = 1 AND EXISTS (
+          SELECT 1 FROM outfit_items
+          INNER JOIN outfits ON outfits.id = outfit_items.outfit_id
+          WHERE outfits.owner_id = users.id AND outfits.is_public = 1
+            AND outfit_items.garment_client_id = garments.client_id
+        ))
+      )
+    LIMIT 1
+  `).bind(handle, clientId).first<GarmentRow>();
+  if (!garment) return new Response("Not found", { status: 404 });
+  const key = variant === "open" ? garment.open_image_key : garment.image_key;
+  if (!key) return new Response("Not found", { status: 404 });
+  const object = await env.WARDROBE_MEDIA.get(key);
+  if (!object) return new Response("Not found", { status: 404 });
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  headers.set("cache-control", "public, max-age=86400, stale-while-revalidate=604800");
+  headers.set("x-content-type-options", "nosniff");
+  return new Response(object.body, { headers });
+}
+
 async function internalGarmentOperation(
   request: Request,
   env: WardrobeEnv,
@@ -1122,9 +1254,9 @@ async function reconcileGarmentBatches(
 }
 
 async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
-  const outfits = await db.prepare("SELECT id, client_id, name, created_at, updated_at FROM outfits WHERE owner_id = ? ORDER BY updated_at DESC")
+  const outfits = await db.prepare("SELECT id, client_id, name, is_public, created_at, updated_at FROM outfits WHERE owner_id = ? ORDER BY updated_at DESC")
     .bind(ownerId)
-    .all<{ id: string; client_id: string; name: string; created_at: string; updated_at: string }>();
+    .all<{ id: string; client_id: string; name: string; is_public: number; created_at: string; updated_at: string }>();
   const items = await db.prepare(`
     SELECT outfit_items.id, outfit_items.outfit_id, outfit_items.garment_client_id,
       outfit_items.variant, outfit_items.x, outfit_items.y, outfit_items.scale,
@@ -1150,6 +1282,7 @@ async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
     outfits: outfits.results.map((outfit) => ({
       id: outfit.client_id,
       name: outfit.name,
+      isPublic: Boolean(outfit.is_public),
       createdAt: outfit.created_at,
       updatedAt: outfit.updated_at,
       items: (byOutfit.get(outfit.id) ?? []).map((item) => ({
@@ -1167,7 +1300,7 @@ async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
 }
 
 async function saveOutfit(request: Request, db: D1Database, ownerId: string, outfitId: string): Promise<Response> {
-  const value = await request.json().catch(() => null) as { name?: unknown; items?: unknown } | null;
+  const value = await request.json().catch(() => null) as { name?: unknown; items?: unknown; isPublic?: unknown } | null;
   if (!value || !Array.isArray(value.items) || value.items.length > 30) return apiError("El conjunto no es válido.", 400);
   const name = textValue(value.name, "Conjunto sin nombre") || "Conjunto sin nombre";
   const items: Array<{
@@ -1197,15 +1330,19 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
       z: Math.round(Number(item.z)),
     });
   }
-  const existing = await db.prepare("SELECT id FROM outfits WHERE owner_id = ? AND client_id = ? LIMIT 1")
+  const existing = await db.prepare("SELECT id, is_public FROM outfits WHERE owner_id = ? AND client_id = ? LIMIT 1")
     .bind(ownerId, outfitId)
-    .first<{ id: string }>();
+    .first<{ id: string; is_public: number }>();
   const serverId = existing?.id ?? crypto.randomUUID();
+  const isPublic = value.isPublic === undefined ? Boolean(existing?.is_public) : booleanValue(value.isPublic);
   await db.batch([
     db.prepare(`
-      INSERT INTO outfits (id, owner_id, client_id, name) VALUES (?, ?, ?, ?)
-      ON CONFLICT(owner_id, client_id) DO UPDATE SET name = excluded.name, updated_at = CURRENT_TIMESTAMP
-    `).bind(serverId, ownerId, outfitId, name),
+      INSERT INTO outfits (id, owner_id, client_id, name, is_public) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(owner_id, client_id) DO UPDATE SET
+        name = excluded.name,
+        is_public = excluded.is_public,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(serverId, ownerId, outfitId, name, isPublic ? 1 : 0),
     db.prepare("DELETE FROM outfit_items WHERE outfit_id = ? AND EXISTS (SELECT 1 FROM outfits WHERE id = ? AND owner_id = ?)")
       .bind(serverId, serverId, ownerId),
     ...items.map((item) => db.prepare(`
@@ -1226,7 +1363,7 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
       ownerId,
     )),
   ]);
-  return json({ id: outfitId, name, items });
+  return json({ id: outfitId, name, isPublic, items });
 }
 
 async function deleteOutfit(db: D1Database, ownerId: string, outfitId: string): Promise<Response> {
@@ -1240,6 +1377,156 @@ async function deleteOutfit(db: D1Database, ownerId: string, outfitId: string): 
     db.prepare("DELETE FROM outfits WHERE id = ? AND owner_id = ?").bind(existing.id, ownerId),
   ]);
   return new Response(null, { status: 204 });
+}
+
+async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Response> {
+  const handle = normalizeHandle(rawHandle);
+  if (!handle) return apiError("Perfil no encontrado.", 404);
+  const user = await db.prepare(`
+    SELECT id, email, display_name, handle, bio, avatar_url,
+      profile_public, discoverable, show_closet, show_looks
+    FROM users WHERE handle = ? AND profile_public = 1 LIMIT 1
+  `).bind(handle).first<UserProfileRow>();
+  if (!user) return apiError("Este perfil es privado o no existe.", 404);
+
+  const garmentRows = user.show_closet
+    ? await db.prepare(`
+      SELECT ${garmentColumns} FROM garments
+      WHERE owner_id = ? AND is_public = 1 AND deleted = 0
+      ORDER BY updated_at DESC LIMIT 120
+    `).bind(user.id).all<GarmentRow>()
+    : { results: [] as GarmentRow[] };
+  const tagRows = garmentRows.results.length
+    ? await db.prepare(`
+      SELECT garment_tags.garment_id, garment_tags.tag FROM garment_tags
+      INNER JOIN garments ON garments.id = garment_tags.garment_id
+      WHERE garments.owner_id = ? AND garments.is_public = 1
+      ORDER BY garment_tags.tag COLLATE NOCASE
+    `).bind(user.id).all<{ garment_id: string; tag: string }>()
+    : { results: [] as Array<{ garment_id: string; tag: string }> };
+  const tags = new Map<string, string[]>();
+  for (const row of tagRows.results) tags.set(row.garment_id, [...(tags.get(row.garment_id) ?? []), row.tag]);
+
+  const outfitRows = user.show_looks
+    ? await db.prepare(`
+      SELECT id, client_id, name, created_at, updated_at FROM outfits
+      WHERE owner_id = ? AND is_public = 1 ORDER BY updated_at DESC LIMIT 60
+    `).bind(user.id).all<{ id: string; client_id: string; name: string; created_at: string; updated_at: string }>()
+    : { results: [] as Array<{ id: string; client_id: string; name: string; created_at: string; updated_at: string }> };
+  const outfitItems = outfitRows.results.length
+    ? await db.prepare(`
+      SELECT outfit_items.id, outfit_items.outfit_id, outfit_items.garment_client_id,
+        outfit_items.variant, outfit_items.x, outfit_items.y, outfit_items.scale,
+        outfit_items.rotation, outfit_items.z
+      FROM outfit_items
+      INNER JOIN outfits ON outfits.id = outfit_items.outfit_id
+      WHERE outfits.owner_id = ? AND outfits.is_public = 1
+      ORDER BY outfit_items.z
+    `).bind(user.id).all<{
+      id: string;
+      outfit_id: string;
+      garment_client_id: string;
+      variant: string;
+      x: number;
+      y: number;
+      scale: number;
+      rotation: number;
+      z: number;
+    }>()
+    : { results: [] as Array<{
+      id: string;
+      outfit_id: string;
+      garment_client_id: string;
+      variant: string;
+      x: number;
+      y: number;
+      scale: number;
+      rotation: number;
+      z: number;
+    }> };
+  const byOutfit = new Map<string, typeof outfitItems.results>();
+  for (const item of outfitItems.results) byOutfit.set(item.outfit_id, [...(byOutfit.get(item.outfit_id) ?? []), item]);
+  const mediaBase = `/api/public-media/${encodeURIComponent(handle)}`;
+
+  return json({
+    profile: {
+      name: user.display_name || "Perfil de Formé",
+      handle: `@${handle}`,
+      bio: user.bio || "",
+      avatarUrl: user.avatar_url,
+      discoverable: Boolean(user.discoverable),
+    },
+    garments: garmentRows.results.flatMap((row) => {
+      const staticMedia = staticGarmentMedia.get(row.client_id);
+      const image = row.image_key
+        ? `${mediaBase}/${encodeURIComponent(row.client_id)}/cutout?v=${row.revision || 1}`
+        : staticMedia?.image;
+      if (!image) return [];
+      return [{
+        ...garmentJson(row, tags.get(row.id) ?? []),
+        image,
+        openImage: row.open_image_key
+          ? `${mediaBase}/${encodeURIComponent(row.client_id)}/open?v=${row.revision || 1}`
+          : staticMedia?.openImage,
+        originalImage: undefined,
+        generatedImage: undefined,
+        generatedOpenImage: undefined,
+      }];
+    }),
+    outfits: outfitRows.results.map((outfit) => ({
+      id: outfit.client_id,
+      name: outfit.name,
+      createdAt: outfit.created_at,
+      updatedAt: outfit.updated_at,
+      items: (byOutfit.get(outfit.id) ?? []).map((item) => {
+        const staticMedia = staticGarmentMedia.get(item.garment_client_id);
+        const isOpen = item.variant === "open";
+        return {
+          instanceId: item.id,
+          garmentId: item.garment_client_id,
+          variant: isOpen ? "open" : "closed",
+          image: isOpen && staticMedia?.openImage
+            ? staticMedia.openImage
+            : staticMedia?.image ?? `${mediaBase}/${encodeURIComponent(item.garment_client_id)}/${isOpen ? "open" : "cutout"}`,
+          x: item.x / 1000,
+          y: item.y / 1000,
+          scale: item.scale / 1000,
+          rotation: item.rotation / 1000,
+          z: item.z,
+        };
+      }),
+    })),
+  });
+}
+
+async function discoverProfiles(db: D1Database, rawQuery: string): Promise<Response> {
+  const query = textValue(rawQuery, "").toLocaleLowerCase();
+  const pattern = `%${query.replace(/[%_]/g, "")}%`;
+  const profiles = await db.prepare(`
+    SELECT users.display_name, users.handle, users.bio, users.avatar_url,
+      (SELECT COUNT(*) FROM garments WHERE garments.owner_id = users.id AND garments.is_public = 1 AND garments.deleted = 0) AS garment_count,
+      (SELECT COUNT(*) FROM outfits WHERE outfits.owner_id = users.id AND outfits.is_public = 1) AS outfit_count
+    FROM users
+    WHERE users.profile_public = 1 AND users.discoverable = 1
+      AND (? = '' OR LOWER(users.display_name) LIKE ? OR LOWER(users.handle) LIKE ?)
+    ORDER BY users.updated_at DESC
+    LIMIT 24
+  `).bind(query, pattern, pattern).all<{
+    display_name: string;
+    handle: string;
+    bio: string;
+    avatar_url: string | null;
+    garment_count: number;
+    outfit_count: number;
+  }>();
+  return json({ profiles: profiles.results.map((profile) => ({
+    name: profile.display_name,
+    handle: `@${profile.handle}`,
+    bio: profile.bio,
+    avatarUrl: profile.avatar_url,
+    garmentCount: profile.garment_count,
+    outfitCount: profile.outfit_count,
+  })) });
 }
 
 async function getWeeklyPlan(db: D1Database, ownerId: string): Promise<Response> {
@@ -1413,6 +1700,24 @@ export async function handleWardrobeApi(
   if (url.pathname === "/api/internal/garment-operation") {
     return internalGarmentOperation(request, env, ctx);
   }
+  const publicProfileMatch = url.pathname.match(/^\/api\/public-profile\/([^/]+)$/);
+  if (publicProfileMatch && request.method === "GET") {
+    if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+    return getPublicProfile(env.DB, decodeURIComponent(publicProfileMatch[1]));
+  }
+  if (url.pathname === "/api/discover" && request.method === "GET") {
+    if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+    return discoverProfiles(env.DB, url.searchParams.get("q") ?? "");
+  }
+  const publicMediaMatch = url.pathname.match(/^\/api\/public-media\/([^/]+)\/([^/]+)\/(cutout|open)$/);
+  if (publicMediaMatch && request.method === "GET") {
+    if (!env.DB) return new Response("Not found", { status: 404 });
+    const handle = normalizeHandle(decodeURIComponent(publicMediaMatch[1]));
+    const clientId = safeClientId(decodeURIComponent(publicMediaMatch[2]));
+    return handle && clientId
+      ? publicMediaResponse(env, env.DB, handle, clientId, publicMediaMatch[3])
+      : new Response("Not found", { status: 404 });
+  }
   const auth = await authenticated(request, env);
   if (auth instanceof Response) return auth;
   const { db, identity } = auth;
@@ -1420,13 +1725,14 @@ export async function handleWardrobeApi(
   try {
     if (url.pathname === "/api/session" && request.method === "GET") {
       const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
-      return json({ user: {
-        id: identity.id,
-        name: identity.displayName,
-        handle: `@${identity.email.split("@")[0]}`,
-        avatarUrl: identity.avatarUrl,
-        isOwner: Boolean(ownerEmail && identity.email === ownerEmail),
-      } });
+      return json({ user: accountProfileJson(
+        await readAccountProfile(db, identity.id),
+        Boolean(ownerEmail && identity.email === ownerEmail),
+      ) });
+    }
+    if (url.pathname === "/api/profile" && request.method === "PUT") {
+      const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
+      return saveAccountProfile(request, db, identity, Boolean(ownerEmail && identity.email === ownerEmail));
     }
     if (url.pathname === "/api/wardrobe" && request.method === "GET") return getWardrobe(db, identity.id);
     if (url.pathname === "/api/upload" && request.method === "POST") return uploadGarment(request, env, ctx, db, identity);

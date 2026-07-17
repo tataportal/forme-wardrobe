@@ -24,6 +24,7 @@ export type Garment = GarmentAttributes & {
   qaNotes?: string;
   status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "batch_staged" | "batch_processing" | "cutout_pending" | "ready" | "failed";
   favorite?: boolean;
+  isPublic?: boolean;
 };
 
 type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status" | keyof GarmentAttributes> & {

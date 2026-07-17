@@ -99,12 +99,14 @@ type FilterOptions = Record<FilterKey, string[]> & { tonesByColor: Record<string
 type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "colorFamily" | "tone" | "material" | "finish" | "silhouette"> & {
   brand: string;
   tags: string[];
+  isPublic: boolean;
 };
 
 type StoredGarmentEdit = Omit<GarmentDraft, "id">;
 type ApiGarment = Omit<GarmentDraft, "id"> & {
   id: string;
   favorite?: boolean;
+  isPublic?: boolean;
   deleted?: boolean;
   status: Garment["status"];
   image?: string;
@@ -116,7 +118,18 @@ type ApiGarment = Omit<GarmentDraft, "id"> & {
   qaStatus?: "pending" | "passed" | "review";
   qaNotes?: string;
 };
-type WardrobeProfile = { name: string; handle: string; avatarUrl?: string | null; isOwner?: boolean };
+type WardrobeProfile = {
+  name: string;
+  handle: string;
+  bio: string;
+  avatarUrl?: string | null;
+  profilePublic: boolean;
+  discoverable: boolean;
+  showCloset: boolean;
+  showLooks: boolean;
+  isOwner?: boolean;
+};
+type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
 type UploadItem = {
@@ -133,6 +146,7 @@ type UploadItem = {
 type SavedLook = {
   id: string;
   name: string;
+  isPublic?: boolean;
   items: CanvasPiece[];
   createdAt?: string;
   updatedAt?: string;
@@ -617,6 +631,7 @@ const apiPayload = (garment: Garment | GarmentDraft) => ({
   finish: garment.finish,
   silhouette: garment.silhouette,
   favorite: "favorite" in garment ? Boolean(garment.favorite) : false,
+  isPublic: Boolean(garment.isPublic),
   tags: garment.tags ?? [],
 });
 
@@ -1637,7 +1652,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
   onClose: () => void;
   onSave: (profile: StyleProfile) => Promise<void>;
 }) {
-  const [stage, setStage] = useState<"intro" | "audience" | "families" | "result">("intro");
+  const [stage, setStage] = useState<"intro" | "audience" | "families" | "result">(profile?.completed ? "result" : "intro");
   const [audience, setAudience] = useState<StyleAudience>(profile?.audience ?? "hombre");
   const [exploration, setExploration] = useState(profile?.exploration ?? 35);
   const [familyIndex, setFamilyIndex] = useState(0);
@@ -1771,7 +1786,7 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
           <div><small>QUIERO LO FAMILIAR</small><small>SORPRÉNDEME</small></div>
         </div>
         {saveError && <p className="style-save-error" role="alert">{saveError}</p>}
-        <button className="style-primary-action" type="button" disabled={saving} onClick={() => void submitProfile()}><span>{saving ? "GUARDANDO…" : "ENTRAR A MI CLOSET"}</span><b>{saving ? "" : "→"}</b></button>
+        <button className="style-primary-action" type="button" disabled={saving} onClick={() => void submitProfile()}><span>{saving ? "GUARDANDO…" : profile?.completed ? "GUARDAR" : "ENTRAR A MI CLOSET"}</span><b>{saving ? "" : "→"}</b></button>
       </div>}
     </section>
   </div>;
@@ -1792,7 +1807,19 @@ export default function Home() {
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [wardrobeError, setWardrobeError] = useState("");
-  const [profile, setProfile] = useState<WardrobeProfile>({ name: "Tata", handle: "@tataportal" });
+  const [profile, setProfile] = useState<WardrobeProfile>({
+    name: "Tata",
+    handle: "@tataportal",
+    bio: "",
+    profilePublic: false,
+    discoverable: false,
+    showCloset: false,
+    showLooks: false,
+  });
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
   const [canvasPieces, setCanvasPieces] = useState(initialDemoCanvas);
   const [savedLooks, setSavedLooks] = useState<SavedLook[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanEntry[]>([]);
@@ -2032,6 +2059,17 @@ export default function Home() {
 
   useEffect(() => {
     if (!profileOpen) return;
+    setProfileDraft({
+      name: profile.name,
+      handle: profile.handle,
+      bio: profile.bio,
+      profilePublic: profile.profilePublic,
+      discoverable: profile.discoverable,
+      showCloset: profile.showCloset,
+      showLooks: profile.showLooks,
+    });
+    setProfileSaveError("");
+    setProfileSaved(false);
     const closeProfileOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setProfileOpen(false);
     };
@@ -2075,6 +2113,95 @@ export default function Home() {
     }
   }
 
+  function updateProfileDraft<Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) {
+    setProfileDraft((current) => current ? { ...current, [key]: value } : current);
+    setProfileSaved(false);
+    setProfileSaveError("");
+  }
+
+  async function saveAccountSettings() {
+    if (!profileDraft || savingProfile) return;
+    setSavingProfile(true);
+    setProfileSaveError("");
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(profileDraft),
+      });
+      const result = await response.json().catch(() => null) as { profile?: WardrobeProfile; error?: string } | null;
+      if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar tu perfil.");
+      setProfile(result.profile);
+      setProfileDraft({
+        name: result.profile.name,
+        handle: result.profile.handle,
+        bio: result.profile.bio,
+        profilePublic: result.profile.profilePublic,
+        discoverable: result.profile.discoverable,
+        showCloset: result.profile.showCloset,
+        showLooks: result.profile.showLooks,
+      });
+      setProfileSaved(true);
+    } catch (error) {
+      setProfileSaveError(error instanceof Error ? error.message : "No se pudo guardar tu perfil.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function saveExplorationPreference(next: number) {
+    if (!styleProfile) return;
+    const normalized = Math.max(0, Math.min(100, Math.round(next / 5) * 5));
+    const nextProfile = { ...styleProfile, exploration: normalized };
+    setStyleProfile(nextProfile);
+    try {
+      const response = await fetch("/api/style-profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(nextProfile),
+      });
+      const result = await response.json().catch(() => null) as { profile?: StyleProfile; error?: string } | null;
+      if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar cuánto quieres experimentar.");
+      setStyleProfile(result.profile);
+      setStylingRecommendations([]);
+      setRecommendationHistory([]);
+    } catch (error) {
+      setProfileSaveError(error instanceof Error ? error.message : "No se pudo guardar cuánto quieres experimentar.");
+    }
+  }
+
+  async function sharePublicProfile() {
+    if (!profile.profilePublic) {
+      setProfileSaveError("Activa tu perfil público antes de compartirlo.");
+      return;
+    }
+    const url = `${window.location.origin}/${profile.handle}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `${profile.name} en Formé`, text: `Mira mi closet en Formé`, url });
+      else await navigator.clipboard.writeText(url);
+      setProfileSaved(true);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setProfileSaveError("No se pudo compartir el perfil.");
+    }
+  }
+
+  async function toggleOutfitVisibility(look: SavedLook) {
+    const nextPublic = !look.isPublic;
+    setSavedLooks((looks) => looks.map((item) => item.id === look.id ? { ...item, isPublic: nextPublic } : item));
+    try {
+      const response = await fetch(`/api/outfits/${encodeURIComponent(look.id)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: look.name, items: look.items, isPublic: nextPublic }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo cambiar la visibilidad del look.");
+    } catch (error) {
+      setSavedLooks((looks) => looks.map((item) => item.id === look.id ? look : item));
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo cambiar la visibilidad del look.");
+    }
+  }
+
   function openGarmentEditor(item: Garment) {
     setGarmentDraft({
       id: item.id,
@@ -2087,6 +2214,7 @@ export default function Home() {
       finish: item.finish,
       silhouette: item.silhouette,
       tags: item.tags ?? [],
+      isPublic: Boolean(item.isPublic),
     });
     setTagInput("");
     setGarmentSaved(false);
@@ -3269,11 +3397,52 @@ export default function Home() {
             {profileTopStyles.length > 0 && <div className="profile-style-tags">{profileTopStyles.map((family) => <span key={family.id}>{family.label} <b>{family.rating?.affinity}%</b></span>)}</div>}
             <div className="profile-exploration">
               <div><span>CUÁNTO QUIERES EXPERIMENTAR</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
-              <i><b style={{ width: `${styleProfile?.exploration ?? 35}%` }} /></i>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={styleProfile?.exploration ?? 35}
+                onChange={(event) => setStyleProfile((current) => current ? { ...current, exploration: Number(event.target.value) } : current)}
+                onPointerUp={(event) => void saveExplorationPreference(Number(event.currentTarget.value))}
+                onKeyUp={(event) => void saveExplorationPreference(Number(event.currentTarget.value))}
+                onBlur={(event) => void saveExplorationPreference(Number(event.currentTarget.value))}
+                aria-label="Cuánto quiero experimentar"
+              />
+              <div className="profile-exploration-labels"><small>FAMILIAR</small><small>EXPERIMENTAL</small></div>
               <small>Controla cuánto se alejan las sugerencias de lo que ya usas.</small>
             </div>
-            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
+            <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "REVISAR MI CALIBRACIÓN" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
           </section>
+          {profileDraft && <section className="profile-social-settings">
+            <div className="profile-section-heading">
+              <p>PERFIL PÚBLICO</p>
+              <h3>Comparte solo lo que quieras.</h3>
+              <span>Tu closet sigue siendo privado hasta que tú elijas qué mostrar.</span>
+            </div>
+            <div className="profile-public-fields">
+              <label>NOMBRE PÚBLICO<input value={profileDraft.name} maxLength={60} onChange={(event) => updateProfileDraft("name", event.target.value)} /></label>
+              <label>USUARIO<div className="profile-handle-input"><span>@</span><input value={profileDraft.handle.replace(/^@/, "")} maxLength={30} autoCapitalize="none" spellCheck={false} onChange={(event) => updateProfileDraft("handle", `@${event.target.value.replace(/^@/, "")}`)} /></div></label>
+              <label className="profile-bio-field">BIO<textarea value={profileDraft.bio} maxLength={160} rows={3} placeholder="Una línea sobre tu estilo, tu closet o lo que estás buscando." onChange={(event) => updateProfileDraft("bio", event.target.value)} /></label>
+            </div>
+            <div className="profile-privacy-list">
+              <label><span><strong>PERFIL PÚBLICO</strong><small>Crea una página compartible en Formé.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => setProfileDraft((current) => current ? {
+                ...current,
+                profilePublic: event.target.checked,
+                ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
+              } : current)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR PRENDAS PUBLICADAS</strong><small>{personalGarments.filter((item) => item.isPublic).length} seleccionadas en tu closet.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>MOSTRAR LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} seleccionados en Looks guardados.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
+              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>APARECER EN BÚSQUEDAS</strong><small>Permite que otras personas te encuentren dentro de Formé.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
+            </div>
+            <div className="profile-public-url"><span>forme.gallery/{profileDraft.handle || "@tuusuario"}</span><small>Marca prendas y looks como públicos desde sus fichas.</small></div>
+            {profileSaveError && <p className="profile-save-error" role="alert">{profileSaveError}</p>}
+            <div className="profile-social-actions">
+              <button type="button" disabled={!profile.profilePublic} onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PERFIL</button>
+              <button type="button" disabled={!profile.profilePublic} onClick={() => void sharePublicProfile()}>COMPARTIR</button>
+              <button className={profileSaved ? "saved" : ""} type="button" disabled={savingProfile} onClick={() => void saveAccountSettings()}>{savingProfile ? "GUARDANDO…" : profileSaved ? "GUARDADO ✓" : "GUARDAR PERFIL"}</button>
+            </div>
+          </section>}
         </aside>
       </div>}
       <header className="topbar">
@@ -3341,6 +3510,7 @@ export default function Home() {
                     <div className="saved-look-meta">
                       <div><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></div>
                       <div className="saved-look-actions">
+                        <button className={look.isPublic ? "visibility-toggle public" : "visibility-toggle"} type="button" onClick={() => void toggleOutfitVisibility(look)} aria-label={`${look.isPublic ? "Ocultar" : "Mostrar"} ${look.name} en mi perfil`}>{look.isPublic ? "PÚBLICO" : "PRIVADO"}</button>
                         <button className="share-look" type="button" disabled={Boolean(sharingLookId)} onClick={() => void shareLook(look)} aria-label={`Compartir ${look.name} en Instagram`}>{sharingLookId === look.id ? "PREPARANDO…" : "COMPARTIR ↗"}</button>
                         <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
                       </div>
@@ -3716,6 +3886,11 @@ export default function Home() {
                   {garmentDraft.tags.length > 0 && <div className="custom-tag-list">{garmentDraft.tags.map((tag) => <button type="button" key={tag} onClick={() => updateGarmentDraft("tags", garmentDraft.tags.filter((item) => item !== tag))}>#{tag}<span>×</span></button>)}</div>}
                   <div className="tag-input-row"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={handleTagKeyDown} placeholder="viaje, noche, favorito…" /><button type="button" onClick={addDraftTag} disabled={!tagInput.trim()}>AÑADIR ＋</button></div>
                 </div>
+
+                <label className="item-public-toggle">
+                  <span><strong>MOSTRAR EN MI PERFIL</strong><small>Solo aparecerá si también activas la sección de prendas en tu perfil público.</small></span>
+                  <input type="checkbox" checked={garmentDraft.isPublic} onChange={(event) => updateGarmentDraft("isPublic", event.target.checked)} />
+                </label>
 
                 {editingGarment.originalImage && !isStaticDemo && <details className="processing-options">
                   <summary>MEJORAR IMAGEN</summary>

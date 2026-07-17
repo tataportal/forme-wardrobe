@@ -5,10 +5,19 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
   displayName: text("display_name").notNull().default(""),
+  handle: text("handle"),
+  bio: text("bio").notNull().default(""),
   avatarUrl: text("avatar_url"),
+  profilePublic: integer("profile_public", { mode: "boolean" }).notNull().default(false),
+  discoverable: integer("discoverable", { mode: "boolean" }).notNull().default(false),
+  showCloset: integer("show_closet", { mode: "boolean" }).notNull().default(false),
+  showLooks: integer("show_looks", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-}, (table) => [uniqueIndex("users_email_unique").on(table.email)]);
+}, (table) => [
+  uniqueIndex("users_email_unique").on(table.email),
+  uniqueIndex("users_handle_unique").on(table.handle),
+]);
 
 export const garments = sqliteTable("garments", {
   id: text("id").primaryKey(),
@@ -23,6 +32,7 @@ export const garments = sqliteTable("garments", {
   finish: text("finish").notNull(),
   silhouette: text("silhouette").notNull(),
   favorite: integer("favorite", { mode: "boolean" }).notNull().default(false),
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false),
   deleted: integer("deleted", { mode: "boolean" }).notNull().default(false),
   status: text("status").notNull().default("ready"),
   sourceImageKey: text("source_image_key"),
@@ -83,6 +93,7 @@ export const outfits = sqliteTable("outfits", {
   ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: text("client_id").notNull(),
   name: text("name").notNull().default("Conjunto sin nombre"),
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
