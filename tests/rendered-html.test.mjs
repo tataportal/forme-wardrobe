@@ -178,6 +178,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.share-status-message/);
   assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css, /\.assistant-dialogue/);
+  assert.match(css, /\.assistant-dialogue \{ padding:0; border:0; background:transparent/);
+  assert.match(css, /\.assistant-data-readiness \{ padding:0; border:0; background:transparent/);
   assert.match(css, /\.assistant-question-flow/);
   assert.match(css, /\.assistant-response/);
   assert.match(css, /\.style-onboarding-backdrop/);
