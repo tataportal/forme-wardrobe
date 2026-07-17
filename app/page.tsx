@@ -246,6 +246,8 @@ const emptyFilters: WardrobeFilters = {
 const garmentEditsStorageKey = "forme-garment-edits-v1";
 const demoLooksStorageKey = "forme-demo-looks-v1";
 const demoWeekStorageKey = "forme-demo-week-v1";
+const sessionProfileStorageKey = "forme-session-profile-v1";
+const sessionProfileMaxAge = 12 * 60 * 60 * 1000;
 const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 const operationalSiteUrl = "https://forme.gallery/";
 const currentOutfitId = "current-look";
@@ -547,6 +549,49 @@ const garmentNameTranslations: Record<string, string> = {
 
 const translateValue = (value: string) => valueTranslations[value] ?? value;
 const translateGarmentName = (name: string) => garmentNameTranslations[name] ?? name;
+
+function readCachedSessionProfile(): WardrobeProfile | null {
+  try {
+    const stored = sessionStorage.getItem(sessionProfileStorageKey);
+    if (!stored) return null;
+    const cached = JSON.parse(stored) as { profile?: WardrobeProfile; cachedAt?: number };
+    if (!cached.profile || typeof cached.cachedAt !== "number" || Date.now() - cached.cachedAt > sessionProfileMaxAge) {
+      sessionStorage.removeItem(sessionProfileStorageKey);
+      return null;
+    }
+    return cached.profile;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSessionProfile(profile: WardrobeProfile) {
+  try {
+    sessionStorage.setItem(sessionProfileStorageKey, JSON.stringify({ profile, cachedAt: Date.now() }));
+  } catch {
+    // The live session remains the source of truth when browser storage is unavailable.
+  }
+}
+
+function clearCachedSessionProfile() {
+  try {
+    sessionStorage.removeItem(sessionProfileStorageKey);
+  } catch {
+    // Nothing else is required when browser storage is unavailable.
+  }
+}
+
+function profileDraftFrom(profile: WardrobeProfile): ProfileDraft {
+  return {
+    name: profile.name,
+    handle: profile.handle,
+    bio: profile.bio,
+    profilePublic: profile.profilePublic,
+    discoverable: profile.discoverable,
+    showCloset: profile.showCloset,
+    showLooks: profile.showLooks,
+  };
+}
 
 const matchFilters = (garment: Garment, filters: WardrobeFilters) => filterLabels.every(({ key }) => filters[key] === "All" || garment[key] === filters[key]);
 
@@ -2075,9 +2120,19 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       let active = true;
       let sessionAuthenticated = false;
       const loadAccount = async () => {
+        const cachedProfile = readCachedSessionProfile();
+        if (cachedProfile && active) {
+          sessionAuthenticated = true;
+          setDemoMode(false);
+          setSessionStatus("authenticated");
+          setProfile(cachedProfile);
+          if (profileOpen) setProfileDraft(profileDraftFrom(cachedProfile));
+        }
         const sessionResponse = await fetch("/api/session", { cache: "no-store" });
         if (sessionResponse.status === 401 || sessionResponse.status === 403) {
           if (!active) return;
+          clearCachedSessionProfile();
+          sessionAuthenticated = false;
           setDemoMode(true);
           setSessionStatus("guest");
           try {
@@ -2102,6 +2157,8 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
         setDemoMode(false);
         setSessionStatus("authenticated");
         setProfile(session.user);
+        if (profileOpen) setProfileDraft(profileDraftFrom(session.user));
+        cacheSessionProfile(session.user);
         const batchesReady = fetch("/api/batches/status", { cache: "no-store" }).catch(() => null);
         const [wardrobeResponse, outfitsResponse, weekResponse, styleProfileResponse] = await Promise.all([
           batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
@@ -2192,15 +2249,7 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
 
   useEffect(() => {
     if (!profileOpen) return;
-    setProfileDraft({
-      name: profile.name,
-      handle: profile.handle,
-      bio: profile.bio,
-      profilePublic: profile.profilePublic,
-      discoverable: profile.discoverable,
-      showCloset: profile.showCloset,
-      showLooks: profile.showLooks,
-    });
+    setProfileDraft(profileDraftFrom(profile));
     setProfileSaveError("");
     setProfileSaved(false);
     const closeProfileOnEscape = (event: KeyboardEvent) => {
@@ -2265,15 +2314,8 @@ export function WardrobeApp({ initialRoute = "closet" }: { initialRoute?: Wardro
       const result = await response.json().catch(() => null) as { profile?: WardrobeProfile; error?: string } | null;
       if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar tu perfil.");
       setProfile(result.profile);
-      setProfileDraft({
-        name: result.profile.name,
-        handle: result.profile.handle,
-        bio: result.profile.bio,
-        profilePublic: result.profile.profilePublic,
-        discoverable: result.profile.discoverable,
-        showCloset: result.profile.showCloset,
-        showLooks: result.profile.showLooks,
-      });
+      cacheSessionProfile(result.profile);
+      setProfileDraft(profileDraftFrom(result.profile));
       setProfileSaved(true);
     } catch (error) {
       setProfileSaveError(error instanceof Error ? error.message : "No se pudo guardar tu perfil.");

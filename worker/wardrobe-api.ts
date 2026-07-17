@@ -324,6 +324,23 @@ async function readAccountProfile(db: D1Database, ownerId: string): Promise<User
   return row;
 }
 
+async function getSession(request: Request, env: WardrobeEnv): Promise<Response> {
+  if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+  const identity = await identify(request, env);
+  if (!identity) return apiError("Inicia sesión para abrir tu armario.", 401);
+  let row = await env.DB.prepare(`
+    SELECT id, email, display_name, handle, bio, avatar_url,
+      profile_public, discoverable, show_closet, show_looks
+    FROM users WHERE id = ? LIMIT 1
+  `).bind(identity.id).first<UserProfileRow>();
+  if (!row) {
+    await ensureUser(env.DB, identity);
+    row = await readAccountProfile(env.DB, identity.id);
+  }
+  const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
+  return json({ user: accountProfileJson(row, Boolean(ownerEmail && identity.email === ownerEmail)) });
+}
+
 async function saveAccountProfile(request: Request, db: D1Database, identity: Identity, isOwner: boolean): Promise<Response> {
   const value = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!value) return apiError("Revisa los datos de tu perfil.", 400);
@@ -1762,18 +1779,12 @@ export async function handleWardrobeApi(
       ? publicMediaResponse(env, env.DB, handle, clientId, publicMediaMatch[3])
       : new Response("Not found", { status: 404 });
   }
+  if (url.pathname === "/api/session" && request.method === "GET") return getSession(request, env);
   const auth = await authenticated(request, env);
   if (auth instanceof Response) return auth;
   const { db, identity } = auth;
 
   try {
-    if (url.pathname === "/api/session" && request.method === "GET") {
-      const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
-      return json({ user: accountProfileJson(
-        await readAccountProfile(db, identity.id),
-        Boolean(ownerEmail && identity.email === ownerEmail),
-      ) });
-    }
     if (url.pathname === "/api/profile" && request.method === "PUT") {
       const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
       return saveAccountProfile(request, db, identity, Boolean(ownerEmail && identity.email === ownerEmail));

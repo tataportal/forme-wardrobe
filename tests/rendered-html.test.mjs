@@ -65,6 +65,12 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /useState\(formeBasics\)/);
   assert.match(page, /function beginGoogleSignIn/);
   assert.match(page, /function navigateWardrobeRoute/);
+  assert.match(page, /sessionProfileStorageKey/);
+  assert.match(page, /readCachedSessionProfile/);
+  assert.match(page, /cacheSessionProfile/);
+  assert.match(page, /clearCachedSessionProfile/);
+  assert.match(page, /const cachedProfile = readCachedSessionProfile\(\)/);
+  assert.match(page, /profileDraftFrom/);
   assert.match(page, /window\.history\.pushState/);
   assert.doesNotMatch(page, /sessionStatus === "checking" \? "ENTRANDO…"/);
   assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
@@ -77,6 +83,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(auth, /SameSite=Lax/);
   assert.match(auth, /crypto\.subtle\.verify/);
   assert.match(worker, /readNativeSession/);
+  assert.match(worker, /async function getSession/);
+  assert.match(worker, /if \(url\.pathname === "\/api\/session" && request\.method === "GET"\) return getSession\(request, env\)/);
   assert.doesNotMatch(page, /entry-gate/);
   assert.match(page, /Básicos Formé/);
   assert.match(page, /visiblePersonalGarments/);
