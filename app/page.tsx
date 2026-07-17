@@ -2097,6 +2097,10 @@ export function WardrobeApp({
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
   const retroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
+  const retroShowcaseLooks: SavedLook[] = savedLooks.length
+    ? savedLooks.slice(0, 3)
+    : [{ id: "retro-demo-look", name: "Demo Formé", items: initialDemoCanvas }];
+  const retroPlannedCount = weekDays.filter((day) => weeklyPlan.some((entry) => entry.date === day.key)).length;
   const retroReadyCount = personalGarments.filter((item) => item.status === "ready" || item.status === "ghosted").length;
   const retroFavoriteCount = personalGarments.filter((item) => item.favorite).length;
   const insightGarments = demoMode ? sharedBasics : personalGarments;
@@ -3650,7 +3654,7 @@ export function WardrobeApp({
   }
 
   return (
-    <main className={`site-shell view-${view}${isRetroCloset ? " closet-v2" : ""}`}>
+    <main className={`site-shell view-${view}${isRetroCloset ? " closet-v2 forme-v2" : ""}`}>
       {!demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -3885,13 +3889,35 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
-              <div className="saved-looks-heading">
+              {isRetroCloset ? <header className="v2-section-hero v2-looks-hero">
+                <div className="v2-section-copy">
+                  <span>ARCHIVO PERSONAL / LOOKS</span>
+                  <h1>Looks</h1>
+                  <p>Guarda combinaciones, vuelve a editarlas y deja lista tu semana.</p>
+                  <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
+                  <dl className="v2-section-metrics">
+                    <div><dt>Guardados</dt><dd>{savedLooks.length}</dd></div>
+                    <div><dt>Esta semana</dt><dd>{retroPlannedCount}/7</dd></div>
+                    <div><dt>Públicos</dt><dd>{savedLooks.filter((look) => look.isPublic).length}</dd></div>
+                  </dl>
+                </div>
+                <figure className="v2-looks-stack" aria-label="Vista previa de looks guardados">
+                  <figcaption><span>COMPOSICIONES</span><strong>{retroShowcaseLooks.length} EN FOCO</strong></figcaption>
+                  <div>
+                    {retroShowcaseLooks.map((look, index) => <article key={look.id} style={{ "--look-slot": index } as CSSProperties}>
+                      <LookPreview look={look} garmentById={garmentById} />
+                      <span>{look.name}</span>
+                    </article>)}
+                  </div>
+                  <i aria-hidden="true" />
+                </figure>
+              </header> : <div className="saved-looks-heading">
                 <div><h2>Looks</h2></div>
                 <div className="saved-looks-heading-actions">
                   <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
                   <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
                 </div>
-              </div>
+              </div>}
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
                 {savedLooks.map((look) => (
@@ -3930,6 +3956,27 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
+              {isRetroCloset && <header className="v2-section-hero v2-assistant-hero">
+                <div className="v2-section-copy">
+                  <span>LECTURA PERSONAL / ASISTENTE</span>
+                  <h1>Asistente</h1>
+                  <p>Pregunta desde una ocasión concreta. Formé cruza tu perfil con las prendas y looks que ya tienes.</p>
+                  <dl className="v2-section-metrics">
+                    <div><dt>Perfil</dt><dd>{assistantProfileReady ? "OK" : "–"}</dd></div>
+                    <div><dt>Prendas</dt><dd>{assistantGarments.length}</dd></div>
+                    <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
+                  </dl>
+                </div>
+                <figure className="v2-assistant-map" aria-label="Fuentes que usa el asistente">
+                  <figcaption><span>LECTURA ACTIVA</span><strong>{assistantDataGaps.length ? "POR COMPLETAR" : "LISTA"}</strong></figcaption>
+                  <div className="v2-assistant-nodes">
+                    <article className={assistantProfileReady ? "ready" : ""}><span>01</span><strong>Perfil</strong><small>Preferencias y estilo</small></article>
+                    <article className={assistantClosetReady ? "ready" : ""}><span>02</span><strong>Closet</strong><small>Prendas disponibles</small></article>
+                    <article className={savedLooks.length > 0 ? "ready" : ""}><span>03</span><strong>Looks</strong><small>Lo que guardas</small></article>
+                    <div className="v2-assistant-output"><span>FORMÉ</span><strong>Una respuesta para ti</strong></div>
+                  </div>
+                </figure>
+              </header>}
               <section className="assistant-dialogue">
                 <div className="assistant-dialogue-copy">
                   <h2>¿Qué necesitas hoy?</h2>
