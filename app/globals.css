@@ -912,12 +912,19 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .about-story blockquote { margin-top:70px; font-size:43px; }
   .about-cta { min-height:360px; padding:54px 18px; }
   .about-cta h2 { font-size:52px; }
-  .pricing-page-content { padding:52px 16px 68px; }
+  .pricing-page-content { padding:52px 16px calc(150px + env(safe-area-inset-bottom)); }
   .pricing-page .pricing-intro h1 { font-size:52px; }
   .pricing-page .pricing-intro span { font-size:var(--type-body); }
-  .pricing-page .pricing-cycle { margin-top:32px; }
-  .pricing-page .pricing-plan-list { grid-template-columns:1fr; }
-  .pricing-page .pricing-plan-list article { min-height:0; }
+  .pricing-page .pricing-cycle { margin:32px 0 20px; }
+  .pricing-page .pricing-cycle-note { margin:-8px 0 22px; }
+  .pricing-page .pricing-plan-list { grid-template-columns:1fr; gap:16px; }
+  .pricing-page .pricing-plan-list article { min-height:0; padding:24px 20px 22px; border-radius:18px; }
+  .pricing-page .pricing-plan-heading { gap:14px; }
+  .pricing-page .pricing-plan-description { margin-top:18px; line-height:1.5; }
+  .pricing-page .pricing-plan-list ul { margin-top:20px; gap:10px; }
+  .pricing-page .pricing-plan-list article > small { margin-top:22px; line-height:1.4; }
+  .pricing-page .pricing-plan-list article > button { min-height:48px; margin-top:18px; }
+  .pricing-page .pricing-beta-note { margin-top:26px; padding:0 10px; line-height:1.5; }
   .guest-closet { padding-top:10px; }
   .guest-welcome-actions { align-items:stretch; flex-direction:column; }
   .guest-welcome-actions button { width:100%; }

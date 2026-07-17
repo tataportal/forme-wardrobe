@@ -242,6 +242,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.saved-looks-heading-actions/);
   assert.match(css, /\.insights-dashboard/);
   assert.match(css, /--canvas-greige:#d9d5cc/);
+  assert.match(css, /padding:52px 16px calc\(150px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.pricing-page \.pricing-plan-list \{ grid-template-columns:1fr; gap:16px; \}/);
+  assert.match(css, /\.pricing-page \.pricing-plan-list article > button \{ min-height:48px; margin-top:18px; \}/);
 });
 
 test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
