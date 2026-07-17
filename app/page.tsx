@@ -239,17 +239,17 @@ const maxUploadBytes = 20 * 1024 * 1024;
 const uploadStatusLabels: Record<UploadStatus, string> = {
   ready: "LISTA",
   uploading: "SUBIENDO",
-  processing: "CREANDO RECORTE",
-  done: "TERMINADA",
-  waiting: "GUARDADA",
+  processing: "PREPARANDO",
+  done: "LISTA",
+  waiting: "EN ESPERA",
   failed: "REVISAR",
 };
 
-const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "Smart", formal: "Formal", experimental: "Experimental" };
+const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "Pulido", formal: "Formal", experimental: "Experimental" };
 const styleMomentLabels: Record<StyleMoment, string> = { day: "Día", night: "Noche" };
 const styleOccasionLabels: Record<StyleOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento" };
 const weeklyOccasionLabels: Record<WeeklyOccasion, string> = { daily: "Diario", work: "Trabajo", dinner: "Cena", event: "Evento", weekend: "Fin de semana" };
-const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Statement", minimal: "Esencial", layered: "Capas" };
+const stylingStrategyLabels: Record<StylingStrategy, string> = { balanced: "Seguro", contrast: "Contraste", statement: "Protagonista", minimal: "Esencial", layered: "Capas" };
 const assistantPresets: AssistantPreset[] = [
   {
     id: "today",
@@ -265,19 +265,19 @@ const assistantPresets: AssistantPreset[] = [
   },
   {
     id: "week",
-    label: "¿Cómo visto mi semana?",
-    detail: "Cinco direcciones que puedas guardar y rotar.",
+    label: "¿Qué uso esta semana?",
+    detail: "Cinco opciones para guardar y repetir.",
     followup: "¿Qué domina tu semana?",
     options: [
       { id: "week-office", label: "Oficina", detail: "Bases repetibles con capas pulidas", occasion: "work", code: "smart", moment: "day", intent: "outfit", focus: "una semana de oficina" },
       { id: "week-mixed", label: "Semana mixta", detail: "Del día a una salida", occasion: "daily", code: "smart", moment: "day", intent: "outfit", focus: "una semana con planes mixtos" },
-      { id: "week-night", label: "Más planes de noche", detail: "Looks que suben el registro", occasion: "dinner", code: "smart", moment: "night", intent: "outfit", focus: "una semana con planes de noche" },
+      { id: "week-night", label: "Más planes de noche", detail: "Opciones con más presencia", occasion: "dinner", code: "smart", moment: "night", intent: "outfit", focus: "una semana con planes de noche" },
       { id: "week-casual", label: "Todo casual", detail: "Comodidad con proporción", occasion: "daily", code: "casual", moment: "day", intent: "outfit", focus: "una semana casual" },
     ],
   },
   {
     id: "rotation",
-    label: "Quiero usar más mi closet",
+    label: "Quiero usar más lo que tengo",
     detail: "Prioriza prendas que ya son tuyas, pero aparecen poco.",
     followup: "¿Qué quieres recuperar?",
     options: [
@@ -295,7 +295,7 @@ const assistantPresets: AssistantPreset[] = [
     options: [
       { id: "explore-color", label: "Más color", detail: "Un acento fuera de tu base habitual", occasion: "daily", code: "experimental", moment: "day", intent: "experimental", focus: "introducir más color" },
       { id: "explore-shape", label: "Otra silueta", detail: "Cambiar proporción antes que comprar", occasion: "event", code: "experimental", moment: "night", intent: "experimental", focus: "probar otra silueta" },
-      { id: "explore-polished", label: "Más pulido", detail: "Subir el registro de lo cotidiano", occasion: "work", code: "formal", moment: "day", intent: "experimental", focus: "verte más pulido" },
+      { id: "explore-polished", label: "Más pulido", detail: "Dar más intención a lo cotidiano", occasion: "work", code: "formal", moment: "day", intent: "experimental", focus: "verte más pulido" },
       { id: "explore-relaxed", label: "Más relajado", detail: "Volumen y comodidad con intención", occasion: "daily", code: "casual", moment: "day", intent: "experimental", focus: "verte más relajado" },
     ],
   },
@@ -303,12 +303,12 @@ const assistantPresets: AssistantPreset[] = [
     id: "missing",
     label: "¿Qué falta en mi closet?",
     detail: "Lee huecos reales antes de sugerirte comprar algo.",
-    followup: "¿Qué quieres desbloquear?",
+    followup: "¿Qué quieres resolver?",
     options: [
-      { id: "missing-combinations", label: "Más combinaciones", detail: "Categorías puente y proporción", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "crear más combinaciones" },
+      { id: "missing-combinations", label: "Más combinaciones", detail: "Piezas que multiplican opciones", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "crear más combinaciones" },
       { id: "missing-work", label: "Trabajo", detail: "Cobertura para días pulidos", occasion: "work", code: "smart", moment: "day", intent: "missing", focus: "vestirte para trabajo" },
       { id: "missing-night", label: "Noche", detail: "Opciones para cena y evento", occasion: "dinner", code: "smart", moment: "night", intent: "missing", focus: "tener más opciones de noche" },
-      { id: "missing-weather", label: "Entretiempo", detail: "Capas ligeras y piezas puente", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "resolver el entretiempo" },
+      { id: "missing-weather", label: "Entretiempo", detail: "Capas ligeras fáciles de combinar", occasion: "daily", code: "casual", moment: "day", intent: "missing", focus: "resolver el entretiempo" },
     ],
   },
 ];
@@ -542,7 +542,7 @@ async function whiteStudioCutout(sourceUrl: string): Promise<{ file: File; qaSta
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
   const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("No se pudo preparar el recorte.");
+  if (!context) throw new Error("No se pudo preparar la imagen.");
   context.drawImage(bitmap, 0, 0);
   bitmap.close();
   const image = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -604,7 +604,7 @@ async function whiteStudioCutout(sourceUrl: string): Promise<{ file: File; qaSta
     ? "La silueta quedó demasiado cerca del borde o con una proporción inusual."
     : "Silueta completa, márgenes correctos y fondo exterior transparente.";
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("No se pudo guardar el recorte.");
+  if (!blob) throw new Error("No se pudo guardar la imagen.");
   return { file: new File([blob], "cutout.png", { type: "image/png" }), qaStatus: needsReview ? "review" : "passed", qaNotes };
 }
 const apiPayload = (garment: Garment | GarmentDraft) => ({
@@ -840,7 +840,7 @@ function stylingReason(strategy: StylingStrategy, top: Garment, bottom: Garment,
   const context = `${styleOccasionLabels[occasion].toLocaleLowerCase()} de ${styleMomentLabels[moment].toLocaleLowerCase()}`;
   if (strategy === "balanced") return `${topName} y ${bottomName} construyen una base limpia; ${outerName} mantiene la paleta y equilibra el volumen. Es la opción más fácil de llevar para ${context}.`;
   if (strategy === "contrast") return `${outerName} introduce contraste de color o material sobre la base de ${topName} y ${bottomName}. Las siluetas no compiten, así que el look se siente intencional para ${context}.`;
-  if (strategy === "minimal") return `${topName}, ${bottomName} y ${outerName} comparten una lectura contenida. La variación está en la proporción y no en sumar ruido; funciona como uniforme para ${context}.`;
+  if (strategy === "minimal") return `${topName}, ${bottomName} y ${outerName} mantienen una paleta tranquila. La proporción evita que el look se vea plano y funciona como uniforme para ${context}.`;
   if (strategy === "layered") return `${outerName} se usa abierto para dejar visible ${topName}; ${bottomName} sostiene la silueta. La diferencia de materiales le da profundidad sin perder claridad para ${context}.`;
   return `${outerName} funciona como pieza protagonista. ${topName} y ${bottomName} permanecen contenidos para dejarle el foco sin perder proporción; funciona especialmente bien para ${context}.`;
 }
@@ -1009,7 +1009,7 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
     },
     {
       id: "statement" as StylingStrategy,
-      title: "Statement",
+      title: "Protagonista",
       name: `${styleCodeLabels[code]} · Monocromo`,
       reason: "La silueta negra conecta top, pantalón y accesorios. El tacón estiliza la base y el tote mantiene el look funcional.",
       ids: ["top-oversized-black-tee", "bottom-black-trouser", "footwear-black-pumps", "accessory-black-tote", "accessory-black-sunglasses"],
@@ -1025,7 +1025,7 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
       id: "layered" as StylingStrategy,
       title: "Capas",
       name: `${styleMomentLabels[moment]} · Base oscura`,
-      reason: "La camiseta negra y el denim lavado construyen una base tonal; los zapatos marrones y la gorra cambian el registro sin perder comodidad.",
+      reason: "La camiseta negra y el denim lavado construyen una base tonal; los zapatos marrones y la gorra hacen que se vea menos deportiva sin perder comodidad.",
       ids: ["top-oversized-black-tee", "bottom-black-jeans", "footwear-brown-leather-shoes", "accessory-black-cap"],
     },
   ];
@@ -1056,7 +1056,7 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
 const iterationProfiles = [
   { id: "clean", title: "Limpio", outer: /collarless|coach|field|shell/, footwear: /white|sneaker/, accessory: /tote/ },
   { id: "contrast", title: "Contraste", outer: /puffer|fleece|tan|camel|sage|denim/, footwear: /black leather/, accessory: /sunglasses/ },
-  { id: "statement", title: "Statement", outer: /graphic|embroidered|cape|poncho|transparent|varsity/, footwear: /pump|black/, accessory: /sunglasses|beanie/ },
+  { id: "statement", title: "Protagonista", outer: /graphic|embroidered|cape|poncho|transparent|varsity/, footwear: /pump|black/, accessory: /sunglasses|beanie/ },
   { id: "tailored", title: "Pulido", outer: /blazer|coat|trench|leather/, footwear: /brown|black leather/, accessory: /tote/ },
   { id: "relaxed", title: "Relajado", outer: /parka|puffer|coach|fleece|bomber|blouson/, footwear: /sneaker/, accessory: /cap|beanie/ },
 ] as const;
@@ -1204,8 +1204,8 @@ function buildAssistantAnswer({
   const usedGarmentIds = new Set(savedLooks.flatMap((look) => look.items.map((item) => item.garmentId)));
   const underusedCount = garments.filter((garment) => !usedGarmentIds.has(garment.id)).length;
 
-  let title = `${salutation}empezaría por cinco direcciones reales.`;
-  let summary = `Las opciones responden a ${followup.focus} y se construyen con las prendas disponibles en tu closet, sin inventar piezas.`;
+  let title = `${salutation}te propongo cinco opciones.`;
+  let summary = `Todas parten de ${followup.focus} y de prendas que ya tienes.`;
   if (followup.intent === "underused") {
     title = `${salutation}hay ${underusedCount} piezas que todavía pueden entrar en rotación.`;
     summary = `Voy a priorizar prendas que aparecen poco o nunca en tus ${savedLooks.length} ${savedLooks.length === 1 ? "look guardado" : "looks guardados"}, manteniendo una base fácil de usar.`;
@@ -1214,29 +1214,29 @@ function buildAssistantAnswer({
     title = `${salutation}vamos a construir alrededor de tus favoritas.`;
     summary = `Parto de ${favoriteCount || "las"} piezas marcadas como favoritas y cambio sus acompañantes para que no termines repitiendo el mismo look.`;
   } else if (followup.intent === "experimental") {
-    title = `${salutation}podemos mover el look sin perder tu centro.`;
-    summary = `La propuesta busca ${followup.focus}. Tu nivel de exploración y las familias que elegiste regulan qué tan lejos se mueve cada opción.`;
+    title = `${salutation}podemos probar algo nuevo sin dejar de parecerte.`;
+    summary = `Voy a cambiar una variable por vez —color, proporción o capa— para ${followup.focus}.`;
   } else if (followup.intent === "missing") {
     title = missingCategories.length
       ? `${salutation}el hueco principal está en ${missingCategories.slice(0, 2).map((category) => translateValue(category).toLocaleLowerCase()).join(" y ")}.`
       : `${salutation}no falta una categoría completa; falta balancear lo que ya tienes.`;
     summary = missingCategories.length
-      ? `Completar esa cobertura desbloquea más looks para ${followup.focus}. Primero conviene probar el efecto con los básicos compartidos antes de comprar.`
-      : `${translateValue(dominantCategory ?? "tu categoría principal")} concentra la mayor parte del closet. Para ${followup.focus}, una pieza puente en una categoría menos representada aportaría más que otra variante de lo mismo.`;
+      ? `Antes de comprar, prueba esa categoría con los básicos Formé y mira si realmente te da más opciones para ${followup.focus}.`
+      : `${translateValue(dominantCategory ?? "tu categoría principal")} es lo que más se repite. Para ${followup.focus}, te serviría más sumar otra categoría que otra versión de lo mismo.`;
   }
 
   return {
     question: preset.label,
     followup: followup.label,
-    eyebrow: followup.intent === "missing" ? "LECTURA PERSONAL" : "RESPUESTA PERSONALIZADA",
+    eyebrow: "PARA TI",
     title,
     summary,
     intent: followup.intent,
     signals: [
-      demoMode ? "Persona: modo de prueba, todavía sin cuenta" : `Persona: ${profile.name} · ${profile.handle}`,
-      topStyles.length ? `Perfil: ${topStyles.join(" + ")} · exploración ${styleProfile?.exploration ?? 35}%` : "Perfil: falta calibrar tus preferencias de estilo",
-      garments.length ? `Closet: ${garments.length} prendas · base ${translateValue(dominantColor ?? "sin definir")} · ${translateValue(dominantMaterial ?? "material mixto")}` : "Closet: todavía no hay prendas personales para leer",
-      `Uso: ${savedLooks.length} looks guardados · ${weeklyPlan.length} días planeados`,
+      demoMode ? "Esta es una muestra; al entrar usaremos tu propio closet." : `${profile.name}, estas opciones parten de tus preferencias guardadas.`,
+      topStyles.length ? `${topStyles.join(" y ")} son las direcciones que más te representan.` : "Calibra tu estilo para afinar estas opciones.",
+      garments.length ? `Tu base combina ${translateValue(dominantColor ?? "varios colores").toLocaleLowerCase()} con ${translateValue(dominantMaterial ?? "materiales mixtos").toLocaleLowerCase()}.` : "Añade prendas para recibir opciones de tu propio closet.",
+      underusedCount > 0 ? `${underusedCount} prendas todavía no aparecen en tus looks guardados.` : `${savedLooks.length} looks guardados y ${weeklyPlan.length} días planeados.`,
     ],
   };
 }
@@ -1467,7 +1467,7 @@ function WeeklyPlanView({
   return (
     <section className="week-view">
       <div className="app-section-heading week-heading">
-        <div><p>PLAN SEMANAL</p><h2>Viste tu semana</h2><span>Asigna tus looks guardados y vuelve a ellos cuando toque vestirte.</span></div>
+        <div><h2>Tu semana</h2><span>Deja listo qué vas a usar cada día.</span></div>
         <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
       </div>
 
@@ -1493,7 +1493,7 @@ function WeeklyPlanView({
             </button>
             <div className="day-look-meta"><div><p>LOOK DEL DÍA</p><h3>{selectedLook.name}</h3><span>{selectedLook.items.length} piezas · {weeklyOccasionLabels[selectedEntry.occasion]}</span></div><button type="button" onClick={() => onToggleWorn(selectedEntry)}>{selectedEntry.worn ? "DESMARCAR" : "YA LO USÉ ✓"}</button></div>
             <button className="week-remove" type="button" onClick={() => onRemove(selectedDate)}>QUITAR DEL DÍA</button>
-          </> : <div className="day-plan-empty"><span>＋</span><h3>Este día está libre</h3><p>Elige uno de tus looks guardados para dejarlo listo.</p><button type="button" onClick={onCreateLook}>CREAR UN LOOK EN CANVAS →</button></div>}
+          </> : <div className="day-plan-empty"><span>＋</span><h3>Aún no elegiste un look</h3><p>Elige uno de tus looks guardados o crea uno nuevo.</p><button type="button" onClick={onCreateLook}>CREAR UN LOOK →</button></div>}
         </section>
 
         <aside className="week-look-library">
@@ -1552,8 +1552,8 @@ function WardrobeInsightsView({
       ? `${translateValue(colorCounts[0][0])} concentra ${dominantColorShare}% de tu paleta. ${dominantColorShare > 45 ? "Úsalo como base y rota acentos para que los looks no se sientan repetidos." : "La paleta está suficientemente repartida para crear contraste sin comprar más."}`
       : "Añade prendas para construir una lectura real de tu paleta.",
     missingCategory
-      ? `Tu mayor hueco está en ${translateValue(missingCategory).toLocaleLowerCase()}. Completar esa categoría desbloquea más combinaciones reales.`
-      : "Tienes cobertura en todas las categorías esenciales: ya puedes construir looks completos sin piezas de relleno.",
+      ? `Hay espacio para sumar ${translateValue(missingCategory).toLocaleLowerCase()}. Una pieza de esa categoría te daría más opciones que repetir otra de las que ya tienes.`
+      : "Ya tienes las categorías necesarias para armar looks completos con lo que hay en tu closet.",
     savedLooks.length > 0
       ? `Tienes ${savedLooks.length} ${savedLooks.length === 1 ? "look guardado" : "looks guardados"}. Planificar la semana hará visible cuáles piezas sí rotas y cuáles se quedan quietas.`
       : "Aún no hay looks guardados. Empieza con una base simple y usa Mezclar para probar cinco direcciones.",
@@ -1561,38 +1561,38 @@ function WardrobeInsightsView({
 
   return (
     <section className="insights-view">
-      <div className="app-section-heading insights-heading"><div><p>LECTURA DEL ARMARIO</p><h2>Lo que ya tienes</h2><span>Se actualiza con la ficha de cada prenda, tus looks y el plan semanal.</span></div><button type="button" onClick={onGoToPieces}>REVISAR PRENDAS →</button></div>
+      <div className="app-section-heading insights-heading"><div><h2>Lo que dice tu closet</h2><span>Patrones útiles para vestirte mejor con lo que ya tienes.</span></div><button type="button" onClick={onGoToPieces}>VER PRENDAS →</button></div>
       <div className="insights-dashboard">
         <article className="wardrobe-score-card">
           <div className="score-ring" style={{ "--score": `${wardrobeScore * 3.6}deg` } as CSSProperties}><span><strong>{wardrobeScore}</strong><small>/100</small></span></div>
-          <div><p>CAPACIDAD DEL ARMARIO</p><h3>{wardrobeScore >= 80 ? "Listo para rotar" : wardrobeScore >= 55 ? "Buena base" : "Todavía construyéndose"}</h3><span>Medimos cobertura de categorías, prendas listas y looks que ya puedes reutilizar.</span></div>
+          <div><p>QUÉ TAN FÁCIL ES ARMAR LOOKS</p><h3>{wardrobeScore >= 80 ? "Tienes muchas opciones" : wardrobeScore >= 55 ? "Tienes una buena base" : "Aún faltan algunas bases"}</h3><span>Sube cuando cubres más categorías y guardas looks que puedes repetir.</span></div>
         </article>
         <div className="insight-metric-grid">
-          <article><span>PRENDAS</span><strong>{garments.length}</strong><small>{readyCount} listas para Canvas</small></article>
+          <article><span>PRENDAS</span><strong>{garments.length}</strong><small>{readyCount} listas para usar</small></article>
           <article><span>SEMANA</span><strong>{plannedEntries.length}/7</strong><small>{wornEntries.length} marcadas como usadas</small></article>
-          <article><span>LOOKS</span><strong>{savedLooks.length}</strong><button type="button" onClick={onGoToLooks}>ABRIR ARCHIVO →</button></article>
+          <article><span>LOOKS</span><strong>{savedLooks.length}</strong><button type="button" onClick={onGoToLooks}>VER GUARDADOS →</button></article>
         </div>
       </div>
 
       <div className="insight-content-grid">
         <section className="composition-panel">
-          <div className="insight-panel-heading"><p>COMPOSICIÓN</p><h3>Balance por categoría</h3></div>
+          <div className="insight-panel-heading"><h3>Tus categorías</h3></div>
           <div className="composition-list">{categoryCounts.map(([category, count]) => <div key={category}><span>{translateValue(category)}</span><i><b style={{ width: `${count / maxCategoryCount * 100}%` }} /></i><strong>{count}</strong></div>)}</div>
         </section>
         <section className="palette-panel">
-          <div className="insight-panel-heading"><p>PALETA + MATERIALES</p><h3>Tu lenguaje visual</h3></div>
+          <div className="insight-panel-heading"><h3>Colores y materiales</h3></div>
           <div className="palette-list">{colorCounts.slice(0, 5).map(([color, count], index) => <span key={color}><i className={`palette-swatch palette-${color.toLocaleLowerCase().replace(/[^a-z]+/g, "-")}`} />{translateValue(color)}<small>{count}</small>{index === 0 && <b>BASE</b>}</span>)}</div>
           <div className="material-list">{materialCounts.slice(0, 5).map(([material, count]) => <span key={material}>{translateValue(material)} <b>{count}</b></span>)}</div>
         </section>
       </div>
 
       <section className="insight-notes">
-        <div className="insight-panel-heading"><p>INSIGHTS</p><h3>Qué haría ahora</h3></div>
+        <div className="insight-panel-heading"><h3>Qué probar ahora</h3></div>
         <div>{insights.map((insight, index) => <article key={insight}><span>0{index + 1}</span><p>{insight}</p></article>)}</div>
       </section>
 
       <section className="versatile-section">
-        <div className="insight-panel-heading"><p>PIEZAS PUENTE</p><h3>Las más fáciles de repetir</h3><span>Neutros, cortes combinables y acabados que conviven con más prendas.</span></div>
+        <div className="insight-panel-heading"><h3>Tus prendas más versátiles</h3><span>Son las que combinan con más cosas de tu closet.</span></div>
         <div className="versatile-grid">{versatileGarments.map((garment) => <button type="button" onClick={() => onOpenGarment(garment)} key={garment.id}><img src={imageSrc(garment.image)} alt={translateGarmentName(garment.name)} /><span><strong>{translateGarmentName(garment.name)}</strong><small>{translateValue(garment.tone)} · {translateValue(garment.silhouette)}</small></span></button>)}</div>
       </section>
     </section>
@@ -1618,9 +1618,9 @@ function ClosetGarmentGrid({
     {garments.map((item) => <article className="garment-card" key={item.id}>
       <div className="image-wrap">
         <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
-        {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">{item.status.startsWith("batch") ? "LOTE LOW EN PROCESO" : item.status === "cutout_pending" ? "TERMINANDO BORDE" : "PREPARANDO RECORTE"}</span>}
-        {item.status === "failed" && <span className="processing-badge failed">REVISAR RECORTE</span>}
-        <button className="card-detail-open" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Abrir ficha de"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "VER FICHA ↗"}</span></button>
+        {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">PREPARANDO PRENDA</span>}
+        {item.status === "failed" && <span className="processing-badge failed">NECESITA REVISIÓN</span>}
+        <button className="card-detail-open" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "EDITAR ↗"}</span></button>
         {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
         <button className="card-studio-add" onClick={() => onAdd(item)}>AÑADIR AL CANVAS <span>＋</span></button>
       </div>
@@ -1766,8 +1766,8 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
           {rankedFamilies.map((item, index) => <article key={item.id}><span>0{index + 1}</span><strong>{item.label}</strong><b>{item.affinity}%</b></article>)}
         </div>
         <div className="style-exploration-control">
-          <div><span>NIVEL EXPERIMENTAL</span><strong>{exploration}%</strong></div>
-          <input type="range" min="0" max="100" step="5" value={exploration} onChange={(event) => setExploration(Number(event.target.value))} aria-label="Nivel experimental" />
+          <div><span>¿CUÁNTO QUIERES EXPERIMENTAR?</span><strong>{exploration}%</strong></div>
+          <input type="range" min="0" max="100" step="5" value={exploration} onChange={(event) => setExploration(Number(event.target.value))} aria-label="Cuánto quiero experimentar" />
           <div><small>QUIERO LO FAMILIAR</small><small>SORPRÉNDEME</small></div>
         </div>
         {saveError && <p className="style-save-error" role="alert">{saveError}</p>}
@@ -1910,9 +1910,9 @@ export default function Home() {
     && assistantClosetCategories.has("Bottoms")
     && (assistantClosetCategories.has("Outerwear") || assistantClosetCategories.has("Tailoring"));
   const assistantDataGaps = [
-    demoMode ? "Inicia sesión para que las respuestas partan de tu identidad y no del closet de prueba." : "",
-    !demoMode && !assistantProfileReady ? "Calibra tu estilo para que Formé entienda afinidad, límites y nivel de exploración." : "",
-    !demoMode && !assistantClosetReady ? "Añade al menos ocho prendas y una base de top, pantalón y capa para ganar precisión." : "",
+    demoMode ? "Entra para recibir recomendaciones con tus prendas y preferencias." : "",
+    !demoMode && !assistantProfileReady ? "Cuéntanos qué te gusta para ajustar las recomendaciones a ti." : "",
+    !demoMode && !assistantClosetReady ? "Añade al menos ocho prendas —incluyendo una parte de arriba, un pantalón y una capa— para recomendarte looks completos." : "",
   ].filter(Boolean);
 
   useEffect(() => {
@@ -2214,7 +2214,7 @@ export default function Home() {
       body.append("qaNotes", cutout.qaNotes);
       const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}/cutout`, { method: "POST", body });
       const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
-      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo terminar el recorte.");
+      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo terminar la imagen.");
       setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
       return result.garment;
     } finally {
@@ -2262,7 +2262,7 @@ export default function Home() {
     const notices = [
       oversized ? `${oversized} ${oversized === 1 ? "foto supera" : "fotos superan"} 20 MB` : "",
       invalid ? `${invalid} ${invalid === 1 ? "archivo no es una imagen" : "archivos no son imágenes"}` : "",
-      overflow ? `el lote admite hasta ${maxBatchFiles} prendas` : "",
+      overflow ? `puedes subir hasta ${maxBatchFiles} prendas a la vez` : "",
     ].filter(Boolean);
     setUploadError(notices.join(" · "));
   }
@@ -2308,10 +2308,10 @@ export default function Home() {
         if (item.garmentId) {
           const retryResponse = await fetch(`/api/garments/${encodeURIComponent(item.garmentId)}/retry`, { method: "POST" });
           const retryResult = await retryResponse.json().catch(() => null) as { job?: { status?: string }; error?: string } | null;
-          if (!retryResponse.ok) throw new Error(retryResult?.error || "No se pudo reiniciar el recorte.");
+          if (!retryResponse.ok) throw new Error(retryResult?.error || "No se pudo volver a preparar la imagen.");
           if (retryResult?.job?.status === "waiting_for_key") {
             waitingCount += 1;
-            updateUploadItem(item.id, { status: "waiting", error: "Esperando procesamiento" });
+            updateUploadItem(item.id, { status: "waiting", error: "Se procesará cuando esté disponible" });
           } else {
             remote.set(item.id, item.garmentId);
             updateUploadItem(item.id, { status: "processing", error: undefined });
@@ -2338,7 +2338,7 @@ export default function Home() {
         setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
         if (result.job?.status === "waiting_for_key") {
           waitingCount += 1;
-          updateUploadItem(item.id, { status: "waiting", garmentId: result.garment.id, error: "Esperando procesamiento" });
+          updateUploadItem(item.id, { status: "waiting", garmentId: result.garment.id, error: "Se procesará cuando esté disponible" });
         } else {
           remote.set(item.id, result.garment.id);
           updateUploadItem(item.id, { status: "processing", garmentId: result.garment.id });
@@ -2357,14 +2357,14 @@ export default function Home() {
           body: JSON.stringify({ garmentIds: [...remote.values()] }),
         });
         const batchResult = await batchResponse.json().catch(() => null) as { batch?: { status?: string }; fallback?: string; error?: string } | null;
-        if (!batchResponse.ok) throw new Error(batchResult?.error || "No se pudo crear el lote.");
+        if (!batchResponse.ok) throw new Error(batchResult?.error || "No se pudieron procesar las prendas.");
         remote.forEach((_, localId) => updateUploadItem(localId, {
           status: "processing",
-          error: batchResult?.fallback ? "Procesando ahora" : "Lote Low · hasta 24 h",
+          error: batchResult?.fallback ? "Procesando ahora" : "Puede tardar hasta 24 h",
         }));
       } catch (error) {
         failedCount += remote.size;
-        remote.forEach((_, localId) => updateUploadItem(localId, { status: "failed", error: error instanceof Error ? error.message : "El lote falló" }));
+        remote.forEach((_, localId) => updateUploadItem(localId, { status: "failed", error: error instanceof Error ? error.message : "No se pudieron procesar las prendas" }));
         remote.clear();
       }
     }
@@ -2395,7 +2395,7 @@ export default function Home() {
           remote.delete(localId);
         } else if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
           failedCount += 1;
-          updateUploadItem(localId, { status: "failed", error: statusResult.job?.error || "El recorte falló" });
+          updateUploadItem(localId, { status: "failed", error: statusResult.job?.error || "No se pudo preparar la imagen" });
           remote.delete(localId);
         }
       }
@@ -2405,8 +2405,8 @@ export default function Home() {
       remote.forEach((_, localId) => updateUploadItem(localId, { status: "processing", error: "Continúa en segundo plano" }));
     }
     if (failedCount) setUploadError(`${failedCount} ${failedCount === 1 ? "prenda necesita" : "prendas necesitan"} revisión.`);
-    else if (waitingCount) setUploadError(`${waitingCount} ${waitingCount === 1 ? "prenda quedó guardada" : "prendas quedaron guardadas"}; falta activar el procesamiento.`);
-    else if (timedOut) setUploadError("Los recortes siguen procesándose y aparecerán en el armario al terminar.");
+    else if (waitingCount) setUploadError(waitingCount === 1 ? "La prenda quedó guardada y se procesará cuando el servicio esté disponible." : `${waitingCount} prendas quedaron guardadas y se procesarán cuando el servicio esté disponible.`);
+    else if (timedOut) setUploadError("Las prendas siguen preparándose y aparecerán en tu closet al terminar.");
     setUploadingBatch(false);
   }
 
@@ -3211,23 +3211,23 @@ export default function Home() {
         body: JSON.stringify({ quality, outputVariant, presentation: outputVariant === "open" ? "open" : "closed" }),
       });
       const result = await response.json().catch(() => null) as { job?: { status?: string }; error?: string } | null;
-      if (!response.ok) throw new Error(result?.error || "No se pudo reiniciar el procesamiento.");
-      if (result?.job?.status === "waiting_for_key") throw new Error("Falta conectar la clave de procesamiento.");
+      if (!response.ok) throw new Error(result?.error || "No se pudo volver a preparar la imagen.");
+      if (result?.job?.status === "waiting_for_key") throw new Error("El procesamiento no está disponible en este momento.");
       setGarmentDraft(null);
       for (let attempt = 0; attempt < 90; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const statusResponse = await fetch(`/api/garments/${encodeURIComponent(item.id)}/status`, { cache: "no-store" });
         const statusResult = await statusResponse.json().catch(() => null) as { garment?: ApiGarment; job?: { error?: string; status?: string } } | null;
-        if (!statusResponse.ok || !statusResult?.garment) throw new Error("No se pudo revisar el recorte.");
+        if (!statusResponse.ok || !statusResult?.garment) throw new Error("No se pudo revisar la imagen.");
         let updatedGarment = statusResult.garment;
         if (updatedGarment.status === "cutout_pending") updatedGarment = await finalizePendingCutouts(updatedGarment);
         setGarments((items) => mergeApiGarments(items, [updatedGarment as ApiGarment]));
         if (updatedGarment.status === "ready") return;
-        if (updatedGarment.status === "failed") throw new Error(statusResult.job?.error || "El recorte volvió a fallar.");
+        if (updatedGarment.status === "failed") throw new Error(statusResult.job?.error || "La imagen no pudo prepararse.");
       }
     } catch (error) {
       setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "failed" } : garment));
-      setWardrobeError(error instanceof Error ? error.message : "No se pudo reiniciar el procesamiento.");
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo volver a preparar la imagen.");
     }
   }
 
@@ -3250,10 +3250,10 @@ export default function Home() {
       />}
       {!demoMode && profileOpen && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={() => setProfileOpen(false)}>
         <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Mi perfil" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>RESUMEN</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
+          <header><span>MI PERFIL</span><button type="button" onClick={() => setProfileOpen(false)} aria-label="Cerrar perfil">×</button></header>
           <div className="profile-drawer-identity">
             <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
-            <div><p>MI CLOSET</p><h2>{profile.name}</h2><small>{profile.handle}</small></div>
+            <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
           </div>
           <div className="profile-drawer-stats">
             <p><strong>{personalGarments.length}</strong><span>Prendas</span></p>
@@ -3264,15 +3264,15 @@ export default function Home() {
             <p>TU ESTILO</p>
             <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(" · ") : "Todavía estamos conociéndote."}</h3>
             <span>{profileTopStyles.length
-              ? "Esta lectura ayuda a decidir qué siluetas, combinaciones y niveles de riesgo aparecen primero en tus recomendaciones."
-              : "Cuéntanos qué te representa para que las recomendaciones empiecen desde ti, no desde una tendencia."}</span>
+              ? "Estas son las direcciones que más aparecen en tus recomendaciones."
+              : "Elige lo que te representa para recibir recomendaciones más tuyas."}</span>
             {profileTopStyles.length > 0 && <div className="profile-style-tags">{profileTopStyles.map((family) => <span key={family.id}>{family.label} <b>{family.rating?.affinity}%</b></span>)}</div>}
             <div className="profile-exploration">
-              <div><span>NIVEL DE EXPLORACIÓN</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
+              <div><span>CUÁNTO QUIERES EXPERIMENTAR</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
               <i><b style={{ width: `${styleProfile?.exploration ?? 35}%` }} /></i>
-              <small>Define cuánto se alejan las sugerencias de lo que ya usas.</small>
+              <small>Controla cuánto se alejan las sugerencias de lo que ya usas.</small>
             </div>
-            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONTARLE A FORMÉ QUÉ ME GUSTA"}</span><b>→</b></button>
+            <button type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "AJUSTAR PREFERENCIAS" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
           </section>
         </aside>
       </div>}
@@ -3284,7 +3284,7 @@ export default function Home() {
             <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
           </nav>
           {demoMode
-            ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "REVISANDO SESIÓN" : "CONTINUAR CON GOOGLE"}</button>
+            ? <button className="google-login" onClick={beginGoogleSignIn} disabled={sessionStatus === "checking"}><span>G</span>{sessionStatus === "checking" ? "ENTRANDO…" : "ENTRAR CON GOOGLE"}</button>
             : <button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>}
         </div>
       </header>
@@ -3315,10 +3315,10 @@ export default function Home() {
                   <section className="closet-group personal-group">
                     {personalGarments.length > 0
                       ? <ClosetGarmentGrid garments={visiblePersonalGarments} emptyLabel="NO HAY PRENDAS CON ESTOS FILTROS" onOpen={openGarmentEditor} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
-                      : <div className="closet-empty-personal"><p>{demoMode ? "Inicia sesión para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "CONTINUAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
+                      : <div className="closet-empty-personal"><p>{demoMode ? "Entra para empezar tu propio closet." : "Tu closet todavía está vacío."}</p><button type="button" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>{demoMode ? "ENTRAR CON GOOGLE →" : "AGREGAR PRIMERA PRENDA →"}</button></div>}
                   </section>
                   <section className="closet-group forme-group">
-                    <div className="closet-group-heading"><div><p>BIBLIOTECA COMPARTIDA</p><h3>Básicos Formé</h3></div><span>{sharedBasics.length}</span></div>
+                    <div className="closet-group-heading"><div><h3>Básicos Formé</h3></div><span>{sharedBasics.length}</span></div>
                     <ClosetGarmentGrid garments={visibleFormeBasics} emptyLabel="NO HAY BÁSICOS CON ESTOS FILTROS" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
                   </section>
                 </div>
@@ -3327,7 +3327,7 @@ export default function Home() {
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
               <div className="saved-looks-heading">
-                <div><p>ARCHIVO PERSONAL</p><h2>Looks guardados</h2></div>
+                <div><h2>Looks guardados</h2></div>
                 <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
               </div>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
@@ -3347,42 +3347,34 @@ export default function Home() {
                     </div>
                   </article>
                 ))}
-                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={() => setWardrobePanel("assistant")}>IR AL ASISTENTE →</button></div>}
+                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={() => openStudio("looks")}>CREAR UN LOOK →</button></div>}
               </div>
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
               <section className="assistant-dialogue">
                 <div className="assistant-dialogue-copy">
-                  <p>ASISTENTE DE STYLING</p>
-                  <h2>Pregúntale a tu propio closet.</h2>
-                  <span>Elige una pregunta y afina el contexto. Formé responde desde quién eres, tu calibración y las prendas que realmente tienes.</span>
+                  <h2>¿Qué necesitas hoy?</h2>
+                  <span>Elige una pregunta. Formé usa tu estilo y las prendas que ya tienes.</span>
                 </div>
-                <div className="assistant-data-readiness">
-                  <div className="assistant-signal-row">
-                    <span className={!demoMode ? "ready" : ""}>PERSONA {!demoMode ? "✓" : "—"}</span>
-                    <span className={assistantProfileReady ? "ready" : ""}>PERFIL {assistantProfileReady ? "✓" : "—"}</span>
-                    <span className={assistantClosetReady ? "ready" : ""}>CLOSET {assistantClosetReady ? "✓" : "—"}</span>
-                  </div>
-                  {assistantDataGaps.length > 0
-                    ? <div className="assistant-data-gap"><p>PARA RESPUESTAS MÁS EXACTAS</p><span>{assistantDataGaps[0]}</span><div>
+                {assistantDataGaps.length > 0 && <div className="assistant-data-readiness">
+                    <div className="assistant-data-gap"><p>PUEDO SER MÁS PRECISO</p><span>{assistantDataGaps[0]}</span><div>
                       {demoMode && <button type="button" onClick={beginGoogleSignIn}>INICIAR SESIÓN →</button>}
-                      {!demoMode && !assistantProfileReady && <button type="button" onClick={() => setStyleOnboardingOpen(true)}>CALIBRAR MI ESTILO →</button>}
-                      {!demoMode && !assistantClosetReady && <button type="button" onClick={() => { setWardrobePanel("closet"); setClosetMode("upload"); }}>AGREGAR PRENDAS →</button>}
+                      {!demoMode && !assistantProfileReady && <button type="button" onClick={() => setStyleOnboardingOpen(true)}>CONFIGURAR MI ESTILO →</button>}
+                      {!demoMode && assistantProfileReady && !assistantClosetReady && <button type="button" onClick={() => { setWardrobePanel("closet"); setClosetMode("upload"); }}>AGREGAR PRENDAS →</button>}
                     </div></div>
-                    : <p className="assistant-data-ready">LECTURA PERSONAL ACTIVA · {personalGarments.length} PRENDAS + {savedLooks.length} LOOKS + PERFIL DE ESTILO</p>}
-                </div>
+                </div>}
 
                 <div className="assistant-question-flow">
                   <div className="assistant-preset-list">
-                    <p>01 / ELIGE UNA PREGUNTA</p>
+                    <p>¿QUÉ NECESITAS?</p>
                     {assistantPresets.map((preset) => <button type="button" className={assistantPresetId === preset.id ? "active" : ""} onClick={() => { setAssistantPresetId(preset.id); setAssistantFollowupId(""); setAssistantAnswer(null); setStylingRecommendations([]); }} key={preset.id}>
                       <span><strong>{preset.label}</strong><small>{preset.detail}</small></span><b>→</b>
                     </button>)}
                   </div>
 
                   {selectedAssistantPreset && <div className="assistant-followup-list">
-                    <p>02 / {selectedAssistantPreset.followup.toLocaleUpperCase()}</p>
+                    <p>{selectedAssistantPreset.followup.toLocaleUpperCase()}</p>
                     <div>{selectedAssistantPreset.options.map((option) => <button type="button" className={assistantFollowupId === option.id ? "active" : ""} onClick={() => answerAssistantFollowup(selectedAssistantPreset, option)} key={option.id}>
                       <strong>{option.label}</strong><small>{option.detail}</small>
                     </button>)}</div>
@@ -3401,8 +3393,8 @@ export default function Home() {
 
               {stylingRecommendations.length > 0 && <section className="styling-results" aria-live="polite">
                 <div className="styling-results-heading">
-                  <div><p>CINCO RESPUESTAS DESDE TU CLOSET</p><h2>Guarda las que sí te representan</h2></div>
-                  <div className="styling-results-meta"><span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span><button type="button" onClick={repeatAssistantAnswer}>DAME CINCO DISTINTOS ↻</button></div>
+                  <div><p>PARA TI</p><h2>Elige los que sí usarías</h2></div>
+                  <div className="styling-results-meta"><span>{styleOccasionLabels[styleOccasion]} · {styleCodeLabels[styleCode]} · {styleMomentLabels[styleMoment]}</span><button type="button" onClick={repeatAssistantAnswer}>MOSTRAR OTROS ↻</button></div>
                 </div>
                 <div className="styling-recommendation-grid">
                   {stylingRecommendations.map((recommendation, index) => {
@@ -3447,7 +3439,7 @@ export default function Home() {
             </section>
           ) : (
             <section className="upload-view">
-              <div className="upload-heading"><div><p>NUEVAS PRENDAS</p><h2>Añadir al closet</h2></div><button type="button" onClick={() => setClosetMode("browse")}>← VOLVER A PRENDAS</button></div>
+              <div className="upload-heading"><div><h2>Añadir al closet</h2></div><button type="button" onClick={() => setClosetMode("browse")}>← VOLVER A PRENDAS</button></div>
               <div className="upload-layout">
                 <label
                   className={`dropzone bulk-dropzone ${uploadItems.length ? "has-files" : ""} ${draggingUpload ? "dragging" : ""}`}
@@ -3463,7 +3455,7 @@ export default function Home() {
                   {uploadItems.length > 0 && !uploadingBatch && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length}/{maxBatchFiles}</span>}
                 </label>
                 <div className="intake-panel bulk-intake">
-                  <div className="batch-heading"><span>LOTE</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
+                  <div className="batch-heading"><span>TUS FOTOS</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
                   {uploadItems.length > 0
                     ? <div className="upload-queue">{uploadItems.map((item, index) => {
                       const editable = !uploadingBatch && (item.status === "ready" || item.status === "failed");
@@ -3477,11 +3469,11 @@ export default function Home() {
                         {editable && <button className="remove-upload-item" type="button" onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name || `prenda ${index + 1}`}`}>×</button>}
                       </article>;
                     })}</div>
-                    : <div className="queue-empty"><p>Selecciona varias fotos y corrige el nombre o tipo antes de procesarlas.</p></div>}
+                    : <div className="queue-empty"><p>Selecciona varias fotos. Podrás corregir el nombre y el tipo antes de procesarlas.</p></div>}
                   {uploadError && <p className={`upload-status ${uploadItems.some((item) => item.status === "failed") ? "error" : ""}`}>{uploadError}</p>}
                   {uploadItems.length > 0 && uploadRetryableCount === 0 && !uploadingBatch
                     ? <button className="primary-action ready" onClick={() => { resetUpload(); setClosetMode("browse"); }}>VER EN MI CLOSET <span>→</span></button>
-                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PROCESANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadItems.some((item) => item.status === "failed") ? `REINTENTAR ${uploadRetryableCount}` : `CREAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "RECORTE" : "RECORTES"}`}<span>→</span></button>}
+                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadItems.some((item) => item.status === "failed") ? `REINTENTAR ${uploadRetryableCount}` : `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}`}<span>→</span></button>}
                 </div>
               </div>
             </section>
@@ -3491,7 +3483,6 @@ export default function Home() {
 
       {view === "studio" && (
         <section className="content studio-view">
-          <div className="section-line"><h2>CANVAS</h2><p>{canvasPieces.length} PIEZAS</p></div>
           <div className="studio-layout">
             <div className="canvas-column">
               <div className={`look-canvas ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
@@ -3504,10 +3495,11 @@ export default function Home() {
                   onPointerCancel={stopMarqueeSelection}
                 >
                   <div className={`snapshot-frame ${selectedGroupIds.length ? "selection-active" : ""}`} ref={snapshotFrameRef} aria-hidden="true">
-                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ÁREA DE MINIATURA · 2:3"}</span>
+                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ESTO SE GUARDARÁ"}</span>
                   </div>
-                  <p className="look-date">{activeLookName.toLocaleUpperCase()} / ARRASTRA · PELLIZCA · GIRA</p>
-                  <span className="canvas-hint">DESKTOP: ARRASTRA SOBRE EL FONDO PARA SELECCIONAR · MANTÉN = ABRIR / CERRAR</span>
+                  <p className="look-date">{activeLookName.toLocaleUpperCase()}</p>
+                  <span className="canvas-hint desktop-hint">ARRASTRA SOBRE EL FONDO PARA SELECCIONAR VARIAS PRENDAS</span>
+                  <span className="canvas-hint mobile-hint">TOCA UNA PRENDA PARA EDITARLA</span>
                   {canvasPieces.length === 0 && <button className="empty-canvas" onClick={() => setLibraryOpen(true)}>TU CANVAS ESTÁ VACÍO<br /><span>ABRIR ARMARIO ＋</span></button>}
                   {marqueeRect && <span className="canvas-marquee" aria-hidden="true" style={{ left: marqueeRect.left, top: marqueeRect.top, width: marqueeRect.width, height: marqueeRect.height }} />}
                   {canvasPieces.map((piece) => {
@@ -3690,7 +3682,7 @@ export default function Home() {
         <div className="garment-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setGarmentDraft(null); }}>
           <section className="garment-editor" role="dialog" aria-modal="true" aria-labelledby="garment-editor-title">
             <header className="garment-editor-header">
-              <span>FICHA DE PRENDA / {editingGarment.id.replace("archive-", "").toUpperCase()}</span>
+              <span>EDITAR PRENDA</span>
               <button type="button" onClick={() => setGarmentDraft(null)} aria-label="Cerrar ficha">×</button>
             </header>
             <div className="garment-editor-body">
@@ -3705,9 +3697,8 @@ export default function Home() {
 
               <form className="garment-editor-form" onSubmit={(event) => { event.preventDefault(); saveGarmentDraft(); }}>
                 <div className="garment-editor-intro">
-                  <p>INFORMACIÓN</p>
                   <h2 id="garment-editor-title">{garmentDraft.name || "Prenda sin nombre"}</h2>
-                  <span>Corrige la ficha cuando quieras. Los cambios se guardan {isStaticDemo ? "en este dispositivo" : "en tu cuenta"}.</span>
+                  <span>Edita lo que necesites y guarda los cambios.</span>
                 </div>
                 <div className="garment-editor-fields">
                   <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
@@ -3727,14 +3718,13 @@ export default function Home() {
                 </div>
 
                 {editingGarment.originalImage && !isStaticDemo && <details className="processing-options">
-                  <summary>OPCIONES DE PROCESAMIENTO</summary>
+                  <summary>MEJORAR IMAGEN</summary>
                   <div>
-                    <p>Generada en <strong>{(editingGarment.quality || "low").toLocaleUpperCase()}</strong> · Control de borde: <strong>{editingGarment.qaStatus === "review" ? "REVISAR" : editingGarment.qaStatus === "passed" ? "OK" : "PENDIENTE"}</strong></p>
-                    {editingGarment.qaNotes && <small>{editingGarment.qaNotes}</small>}
+                    <p>Si la imagen no se parece a tu prenda, puedes generarla otra vez.</p>
                     <div className="processing-option-actions">
-                      <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "closed")}>REHACER EN MEDIUM</button>
+                      <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "closed")}>GENERAR DE NUEVO</button>
                       {editingGarment.category === "Outerwear" && !editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "low", "open")}>CREAR VERSIÓN ABIERTA</button>}
-                      {editingGarment.category === "Outerwear" && editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "open")}>ABIERTA EN MEDIUM</button>}
+                      {editingGarment.category === "Outerwear" && editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "open")}>GENERAR ABIERTA DE NUEVO</button>}
                     </div>
                   </div>
                 </details>}
