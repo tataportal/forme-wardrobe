@@ -28,10 +28,14 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(pricing, /Un plan para cada closet/);
 
   const pricingSource = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  const publicProfileSource = await readFile(new URL("../app/[handle]/page.tsx", import.meta.url), "utf8");
   assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
   assert.match(pricingSource, /name: "Club", monthlyPrice: 12\.99/);
   assert.match(pricingSource, /El plan anual se cobra completo una vez al año/);
   assert.match(pricingSource, /Cobro único de US\$\{annualTotal\.toFixed\(2\)\} por todo el año/);
+  assert.match(publicProfileSource, /className="public-profile-frame"/);
+  assert.match(publicProfileSource, /Este perfil todavía no comparte prendas ni looks\./);
+  assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
 });
 
 test("server-renders the FORMÉ wardrobe", async () => {

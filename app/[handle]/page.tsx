@@ -97,35 +97,38 @@ export default function PublicProfilePage() {
   if (!data) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><h1>No encontramos este perfil.</h1><p>{error}</p><a className="public-profile-home" href="/closet">VOLVER A FORMÉ →</a></main>;
 
   return <main className="public-profile-page">
-    <header className="public-profile-nav"><a href="/closet">FORMÉ<span>®</span></a><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
-    <section className="public-profile-hero">
-      <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
-      <div className="public-profile-copy">
-        <p>{data.profile.handle}</p>
-        <h1>{data.profile.name}</h1>
-        {data.profile.bio && <span>{data.profile.bio}</span>}
-      </div>
-      <div className="public-profile-counts">
-        <p><strong>{data.garments.length}</strong><span>PRENDAS</span></p>
-        <p><strong>{data.outfits.length}</strong><span>LOOKS</span></p>
-      </div>
-    </section>
+    <div className="public-profile-frame">
+      <header className="public-profile-nav"><a href="/closet">FORMÉ<span>®</span></a><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
+      <section className="public-profile-hero">
+        <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
+        <div className="public-profile-copy">
+          <p>{data.profile.handle}</p>
+          <h1>{data.profile.name}</h1>
+          {data.profile.bio && <span>{data.profile.bio}</span>}
+        </div>
+        <div className="public-profile-counts">
+          <p><strong>{data.garments.length}</strong><span>PRENDAS</span></p>
+          <p><strong>{data.outfits.length}</strong><span>LOOKS</span></p>
+        </div>
+      </section>
 
-    {data.outfits.length > 0 && <section className="public-profile-section">
-      <header><p>LOOKS</p><span>{String(data.outfits.length).padStart(2, "0")}</span></header>
-      <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><p>{look.items.length} PIEZAS</p></article>)}</div>
-    </section>}
+      {data.outfits.length > 0 && <section className="public-profile-section">
+        <header><p>LOOKS</p><span>{String(data.outfits.length).padStart(2, "0")}</span></header>
+        <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><p>{look.items.length} PIEZAS</p></article>)}</div>
+      </section>}
 
-    {data.garments.length > 0 && <section className="public-profile-section">
-      <header><p>SELECCIÓN DEL CLOSET</p><span>{String(data.garments.length).padStart(2, "0")}</span></header>
-      <div className="public-garments-grid">{data.garments.map((garment) => <article key={garment.id}>
-        <div><img src={garment.image} alt={garment.name} /></div>
-        <h2>{garment.name}</h2>
-        <p>{[garment.brand, garment.category, garment.tone].filter(Boolean).join(" · ")}</p>
-      </article>)}</div>
-    </section>}
+      {data.garments.length > 0 && <section className="public-profile-section">
+        <header><p>SELECCIÓN DEL CLOSET</p><span>{String(data.garments.length).padStart(2, "0")}</span></header>
+        <div className="public-garments-grid">{data.garments.map((garment) => <article key={garment.id}>
+          <div><img src={garment.image} alt={garment.name} /></div>
+          <h2>{garment.name}</h2>
+          <p>{[garment.brand, garment.category, garment.tone].filter(Boolean).join(" / ")}</p>
+        </article>)}</div>
+      </section>}
 
-    {data.outfits.length === 0 && data.garments.length === 0 && <section className="public-profile-empty"><p>Este perfil todavía no publicó prendas ni looks.</p></section>}
-    <footer className="public-profile-footer"><a href="/closet">CREA TU CLOSET EN FORMÉ →</a><span>Tu estilo, leído desde lo que ya tienes.</span></footer>
+      {data.outfits.length === 0 && data.garments.length === 0
+        ? <section className="public-profile-empty"><p>Este perfil todavía no comparte prendas ni looks.</p><a href="/closet">CREA TU CLOSET EN FORMÉ →</a></section>
+        : <footer className="public-profile-footer"><a href="/closet">CREA TU CLOSET EN FORMÉ →</a><span>Tu estilo, leído desde lo que ya tienes.</span></footer>}
+    </div>
   </main>;
 }

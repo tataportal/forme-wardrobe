@@ -323,6 +323,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .pricing-page .pricing-beta-note { margin-top:20px; text-align:center; }
 
 .public-profile-page,.public-profile-state { min-height:100dvh; background:var(--paper); color:var(--ink); }
+.public-profile-frame { width:min(100%,1280px); min-height:100dvh; margin:0 auto; }
 .public-profile-nav { height:68px; padding:0 18px; border-bottom:1px solid var(--ink); display:flex; align-items:center; justify-content:space-between; gap:18px; }
 .public-profile-nav > a,.public-profile-state > a:first-child { color:var(--ink); text-decoration:none; font:700 27px/1 Georgia,serif; letter-spacing:-1.8px; }
 .public-profile-nav > a span,.public-profile-state > a:first-child span { margin-left:3px; color:var(--signal); font:10px/1 Arial,sans-serif; vertical-align:top; letter-spacing:0; }
@@ -350,8 +351,9 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .public-looks-grid article > p,.public-garments-grid article > p { margin:5px 0 0; color:var(--muted); font-size:var(--type-kicker); line-height:1.35; letter-spacing:.07em; text-transform:uppercase; }
 .public-garments-grid article > div { width:100%; aspect-ratio:4/5; overflow:hidden; background:rgba(255,255,255,.24); }
 .public-garments-grid img { width:100%; height:100%; padding:6%; object-fit:contain; display:block; filter:drop-shadow(0 12px 12px rgba(17,17,15,.09)); }
-.public-profile-empty { min-height:280px; padding:30px 18px; display:grid; place-items:center; text-align:center; }
+.public-profile-empty { min-height:360px; padding:64px 18px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; text-align:center; }
 .public-profile-empty p { max-width:320px; margin:0; font:24px/1.1 Georgia,serif; }
+.public-profile-empty a { padding-bottom:6px; border-bottom:1px solid var(--ink); color:var(--ink); font-size:var(--type-kicker); letter-spacing:.12em; text-decoration:none; }
 .public-profile-footer { min-height:170px; padding:30px 18px 40px; display:flex; flex-direction:column; justify-content:space-between; gap:40px; }
 .public-profile-footer a { color:var(--ink); text-decoration:none; font:400 27px/1 Georgia,serif; letter-spacing:-.035em; }
 .public-profile-footer span { color:var(--muted); font-size:var(--type-meta); }
@@ -1047,18 +1049,18 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .guest-basics-heading h2 { font-size:42px; }
   .public-profile-nav { height:82px; padding:0 40px; }
   .public-profile-nav > a { font-size:32px; }
-  .public-profile-hero { min-height:340px; padding:64px 6vw 48px; grid-template-columns:116px minmax(0,1fr) auto; align-items:start; gap:28px; }
+  .public-profile-hero { min-height:300px; padding:54px 64px 44px; grid-template-columns:116px minmax(0,720px) auto; align-items:center; justify-content:center; gap:28px; }
   .public-profile-avatar { width:116px; height:116px; }
   .public-profile-copy h1 { font-size:clamp(62px,7vw,108px); }
   .public-profile-copy > span { font-size:17px; }
   .public-profile-counts { grid-column:auto; align-self:end; padding:0 0 10px; gap:44px; }
   .public-profile-counts strong { font-size:34px; }
-  .public-profile-section { padding:48px 6vw 72px; }
+  .public-profile-section { padding:48px 64px 72px; }
   .public-profile-section > header { margin-bottom:24px; }
   .public-looks-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:46px 18px; }
   .public-garments-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:44px 18px; }
   .public-looks-grid h2,.public-garments-grid h2 { font-size:22px; }
-  .public-profile-footer { min-height:230px; padding:48px 6vw; flex-direction:row; align-items:flex-end; }
+  .public-profile-footer { min-height:230px; padding:48px 64px; flex-direction:row; align-items:flex-end; }
   .public-profile-footer a { font-size:42px; }
   .public-profile-state { padding:6vw; }
   .canvas-piece.selected { cursor:move; }
