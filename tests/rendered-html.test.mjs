@@ -24,7 +24,8 @@ test("keeps the main product areas on stable routes", async () => {
 
   const about = await responses[0].text();
   const pricing = await responses[4].text();
-  assert.match(about, /Nadie te enseña a leer tu propio closet/);
+  assert.match(about, /Vístete con lo que ya tienes/);
+  assert.match(about, /Tu closet, por fin legible/);
   assert.match(pricing, /Un plan para cada closet/);
 
   const [pricingSource, publicProfileSource, closetSource, looksSource, profileSource] = await Promise.all([
