@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 export default function AboutPage() {
   return <main className="route-page about-page">
     <header className="route-header">
@@ -7,16 +5,9 @@ export default function AboutPage() {
       <nav><a href="/closet">CLOSET</a><a href="/pricing">PLANES</a><a className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</a></nav>
     </header>
     <section className="about-hero">
-      <div className="about-hero-copy">
-        <p>SOBRE FORMÉ</p>
-        <h1>Nadie te enseña a leer tu propio closet.</h1>
-        <span>Pero ahí está todo: la persona que eras, la que eres hoy y la que todavía estás construyendo.</span>
-      </div>
-      <figure className="about-hero-wardrobe" aria-label="Selección de prendas de un closet Formé">
-        <Image src="/wardrobe/clean/029_DSC01830-open.webp" alt="Chaqueta negra abierta" width={900} height={1125} priority />
-        <Image src="/wardrobe/clean/032_DSC01838-open.webp" alt="Abrigo negro abierto" width={900} height={1125} priority />
-        <Image src="/wardrobe/clean/049_DSC01884-open.webp" alt="Chaqueta gráfica abierta" width={900} height={1125} priority />
-      </figure>
+      <p>SOBRE FORMÉ</p>
+      <h1>Nadie te enseña a leer tu propio closet.</h1>
+      <span>Pero ahí está todo: la persona que eras, la que eres hoy y la que todavía estás construyendo.</span>
     </section>
     <section className="about-story">
       <p>Tu estilo no es lo que compras. Es lo que repites sin pensarlo, lo que guardas aunque ya no uses y lo que encuentras cuando no sabes qué ponerte.</p>
