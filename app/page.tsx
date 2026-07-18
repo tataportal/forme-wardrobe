@@ -1406,7 +1406,7 @@ function buildAssistantAnswer({
     summary = `Parto de ${favoriteCount || "las"} piezas marcadas como favoritas y cambio sus acompañantes para que no termines repitiendo el mismo look.`;
   } else if (followup.intent === "experimental") {
     title = `${salutation}podemos probar algo nuevo sin dejar de parecerte.`;
-    summary = `Voy a cambiar una variable por vez —color, proporción o capa— para ${followup.focus}.`;
+    summary = `Voy a cambiar una variable por vez: color, proporción o capa, para ${followup.focus}.`;
   } else if (followup.intent === "missing") {
     title = missingCategories.length
       ? `${salutation}el hueco principal está en ${missingCategories.slice(0, 2).map((category) => translateValue(category).toLocaleLowerCase()).join(" y ")}.`
@@ -2154,7 +2154,7 @@ export function WardrobeApp({
   const assistantDataGaps = [
     demoMode ? "Entra para recibir recomendaciones con tus prendas y preferencias." : "",
     !demoMode && !assistantProfileReady ? "Cuéntanos qué te gusta para ajustar las recomendaciones a ti." : "",
-    !demoMode && !assistantClosetReady ? "Añade al menos ocho prendas —incluyendo una parte de arriba, un pantalón y una capa— para recomendarte looks completos." : "",
+    !demoMode && !assistantClosetReady ? "Añade al menos ocho prendas, incluyendo una parte de arriba, un pantalón y una capa, para recomendarte looks completos." : "",
   ].filter(Boolean);
 
   useEffect(() => {
@@ -3961,7 +3961,7 @@ export function WardrobeApp({
                   <h1>Asistente</h1>
                   <p>Pregunta desde una ocasión concreta. Formé cruza tu perfil con las prendas y looks que ya tienes.</p>
                   <dl className="v2-section-metrics">
-                    <div><dt>Perfil</dt><dd>{assistantProfileReady ? "OK" : "–"}</dd></div>
+                    <div><dt>Perfil</dt><dd>{assistantProfileReady ? "OK" : "Pendiente"}</dd></div>
                     <div><dt>Prendas</dt><dd>{assistantGarments.length}</dd></div>
                     <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
                   </dl>

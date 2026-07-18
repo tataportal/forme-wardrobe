@@ -93,7 +93,7 @@ export default function PublicProfilePage() {
     else await navigator.clipboard.writeText(window.location.href).catch(() => null);
   }
 
-  if (loading) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><p>ABRIENDO PERFIL…</p></main>;
+  if (loading) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><p>ABRIENDO PERFIL...</p></main>;
   if (!data) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><h1>No encontramos este perfil.</h1><p>{error}</p><a className="public-profile-home" href="/closet">VOLVER A FORMÉ →</a></main>;
 
   return <main className="public-profile-page">
