@@ -2782,6 +2782,35 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .public-profile-state p { color:var(--product-muted); }
 
 @media (max-width:759px) {
+  .closet-v2:not(.view-studio) .profile-page { padding:18px 16px 88px; }
+  .closet-v2:not(.view-studio) .profile-page-hero {
+    padding:28px 0 34px;
+    grid-template-columns:104px minmax(0,1fr);
+    align-items:center;
+    gap:18px 22px;
+  }
+  .closet-v2:not(.view-studio) .profile-page-portrait {
+    width:104px;
+    height:104px;
+    aspect-ratio:1;
+    border:1px solid var(--line);
+    border-radius:50%;
+  }
+  .closet-v2:not(.view-studio) .profile-page-intro h1 {
+    margin-top:5px;
+    font-size:clamp(42px,11vw,62px);
+    line-height:.9;
+  }
+  .closet-v2:not(.view-studio) .profile-page-intro > p { margin-top:10px; }
+  .closet-v2:not(.view-studio) .profile-page-links { margin-top:16px; gap:7px 16px; }
+  .closet-v2:not(.view-studio) .profile-page-links button { min-height:36px; }
+  .closet-v2:not(.view-studio) .profile-page-stats {
+    grid-column:1/-1;
+    margin-top:8px;
+    gap:12px;
+  }
+  .closet-v2:not(.view-studio) .profile-page-stats dd { font-size:34px; }
+  .closet-v2:not(.view-studio) .profile-page-body { padding-top:42px; gap:42px; }
   .public-profile-frame { width:calc(100% - 24px); }
   .public-profile-nav { height:62px; }
   .public-profile-nav > a,
