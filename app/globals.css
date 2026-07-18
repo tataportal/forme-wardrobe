@@ -277,10 +277,10 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .about-app-system-bar strong { color:var(--forme-ink); font-weight:500; }
 .about-app-outfit-stage { position:absolute; inset:58px 22px 76px; }
 .about-app-piece { position:absolute; display:block; object-fit:contain; filter:drop-shadow(0 18px 18px rgba(13,15,14,.18)); }
-.about-app-piece-tee { z-index:1; width:31%; top:8%; left:34.5%; }
-.about-app-piece-jeans { z-index:1; width:31%; height:59%; top:37%; left:34.5%; }
-.about-app-piece-jacket { z-index:2; width:53%; top:2%; left:23.5%; }
-.about-app-piece-shoes { z-index:3; width:21%; bottom:0; left:39.5%; }
+.about-app-piece-tee { z-index:1; width:25%; top:5%; left:37.5%; }
+.about-app-piece-jeans { z-index:1; width:auto; height:66%; top:28.5%; left:50%; transform:translateX(-50%); }
+.about-app-piece-jacket { z-index:2; width:40%; top:2%; left:30%; }
+.about-app-piece-shoes { z-index:3; width:20%; bottom:0; left:40%; }
 .about-app-scan { position:absolute; z-index:5; left:14px; right:14px; top:50px; height:1px; background:linear-gradient(90deg,transparent,var(--forme-signal),transparent); box-shadow:0 0 18px rgba(240,68,47,.5); animation:about-app-scan 4.8s ease-in-out infinite alternate; pointer-events:none; }
 .about-app-outfit figcaption { position:absolute; z-index:6; left:16px; right:16px; bottom:15px; display:flex; align-items:flex-end; justify-content:space-between; gap:18px; }
 .about-app-outfit figcaption span { color:rgba(13,15,14,.58); font:9px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.1em; }
@@ -921,10 +921,10 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .about-app-outfit { min-height:600px; border-radius:16px; }
   .about-app-system-bar { height:46px; padding-inline:13px; }
   .about-app-outfit-stage { inset:52px 10px 74px; }
-  .about-app-piece-tee { width:42%; left:29%; }
-  .about-app-piece-jeans { width:44%; left:28%; }
-  .about-app-piece-jacket { width:76%; left:12%; }
-  .about-app-piece-shoes { width:36%; left:32%; }
+  .about-app-piece-tee { width:39%; top:5%; left:30.5%; }
+  .about-app-piece-jeans { width:auto; height:66%; top:28%; left:50%; }
+  .about-app-piece-jacket { width:63%; top:2%; left:18.5%; }
+  .about-app-piece-shoes { width:33%; left:33.5%; }
   .about-app-outfit figcaption { left:16px; right:16px; }
   .about-app-outfit figcaption strong { max-width:170px; font-size:18px; }
   .about-app-product { width:calc(100% - 32px); margin:0 auto 24px; padding:52px 20px 54px; border-radius:16px; grid-template-columns:1fr; gap:44px; }
