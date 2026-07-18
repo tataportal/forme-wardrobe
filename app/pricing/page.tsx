@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type BillingCycle = "monthly" | "annual";
 
@@ -13,10 +14,10 @@ const plans = [
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
-  return <main className="route-page pricing-page">
+  return <main className="route-page pricing-page forme-v2 public-v2">
     <header className="route-header">
-      <a className="route-wordmark" href="/closet">FORMÉ<span>®</span></a>
-      <nav><a href="/about">ACERCA</a><a href="/closet">CLOSET</a><a className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</a></nav>
+      <Link className="route-wordmark" href="/closet">FORMÉ<span>®</span></Link>
+      <nav><Link href="/about">ACERCA</Link><Link href="/closet">CLOSET</Link><Link className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</Link></nav>
     </header>
     <section className="pricing-page-content">
       <div className="pricing-intro"><p>PLANES</p><h1>Un plan para cada closet.</h1><span>Empieza gratis. Sube más prendas cuando Formé ya sea parte de tu rutina.</span></div>

@@ -1,5 +1,5 @@
 import { WardrobeApp } from "../page";
 
 export default function ClosetPage() {
-  return <WardrobeApp initialRoute="closet" closetVariant="retro" />;
+  return <WardrobeApp initialRoute="closet" />;
 }

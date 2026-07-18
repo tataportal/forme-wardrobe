@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Qué es Formé | Closet digital y asistente de estilo",
@@ -10,11 +11,11 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export default function AboutPage() {
   return <main className="route-page about-page about-v2">
     <header className="route-header about-v2-nav">
-      <a className="route-wordmark" href="/closet" aria-label="Formé, ir al closet">FORMÉ<span>®</span></a>
+      <Link className="route-wordmark" href="/closet" aria-label="Formé, ir al closet">FORMÉ<span>®</span></Link>
       <nav aria-label="Navegación principal">
-        <a href="/closet">CLOSET</a>
-        <a href="/pricing">PLANES</a>
-        <a className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</a>
+        <Link href="/closet">CLOSET</Link>
+        <Link href="/pricing">PLANES</Link>
+        <Link className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</Link>
       </nav>
     </header>
 
@@ -24,8 +25,8 @@ export default function AboutPage() {
         <h1>Vístete con lo que ya tienes.</h1>
         <span>Digitaliza tus prendas, arma looks y recibe recomendaciones que aprenden de ti.</span>
         <div className="about-v2-actions">
-          <a className="primary" href="/closet">EXPLORAR FORMÉ <b>↗</b></a>
-          <a href="/auth/google/start?return_to=%2Fcloset">CREAR MI CLOSET</a>
+          <Link className="primary" href="/closet">EXPLORAR FORMÉ <b>↗</b></Link>
+          <Link href="/auth/google/start?return_to=%2Fcloset">CREAR MI CLOSET</Link>
         </div>
       </div>
 
@@ -68,14 +69,14 @@ export default function AboutPage() {
       <blockquote>Tu estilo no es lo que compras. Es lo que eliges cuando nadie te está diciendo qué ponerte.</blockquote>
       <div>
         <p>Cada prenda guarda una versión de ti. Formé te ayuda a verla, combinarla y seguir construyéndola.</p>
-        <a href="/closet">ABRIR EL CLOSET <span>↗</span></a>
+        <Link href="/closet">ABRIR EL CLOSET <span>↗</span></Link>
       </div>
     </section>
 
     <footer className="about-v2-footer">
-      <a className="route-wordmark" href="/closet">FORMÉ<span>®</span></a>
+      <Link className="route-wordmark" href="/closet">FORMÉ<span>®</span></Link>
       <p>Tu estilo, leído desde lo que ya tienes.</p>
-      <nav><a href="/pricing">PLANES</a><a href="/closet">CLOSET</a></nav>
+      <nav><Link href="/pricing">PLANES</Link><Link href="/closet">CLOSET</Link></nav>
     </footer>
   </main>;
 }

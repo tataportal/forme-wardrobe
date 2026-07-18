@@ -42,9 +42,10 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /Este perfil todavía no comparte prendas ni looks\./);
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
-  assert.match(closetSource, /closetVariant="retro"/);
-  assert.match(looksSource, /closetVariant="retro"/);
-  assert.match(profileSource, /closetVariant="retro"/);
+  assert.match(closetSource, /WardrobeApp initialRoute="closet"/);
+  assert.match(looksSource, /WardrobeApp initialRoute="looks"/);
+  assert.match(profileSource, /WardrobeApp initialRoute="perfil"/);
+  assert.doesNotMatch(`${closetSource}${looksSource}${profileSource}`, /closetVariant/);
 });
 
 test("server-renders the FORMÉ wardrobe", async () => {
@@ -210,7 +211,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /className="wardrobe-tab-actions"/);
-  assert.match(page, /closetVariant = "retro"/);
+  assert.doesNotMatch(page, /closetVariant|isRetroCloset/);
+  assert.match(page, /site-shell view-\$\{view\} closet-v2 forme-v2/);
   assert.match(page, /className="closet-v2-hero"/);
   assert.match(page, /ARCHIVO PERSONAL/);
   assert.doesNotMatch(page, /ABRIR VERSIÓN CLÁSICA/);

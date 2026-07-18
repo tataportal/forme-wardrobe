@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 type PublicGarment = {
   id: string;
@@ -63,17 +64,14 @@ export default function PublicProfilePage() {
   const params = useParams<{ handle: string }>();
   const rawHandle = typeof params?.handle === "string" ? decodeURIComponent(params.handle) : "";
   const handle = rawHandle.replace(/^@/, "");
+  const invalidHandle = !rawHandle.startsWith("@") || !handle;
   const [data, setData] = useState<PublicProfilePayload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const initials = useMemo(() => data?.profile.name.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toLocaleUpperCase() || "F", [data]);
 
   useEffect(() => {
-    if (!rawHandle.startsWith("@") || !handle) {
-      setError("Este perfil no existe.");
-      setLoading(false);
-      return;
-    }
+    if (invalidHandle) return;
     let active = true;
     void fetch(`/api/public-profile/${encodeURIComponent(handle)}`, { cache: "no-store" })
       .then(async (response) => {
@@ -84,7 +82,7 @@ export default function PublicProfilePage() {
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "No se pudo abrir este perfil."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [handle, rawHandle]);
+  }, [handle, invalidHandle]);
 
   async function shareProfile() {
     if (!data) return;
@@ -93,12 +91,13 @@ export default function PublicProfilePage() {
     else await navigator.clipboard.writeText(window.location.href).catch(() => null);
   }
 
-  if (loading) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><p>ABRIENDO PERFIL...</p></main>;
-  if (!data) return <main className="public-profile-state"><a href="/closet">FORMÉ<span>®</span></a><h1>No encontramos este perfil.</h1><p>{error}</p><a className="public-profile-home" href="/closet">VOLVER A FORMÉ →</a></main>;
+  if (invalidHandle) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>Este perfil no existe.</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
+  if (loading) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><div className="public-profile-loading" aria-label="Abriendo perfil"><i /><i /><i /></div></main>;
+  if (!data) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>{error}</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
 
-  return <main className="public-profile-page">
+  return <main className="public-profile-page forme-v2 public-v2">
     <div className="public-profile-frame">
-      <header className="public-profile-nav"><a href="/closet">FORMÉ<span>®</span></a><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
+      <header className="public-profile-nav"><Link href="/closet">FORMÉ<span>®</span></Link><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
       <section className="public-profile-hero">
         <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
         <div className="public-profile-copy">
@@ -127,8 +126,8 @@ export default function PublicProfilePage() {
       </section>}
 
       {data.outfits.length === 0 && data.garments.length === 0
-        ? <section className="public-profile-empty"><p>Este perfil todavía no comparte prendas ni looks.</p><a href="/closet">CREA TU CLOSET EN FORMÉ →</a></section>
-        : <footer className="public-profile-footer"><a href="/closet">CREA TU CLOSET EN FORMÉ →</a><span>Tu estilo, leído desde lo que ya tienes.</span></footer>}
+        ? <section className="public-profile-empty"><p>Este perfil todavía no comparte prendas ni looks.</p><Link href="/closet">CREA TU CLOSET EN FORMÉ →</Link></section>
+        : <footer className="public-profile-footer"><Link href="/closet">CREA TU CLOSET EN FORMÉ →</Link><span>Tu estilo, leído desde lo que ya tienes.</span></footer>}
     </div>
   </main>;
 }

@@ -1,5 +1,5 @@
 import { WardrobeApp } from "../page";
 
 export default function AssistantPage() {
-  return <WardrobeApp initialRoute="asistente" closetVariant="retro" />;
+  return <WardrobeApp initialRoute="asistente" />;
 }

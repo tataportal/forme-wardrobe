@@ -11,7 +11,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { classifyGarment, formeBasics, Garment, garmentTypesByCategory, inferGarmentType, starterGarments } from "./garments";
+import Link from "next/link";
+import { classifyGarment, formeBasics, Garment, garmentTypesByCategory, starterGarments } from "./garments";
 
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
@@ -1979,12 +1980,9 @@ function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
 
 export function WardrobeApp({
   initialRoute = "closet",
-  closetVariant = "retro",
 }: {
   initialRoute?: WardrobeRoute;
-  closetVariant?: "classic" | "retro";
 }) {
-  const isRetroCloset = closetVariant === "retro";
   const initialWardrobePanel: WardrobePanel = initialRoute === "looks" ? "looks" : initialRoute === "asistente" ? "assistant" : "closet";
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
@@ -2311,6 +2309,8 @@ export function WardrobeApp({
     };
     window.addEventListener("keydown", closeProfileOnEscape);
     return () => window.removeEventListener("keydown", closeProfileOnEscape);
+  // Opening the route initializes the editable draft. Subsequent changes belong to the draft itself.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileOpen]);
 
   function updateArchiveFilter(key: FilterKey, next: string) {
@@ -3646,7 +3646,7 @@ export function WardrobeApp({
   }
 
   if (isStaticDemo) {
-    return <main className="static-redirect" aria-live="polite">
+    return <main className="static-redirect forme-v2" aria-live="polite">
       <p>ABRIENDO FORMÉ</p>
       <h1>Tu armario continúa en la app operativa.</h1>
       <a href={operationalSiteUrl}>CONTINUAR →</a>
@@ -3654,7 +3654,7 @@ export function WardrobeApp({
   }
 
   return (
-    <main className={`site-shell view-${view}${isRetroCloset ? " closet-v2 forme-v2" : ""}`}>
+    <main className={`site-shell view-${view} closet-v2 forme-v2`}>
       {!demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -3817,7 +3817,7 @@ export function WardrobeApp({
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              {isRetroCloset && <header className="closet-v2-hero">
+              <header className="closet-v2-hero">
                 <div className="closet-v2-copy">
                   <span>{demoMode ? "ARCHIVO ABIERTO" : "ARCHIVO PERSONAL"}</span>
                   <h1>{demoMode ? "Closet" : "Mi closet"}</h1>
@@ -3842,7 +3842,7 @@ export function WardrobeApp({
                   </div>
                   <i aria-hidden="true" />
                 </figure>
-              </header>}
+              </header>
               {demoMode ? <div className="guest-closet">
                 <section className="guest-welcome">
                   <div className="guest-welcome-copy">
@@ -3854,7 +3854,7 @@ export function WardrobeApp({
                       <button className="primary" type="button" onClick={openDemoCanvas}><span><strong>EXPLORAR EL VESTIDOR</strong><small>Prueba con prendas Formé, sin crear una cuenta.</small></span><b>→</b></button>
                       <button type="button" onClick={beginGoogleSignIn}><span><strong>ENTRAR Y SUBIR PRENDAS</strong><small>Crea tu closet con tus propias fotos.</small></span><b>→</b></button>
                     </div>
-                    <nav className="guest-public-links" aria-label="Conocer Formé"><a href="/about">QUÉ ES FORMÉ</a><a href="/pricing">PLANES</a></nav>
+                    <nav className="guest-public-links" aria-label="Conocer Formé"><Link href="/about">QUÉ ES FORMÉ</Link><Link href="/pricing">PLANES</Link></nav>
                   </div>
                   <button className="guest-welcome-preview" type="button" onClick={openDemoCanvas} aria-label="Probar este look en el canvas">
                     <LookPreview look={{ id: "guest-demo", name: "Demo Formé", items: initialDemoCanvas }} garmentById={garmentById} />
@@ -3888,7 +3888,7 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
-              {isRetroCloset ? <header className="v2-section-hero v2-looks-hero">
+              <header className="v2-section-hero v2-looks-hero">
                 <div className="v2-section-copy">
                   <span>ARCHIVO PERSONAL / LOOKS</span>
                   <h1>Looks</h1>
@@ -3910,13 +3910,7 @@ export function WardrobeApp({
                   </div>
                   <i aria-hidden="true" />
                 </figure>
-              </header> : <div className="saved-looks-heading">
-                <div><h2>Looks</h2></div>
-                <div className="saved-looks-heading-actions">
-                  <span>{savedLooks.length} {savedLooks.length === 1 ? "LOOK" : "LOOKS"}</span>
-                  <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
-                </div>
-              </div>}
+              </header>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
                 {savedLooks.map((look) => (
@@ -3955,7 +3949,7 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
-              {isRetroCloset && <header className="v2-section-hero v2-assistant-hero">
+              <header className="v2-section-hero v2-assistant-hero">
                 <div className="v2-section-copy">
                   <span>LECTURA PERSONAL / ASISTENTE</span>
                   <h1>Asistente</h1>
@@ -3975,7 +3969,7 @@ export function WardrobeApp({
                     <div className="v2-assistant-output"><span>FORMÉ</span><strong>Una respuesta para ti</strong></div>
                   </div>
                 </figure>
-              </header>}
+              </header>
               <section className="assistant-dialogue">
                 <div className="assistant-dialogue-copy">
                   <h2>¿Qué necesitas hoy?</h2>
