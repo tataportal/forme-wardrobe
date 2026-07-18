@@ -104,7 +104,6 @@ type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "
   isPublic: boolean;
 };
 
-type StoredGarmentEdit = Omit<GarmentDraft, "id">;
 type ApiGarment = Omit<GarmentDraft, "id"> & {
   id: string;
   favorite?: boolean;
@@ -246,13 +245,10 @@ const emptyFilters: WardrobeFilters = {
   silhouette: "All",
 };
 
-const garmentEditsStorageKey = "forme-garment-edits-v1";
 const demoLooksStorageKey = "forme-demo-looks-v1";
 const demoWeekStorageKey = "forme-demo-week-v1";
 const sessionProfileStorageKey = "forme-session-profile-v1";
 const sessionProfileMaxAge = 12 * 60 * 60 * 1000;
-const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
-const operationalSiteUrl = "https://forme.gallery/";
 const currentOutfitId = "current-look";
 const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
@@ -2094,13 +2090,13 @@ export function WardrobeApp({
   );
   const personalGarments = garments.filter((item) => item.collection !== "forme");
   const sharedBasics = garments.filter((item) => item.collection === "forme");
-  const retroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
-  const retroShowcaseLooks: SavedLook[] = savedLooks.length
+  const heroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
+  const showcaseLooks: SavedLook[] = savedLooks.length
     ? savedLooks.slice(0, 3)
-    : [{ id: "retro-demo-look", name: "Demo Formé", items: initialDemoCanvas }];
-  const retroPlannedCount = weekDays.filter((day) => weeklyPlan.some((entry) => entry.date === day.key)).length;
-  const retroReadyCount = personalGarments.filter((item) => item.status === "ready" || item.status === "ghosted").length;
-  const retroFavoriteCount = personalGarments.filter((item) => item.favorite).length;
+    : [{ id: "showcase-look", name: "Demo Formé", items: initialDemoCanvas }];
+  const plannedDaysCount = weekDays.filter((day) => weeklyPlan.some((entry) => entry.date === day.key)).length;
+  const readyGarmentsCount = personalGarments.filter((item) => item.status === "ready" || item.status === "ghosted").length;
+  const favoriteGarmentsCount = personalGarments.filter((item) => item.favorite).length;
   const insightGarments = demoMode ? sharedBasics : personalGarments;
   const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
   const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
@@ -2160,14 +2156,9 @@ export function WardrobeApp({
   }, [selectedPlanDate, weekDays]);
 
   useEffect(() => {
-    if (isStaticDemo) window.location.replace(operationalSiteUrl);
-  }, []);
-
-  useEffect(() => {
-    if (!isStaticDemo) {
-      let active = true;
-      let sessionAuthenticated = false;
-      const loadAccount = async () => {
+    let active = true;
+    let sessionAuthenticated = false;
+    const loadAccount = async () => {
         const cachedProfile = readCachedSessionProfile();
         if (cachedProfile && active) {
           sessionAuthenticated = true;
@@ -2215,7 +2206,7 @@ export function WardrobeApp({
           fetch("/api/week", { cache: "no-store" }),
           fetch("/api/style-profile", { cache: "no-store" }),
         ]);
-        if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu armario.");
+        if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu closet.");
         const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
         const outfits = outfitsResponse.ok
           ? await outfitsResponse.json() as { outfits: SavedLook[] }
@@ -2255,27 +2246,15 @@ export function WardrobeApp({
           setSaved(false);
         }
         setWardrobeError("");
-      };
-      void loadAccount().catch((error: unknown) => {
-        if (!active) return;
-        setDemoMode(!sessionAuthenticated);
-        setSessionStatus(sessionAuthenticated ? "authenticated" : "guest");
-        setAccountDataReady(true);
-        setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu armario.");
-      });
-      return () => { active = false; };
-    }
-    try {
-      const stored = localStorage.getItem(garmentEditsStorageKey);
-      if (!stored) return;
-      const edits = JSON.parse(stored) as Record<string, StoredGarmentEdit>;
-      const frame = window.requestAnimationFrame(() => {
-        setGarments((items) => items.map((item) => edits[item.id] ? { ...item, ...edits[item.id], color: edits[item.id].tone } : item));
-      });
-      return () => window.cancelAnimationFrame(frame);
-    } catch {
-      // A malformed local edit should never block the wardrobe.
-    }
+    };
+    void loadAccount().catch((error: unknown) => {
+      if (!active) return;
+      setDemoMode(!sessionAuthenticated);
+      setSessionStatus(sessionAuthenticated ? "authenticated" : "guest");
+      setAccountDataReady(true);
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo abrir tu closet.");
+    });
+    return () => { active = false; };
   // The initial hydration intentionally runs once; pending cutouts are idempotent and guarded by a ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2283,7 +2262,7 @@ export function WardrobeApp({
   useEffect(() => {
     const syncRouteFromHistory = () => {
       const routePath = window.location.pathname.replace(/^\//, "");
-      const route = (routePath === "closet-v2" ? "closet" : routePath) as WardrobeRoute;
+      const route = routePath as WardrobeRoute;
       if (["closet", "looks", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
     };
     window.addEventListener("popstate", syncRouteFromHistory);
@@ -2508,16 +2487,6 @@ export function WardrobeApp({
       ? { ...item, ...normalized, color: normalized.tone }
       : item));
     setGarmentSaveError("");
-    if (isStaticDemo) {
-      try {
-        const stored = JSON.parse(localStorage.getItem(garmentEditsStorageKey) ?? "{}") as Record<string, StoredGarmentEdit>;
-        localStorage.setItem(garmentEditsStorageKey, JSON.stringify({ ...stored, [id]: normalized }));
-      } catch {
-        // The edit still works for the current session if storage is unavailable.
-      }
-      setGarmentSaved(true);
-      return;
-    }
     try {
       const current = garments.find((item) => item.id === id);
       const response = await fetch(`/api/garments/${encodeURIComponent(id)}`, {
@@ -2537,7 +2506,6 @@ export function WardrobeApp({
   async function toggleFavorite(item: Garment) {
     const next = { ...item, favorite: !item.favorite };
     setGarments((items) => items.map((garment) => garment.id === item.id ? next : garment));
-    if (isStaticDemo) return;
     try {
       const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, {
         method: "PUT",
@@ -2555,7 +2523,6 @@ export function WardrobeApp({
     setGarments((items) => items.filter((garment) => garment.id !== item.id));
     setCanvasPieces((items) => items.filter((piece) => piece.garmentId !== item.id));
     setGarmentDraft(null);
-    if (isStaticDemo) return;
     try {
       const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, {
         method: "DELETE",
@@ -2660,7 +2627,7 @@ export function WardrobeApp({
 
   function resetUpload() {
     uploadItems.forEach((item) => {
-      if (item.preview.startsWith("blob:") && !(isStaticDemo && item.status === "done")) URL.revokeObjectURL(item.preview);
+      if (item.preview.startsWith("blob:")) URL.revokeObjectURL(item.preview);
     });
     setUploadItems([]);
     if (fileInput.current) fileInput.current.value = "";
@@ -2713,20 +2680,6 @@ export function WardrobeApp({
     setUploadingBatch(true);
     setUploadError("");
     pending.forEach((item) => updateUploadItem(item.id, { status: "uploading", error: undefined }));
-
-    if (isStaticDemo) {
-      await new Promise((resolve) => setTimeout(resolve, 650));
-      pending.forEach((item) => updateUploadItem(item.id, { status: "processing" }));
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      const created = pending.map<Garment>((item) => {
-        const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
-        return { id: crypto.randomUUID(), ...custom, ...classifyGarment(custom), garmentType: item.garmentType, image: item.preview, status: "ghosted" };
-      });
-      setGarments((items) => [...created, ...items]);
-      pending.forEach((item) => updateUploadItem(item.id, { status: "done" }));
-      setUploadingBatch(false);
-      return;
-    }
 
     const remote = new Map<string, string>();
     const useDiscountedBatch = pending.length >= discountedBatchThreshold && pending.every((item) => !item.garmentId);
@@ -3251,7 +3204,7 @@ export function WardrobeApp({
     setSavingOutfit(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -3299,7 +3252,7 @@ export function WardrobeApp({
     setPlanningWeek(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/week/${encodeURIComponent(date)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -3324,7 +3277,7 @@ export function WardrobeApp({
     setPlanningWeek(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/week/${encodeURIComponent(date)}`, { method: "DELETE" });
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo liberar ese día.");
       }
@@ -3346,7 +3299,7 @@ export function WardrobeApp({
     setPlanningWeek(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/week/${encodeURIComponent(entry.date)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -3390,7 +3343,7 @@ export function WardrobeApp({
     setPlanningWeek(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch("/api/week", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -3421,7 +3374,7 @@ export function WardrobeApp({
   async function deleteSavedLook(lookId: string) {
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(lookId)}`, { method: "DELETE" });
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar el look.");
       }
@@ -3546,7 +3499,7 @@ export function WardrobeApp({
     setSavingOutfit(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -3584,7 +3537,7 @@ export function WardrobeApp({
     setSavingOutfit(true);
     setWardrobeError("");
     try {
-      if (!isStaticDemo && !demoMode) {
+      if (!demoMode) {
         const response = await fetch(`/api/outfits/${encodeURIComponent(outfitId)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
@@ -3645,16 +3598,8 @@ export function WardrobeApp({
     }
   }
 
-  if (isStaticDemo) {
-    return <main className="static-redirect forme-v2" aria-live="polite">
-      <p>ABRIENDO FORMÉ</p>
-      <h1>Tu armario continúa en la app operativa.</h1>
-      <a href={operationalSiteUrl}>CONTINUAR →</a>
-    </main>;
-  }
-
   return (
-    <main className={`site-shell view-${view} closet-v2 forme-v2`}>
+    <main className={`site-shell view-${view} forme-app`}>
       {!demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -3817,25 +3762,25 @@ export function WardrobeApp({
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              <header className="closet-v2-hero">
-                <div className="closet-v2-copy">
+              <header className="closet-hero">
+                <div className="closet-hero-copy">
                   <span>{demoMode ? "ARCHIVO ABIERTO" : "ARCHIVO PERSONAL"}</span>
                   <h1>{demoMode ? "Closet" : "Mi closet"}</h1>
                   <p>{demoMode ? "Prueba el vestidor con prendas Formé o entra para construir tu propio archivo." : "Explora, filtra y combina las prendas que ya tienes."}</p>
-                  {demoMode && <div className="closet-v2-entry">
+                  {demoMode && <div className="closet-entry">
                     <button type="button" onClick={openDemoCanvas}>EXPLORAR CANVAS →</button>
                     <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
                   </div>}
-                  <dl className="closet-v2-metrics">
+                  <dl className="closet-hero-metrics">
                     <div><dt>Prendas</dt><dd>{demoMode ? sharedBasics.length : personalGarments.length}</dd></div>
-                    <div><dt>{demoMode ? "En demo" : "Listas"}</dt><dd>{demoMode ? sharedBasics.length : retroReadyCount}</dd></div>
-                    <div><dt>Favoritas</dt><dd>{demoMode ? 0 : retroFavoriteCount}</dd></div>
+                    <div><dt>{demoMode ? "En demo" : "Listas"}</dt><dd>{demoMode ? sharedBasics.length : readyGarmentsCount}</dd></div>
+                    <div><dt>Favoritas</dt><dd>{demoMode ? 0 : favoriteGarmentsCount}</dd></div>
                   </dl>
                 </div>
-                <figure className="closet-v2-scanner" aria-label="Vista previa de prendas del closet">
-                  <figcaption><span>VISTA DE ARCHIVO</span><strong>{retroPreviewGarments.length} EN FOCO</strong></figcaption>
-                  <div className="closet-v2-specimens">
-                    {retroPreviewGarments.map((item, index) => <div key={item.id} style={{ "--slot": index } as CSSProperties}>
+                <figure className="closet-scanner" aria-label="Vista previa de prendas del closet">
+                  <figcaption><span>VISTA DE ARCHIVO</span><strong>{heroPreviewGarments.length} EN FOCO</strong></figcaption>
+                  <div className="closet-specimens">
+                    {heroPreviewGarments.map((item, index) => <div key={item.id} style={{ "--slot": index } as CSSProperties}>
                       <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} />
                       <span>{translateValue(item.garmentType)}</span>
                     </div>)}
@@ -3888,22 +3833,22 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
-              <header className="v2-section-hero v2-looks-hero">
-                <div className="v2-section-copy">
+              <header className="archive-hero looks-hero">
+                <div className="archive-hero-copy">
                   <span>ARCHIVO PERSONAL / LOOKS</span>
                   <h1>Looks</h1>
                   <p>Guarda combinaciones, vuelve a editarlas y deja lista tu semana.</p>
                   <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
-                  <dl className="v2-section-metrics">
+                  <dl className="archive-hero-metrics">
                     <div><dt>Guardados</dt><dd>{savedLooks.length}</dd></div>
-                    <div><dt>Esta semana</dt><dd>{retroPlannedCount}/7</dd></div>
+                    <div><dt>Esta semana</dt><dd>{plannedDaysCount}/7</dd></div>
                     <div><dt>Públicos</dt><dd>{savedLooks.filter((look) => look.isPublic).length}</dd></div>
                   </dl>
                 </div>
-                <figure className="v2-looks-stack" aria-label="Vista previa de looks guardados">
-                  <figcaption><span>COMPOSICIONES</span><strong>{retroShowcaseLooks.length} EN FOCO</strong></figcaption>
+                <figure className="looks-showcase" aria-label="Vista previa de looks guardados">
+                  <figcaption><span>COMPOSICIONES</span><strong>{showcaseLooks.length} EN FOCO</strong></figcaption>
                   <div>
-                    {retroShowcaseLooks.map((look, index) => <article key={look.id} style={{ "--look-slot": index } as CSSProperties}>
+                    {showcaseLooks.map((look, index) => <article key={look.id} style={{ "--look-slot": index } as CSSProperties}>
                       <LookPreview look={look} garmentById={garmentById} />
                       <span>{look.name}</span>
                     </article>)}
@@ -3949,24 +3894,24 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
-              <header className="v2-section-hero v2-assistant-hero">
-                <div className="v2-section-copy">
+              <header className="archive-hero assistant-hero">
+                <div className="archive-hero-copy">
                   <span>LECTURA PERSONAL / ASISTENTE</span>
                   <h1>Asistente</h1>
                   <p>Pregunta desde una ocasión concreta. Formé cruza tu perfil con las prendas y looks que ya tienes.</p>
-                  <dl className="v2-section-metrics">
+                  <dl className="archive-hero-metrics">
                     <div><dt>Perfil</dt><dd>{assistantProfileReady ? "OK" : "Pendiente"}</dd></div>
                     <div><dt>Prendas</dt><dd>{assistantGarments.length}</dd></div>
                     <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
                   </dl>
                 </div>
-                <figure className="v2-assistant-map" aria-label="Fuentes que usa el asistente">
+                <figure className="assistant-showcase" aria-label="Fuentes que usa el asistente">
                   <figcaption><span>LECTURA ACTIVA</span><strong>{assistantDataGaps.length ? "POR COMPLETAR" : "LISTA"}</strong></figcaption>
-                  <div className="v2-assistant-nodes">
+                  <div className="assistant-showcase-nodes">
                     <article className={assistantProfileReady ? "ready" : ""}><span>01</span><strong>Perfil</strong><small>Preferencias y estilo</small></article>
                     <article className={assistantClosetReady ? "ready" : ""}><span>02</span><strong>Closet</strong><small>Prendas disponibles</small></article>
                     <article className={savedLooks.length > 0 ? "ready" : ""}><span>03</span><strong>Looks</strong><small>Lo que guardas</small></article>
-                    <div className="v2-assistant-output"><span>FORMÉ</span><strong>Una respuesta para ti</strong></div>
+                    <div className="assistant-showcase-output"><span>FORMÉ</span><strong>Una respuesta para ti</strong></div>
                   </div>
                 </figure>
               </header>
@@ -4200,7 +4145,7 @@ export function WardrobeApp({
             </button>
 
             <aside className={`look-controls garment-library-panel ${libraryOpen ? "panel-open" : "panel-closed"}`} aria-label="Prendas y categorías">
-              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORMÉ" : "ARMARIO"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar armario">×</button></div>
+              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORMÉ" : "PRENDAS"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar panel de prendas">×</button></div>
               <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
                 {([
                   ["all", "Todo"],
@@ -4322,7 +4267,7 @@ export function WardrobeApp({
                   <input type="checkbox" checked={garmentDraft.isPublic} onChange={(event) => updateGarmentDraft("isPublic", event.target.checked)} />
                 </label>
 
-                {editingGarment.originalImage && !isStaticDemo && <details className="processing-options">
+                {editingGarment.originalImage && <details className="processing-options">
                   <summary>MEJORAR IMAGEN</summary>
                   <div>
                     <p>Si la imagen no se parece a tu prenda, puedes generarla otra vez.</p>
@@ -4336,7 +4281,7 @@ export function WardrobeApp({
 
                 <div className="garment-editor-actions">
                   <button type="button" className="delete-garment" onClick={() => deleteGarment(editingGarment)}>ELIMINAR</button>
-                  {(editingGarment.status === "failed" || editingGarment.status === "uploaded") && !isStaticDemo && <button type="button" onClick={() => retryProcessing(editingGarment)}>REPROCESAR</button>}
+                  {(editingGarment.status === "failed" || editingGarment.status === "uploaded") && <button type="button" onClick={() => retryProcessing(editingGarment)}>REPROCESAR</button>}
                   {garmentSaveError && <span className="garment-save-error">{garmentSaveError}</span>}
                   <button type="button" onClick={() => setGarmentDraft(null)}>CANCELAR</button>
                   <button type="submit" className={garmentSaved ? "saved" : ""}>{garmentSaved ? "GUARDADO ✓" : "GUARDAR CAMBIOS"}</button>

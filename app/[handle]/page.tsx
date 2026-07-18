@@ -91,11 +91,11 @@ export default function PublicProfilePage() {
     else await navigator.clipboard.writeText(window.location.href).catch(() => null);
   }
 
-  if (invalidHandle) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>Este perfil no existe.</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
-  if (loading) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><div className="public-profile-loading" aria-label="Abriendo perfil"><i /><i /><i /></div></main>;
-  if (!data) return <main className="public-profile-state forme-v2 public-v2"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>{error}</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
+  if (invalidHandle) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>Este perfil no existe.</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
+  if (loading) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><div className="public-profile-loading" aria-label="Abriendo perfil"><i /><i /><i /></div></main>;
+  if (!data) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>{error}</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
 
-  return <main className="public-profile-page forme-v2 public-v2">
+  return <main className="public-profile-page forme-app public-app">
     <div className="public-profile-frame">
       <header className="public-profile-nav"><Link href="/closet">FORMÉ<span>®</span></Link><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
       <section className="public-profile-hero">

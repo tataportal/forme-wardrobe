@@ -303,7 +303,7 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
 async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: D1Database; identity: Identity } | Response> {
   if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
   const identity = await identify(request, env);
-  if (!identity) return apiError("Inicia sesión para abrir tu armario.", 401);
+  if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
   await ensureUser(env.DB, identity);
   return { db: env.DB, identity };
 }
@@ -337,7 +337,7 @@ async function readAccountProfile(db: D1Database, ownerId: string): Promise<User
 async function getSession(request: Request, env: WardrobeEnv): Promise<Response> {
   if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
   const identity = await identify(request, env);
-  if (!identity) return apiError("Inicia sesión para abrir tu armario.", 401);
+  if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
   let row = await env.DB.prepare(`
     SELECT id, email, display_name, handle, bio, avatar_url,
       profile_public, discoverable, show_closet, show_looks
@@ -986,9 +986,9 @@ async function internalGarmentOperation(
   if (!env.FORME_OPS_TOKEN || request.headers.get("x-forme-ops-token") !== env.FORME_OPS_TOKEN) {
     return apiError("Ruta no encontrada.", 404);
   }
-  if (!env.DB || !env.WARDROBE_MEDIA) return apiError("El armario todavía no está conectado.", 503);
+  if (!env.DB || !env.WARDROBE_MEDIA) return apiError("El closet todavía no está conectado.", 503);
   const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
-  if (!ownerEmail) return apiError("El propietario del armario no está configurado.", 503);
+  if (!ownerEmail) return apiError("El propietario del closet no está configurado.", 503);
   const identity: Identity = {
     id: `usr_${(await hash(ownerEmail)).slice(0, 28)}`,
     email: ownerEmail,

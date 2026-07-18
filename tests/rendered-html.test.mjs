@@ -15,7 +15,7 @@ async function render(pathname = "/") {
 }
 
 test("keeps the main product areas on stable routes", async () => {
-  const routes = ["/about", "/closet", "/closet-v2", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
+  const routes = ["/about", "/closet", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
   const responses = await Promise.all(routes.map((route) => render(route)));
   for (const [index, response] of responses.entries()) {
     assert.equal(response.status, 200, `${routes[index]} should render`);
@@ -23,7 +23,7 @@ test("keeps the main product areas on stable routes", async () => {
   }
 
   const about = await responses[0].text();
-  const pricing = await responses[4].text();
+  const pricing = await responses[3].text();
   assert.match(about, /Vístete con lo que ya tienes/);
   assert.match(about, /Tu closet, por fin legible/);
   assert.match(pricing, /Un plan para cada closet/);
@@ -54,7 +54,7 @@ test("server-renders the FORMÉ wardrobe", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>FORMÉ — Tu armario visual<\/title>/i);
+  assert.match(html, /<title>FORMÉ — Tu closet visual<\/title>/i);
   assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
   assert.match(html, /Vístete con lo que ya tienes/);
   assert.match(html, /CLOSET DIGITAL · ASISTENTE DE ESTILO/);
@@ -212,11 +212,11 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /Mi colección/);
   assert.match(page, /className="wardrobe-tab-actions"/);
   assert.doesNotMatch(page, /closetVariant|isRetroCloset/);
-  assert.match(page, /site-shell view-\$\{view\} closet-v2 forme-v2/);
-  assert.match(page, /className="closet-v2-hero"/);
+  assert.match(page, /site-shell view-\$\{view\} forme-app/);
+  assert.match(page, /className="closet-hero"/);
   assert.match(page, /ARCHIVO PERSONAL/);
   assert.doesNotMatch(page, /ABRIR VERSIÓN CLÁSICA/);
-  assert.match(page, /routePath === "closet-v2"/);
+  assert.doesNotMatch(page, /routePath === "closet-v2"/);
   assert.match(page, /function autocompleteOptions/);
   assert.match(page, /garmentTypesByCategory/);
   assert.match(page, /Sweatshirt: "Polera"/);
@@ -261,7 +261,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
   assert.match(worker, /unique\.size !== 0 && unique\.size !== styleFamilies\.size/);
   assert.match(css, /\.saved-looks-grid/);
-  assert.match(css, /\.closet-v2 \.closet-v2-hero/);
+  assert.match(css, /\.forme-app \.closet-hero/);
   assert.match(css, /\.profile-drawer-backdrop/);
   assert.match(css, /\.profile-style-summary/);
   assert.match(css, /\.profile-page-hero/);
@@ -284,7 +284,6 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /\.mix-canvas-navigator/);
   assert.match(css, /\.week-workspace/);
   assert.match(css, /\.week-strip-preview/);
-  assert.match(css, /\.saved-looks-heading-actions/);
   assert.match(css, /\.guest-entry-choices/);
   assert.doesNotMatch(page, /guest-welcome-flow/);
   assert.match(css, /\.insights-dashboard/);

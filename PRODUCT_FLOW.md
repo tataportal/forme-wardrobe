@@ -2,7 +2,7 @@
 
 ## Qué es Formé
 
-Formé es un armario visual y asistente personal de styling. Permite:
+Formé es un closet digital y asistente personal de styling. Permite:
 
 - Digitalizar prendas reales.
 - Convertir fotos caseras en imágenes limpias de catálogo.
@@ -16,7 +16,7 @@ Formé es un armario visual y asistente personal de styling. Permite:
 
 La aplicación tiene dos zonas principales:
 
-1. **Armario:** administrar prendas, looks, perfil y recomendaciones.
+1. **Closet:** administrar prendas, looks, perfil y recomendaciones.
 2. **Canvas:** construir y editar outfits visualmente.
 
 ## Flujo general
@@ -114,7 +114,7 @@ La calibración puede repetirse periódicamente para corregir cómo evoluciona e
 
 ## 4. Mi closet
 
-Dentro de Armario existen solamente tres tabs:
+Dentro de Closet existen solamente tres tabs:
 
 - **Mi closet**
 - **Looks guardados**

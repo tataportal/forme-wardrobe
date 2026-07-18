@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export default function AboutPage() {
-  return <main className="route-page about-page about-v2">
-    <header className="route-header about-v2-nav">
+  return <main className="route-page about-page about-app">
+    <header className="route-header about-app-nav">
       <Link className="route-wordmark" href="/closet" aria-label="Formé, ir al closet">FORMÉ<span>®</span></Link>
       <nav aria-label="Navegación principal">
         <Link href="/closet">CLOSET</Link>
@@ -19,36 +19,36 @@ export default function AboutPage() {
       </nav>
     </header>
 
-    <section className="about-v2-hero">
-      <div className="about-v2-hero-copy">
+    <section className="about-app-hero">
+      <div className="about-app-hero-copy">
         <p>CLOSET DIGITAL Y ASISTENTE DE ESTILO</p>
         <h1>Vístete con lo que ya tienes.</h1>
         <span>Digitaliza tus prendas, arma looks y recibe recomendaciones que aprenden de ti.</span>
-        <div className="about-v2-actions">
+        <div className="about-app-actions">
           <Link className="primary" href="/closet">EXPLORAR FORMÉ <b>↗</b></Link>
           <Link href="/auth/google/start?return_to=%2Fcloset">CREAR MI CLOSET</Link>
         </div>
       </div>
 
-      <figure className="about-v2-outfit" aria-label="Un look creado con prendas digitalizadas en Formé">
-        <div className="about-v2-system-bar" aria-hidden="true"><span>LOOK ACTIVO</span><strong>4 PIEZAS</strong></div>
-        <div className="about-v2-outfit-stage">
-          <img className="about-v2-piece about-v2-piece-tee" src={`${basePath}/wardrobe/cutouts/basic-white-tee.webp`} alt="Polo blanco digitalizado" />
-          <img className="about-v2-piece about-v2-piece-jacket" src={`${basePath}/wardrobe/cutouts/002_DSC01771-open.webp`} alt="Bomber negra abierta digitalizada" />
-          <img className="about-v2-piece about-v2-piece-jeans" src={`${basePath}/wardrobe/cutouts/blue-straight-jeans.webp`} alt="Jeans azules digitalizados" />
-          <img className="about-v2-piece about-v2-piece-shoes" src={`${basePath}/wardrobe/basics/black-leather-shoes.webp`} alt="Zapatos negros digitalizados" />
+      <figure className="about-app-outfit" aria-label="Un look creado con prendas digitalizadas en Formé">
+        <div className="about-app-system-bar" aria-hidden="true"><span>LOOK ACTIVO</span><strong>4 PIEZAS</strong></div>
+        <div className="about-app-outfit-stage">
+          <img className="about-app-piece about-app-piece-tee" src={`${basePath}/wardrobe/cutouts/basic-white-tee.webp`} alt="Polo blanco digitalizado" />
+          <img className="about-app-piece about-app-piece-jacket" src={`${basePath}/wardrobe/cutouts/002_DSC01771-open.webp`} alt="Bomber negra abierta digitalizada" />
+          <img className="about-app-piece about-app-piece-jeans" src={`${basePath}/wardrobe/cutouts/blue-straight-jeans.webp`} alt="Jeans azules digitalizados" />
+          <img className="about-app-piece about-app-piece-shoes" src={`${basePath}/wardrobe/basics/black-leather-shoes.webp`} alt="Zapatos negros digitalizados" />
         </div>
-        <i className="about-v2-scan" aria-hidden="true" />
+        <i className="about-app-scan" aria-hidden="true" />
         <figcaption><span>UN CLOSET QUE PUEDES USAR</span><strong>Combina antes de vestirte.</strong></figcaption>
       </figure>
     </section>
 
-    <section className="about-v2-product" aria-labelledby="about-product-title">
-      <div className="about-v2-product-intro">
+    <section className="about-app-product" aria-labelledby="about-product-title">
+      <div className="about-app-product-intro">
         <h2 id="about-product-title">Tu closet, por fin legible.</h2>
         <p>Formé convierte fotos comunes en un archivo visual que puedes usar todos los días.</p>
       </div>
-      <div className="about-v2-capabilities">
+      <div className="about-app-capabilities">
         <article>
           <h3>Digitaliza</h3>
           <p>Sube varias prendas. Formé limpia cada imagen y conserva su forma, color y detalles.</p>
@@ -64,7 +64,7 @@ export default function AboutPage() {
       </div>
     </section>
 
-    <section className="about-v2-manifesto">
+    <section className="about-app-manifesto">
       <p>LO QUE REPITES TAMBIÉN CUENTA UNA HISTORIA</p>
       <blockquote>Tu estilo no es lo que compras. Es lo que eliges cuando nadie te está diciendo qué ponerte.</blockquote>
       <div>
@@ -73,7 +73,7 @@ export default function AboutPage() {
       </div>
     </section>
 
-    <footer className="about-v2-footer">
+    <footer className="about-app-footer">
       <Link className="route-wordmark" href="/closet">FORMÉ<span>®</span></Link>
       <p>Tu estilo, leído desde lo que ya tienes.</p>
       <nav><Link href="/pricing">PLANES</Link><Link href="/closet">CLOSET</Link></nav>

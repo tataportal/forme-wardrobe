@@ -14,7 +14,7 @@ const plans = [
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
-  return <main className="route-page pricing-page forme-v2 public-v2">
+  return <main className="route-page pricing-page forme-app public-app">
     <header className="route-header">
       <Link className="route-wordmark" href="/closet">FORMÉ<span>®</span></Link>
       <nav><Link href="/about">ACERCA</Link><Link href="/closet">CLOSET</Link><Link className="route-login" href="/auth/google/start?return_to=%2Fcloset">ENTRAR</Link></nav>
