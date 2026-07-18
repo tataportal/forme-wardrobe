@@ -2489,58 +2489,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   text-transform:none;
 }
 
-.closet-v2:not(.view-studio) .profile-page {
-  max-width:1400px;
-  padding:10px 24px 80px;
-}
-.closet-v2:not(.view-studio) .profile-page-hero {
-  min-height:450px;
-  margin-top:0;
-  padding:24px;
-  border:1px solid var(--product-highlight);
-  border-radius:18px;
-  background:var(--product-panel);
-  grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);
-  gap:32px;
-  box-shadow:inset 0 0 0 1px rgba(17,19,17,.1),0 18px 45px rgba(17,19,17,.07);
-}
-.closet-v2:not(.view-studio) .profile-page-portrait { height:100%; min-height:390px; border-radius:14px; background:#cacbc6; }
-.closet-v2:not(.view-studio) .profile-page-intro { padding:24px 16px; }
-.closet-v2:not(.view-studio) .profile-page-intro h1 { margin-top:10px; font:800 clamp(54px,7vw,88px)/.84 Arial,Helvetica,sans-serif; letter-spacing:-.075em; }
-.closet-v2:not(.view-studio) .profile-page-intro > p { color:var(--product-muted); }
-.closet-v2:not(.view-studio) .profile-page-links button { min-height:40px; padding:0 12px; border:1px solid var(--product-line); border-radius:9px; background:rgba(239,240,236,.5); }
-.closet-v2:not(.view-studio) .profile-page-stats { margin-top:22px; gap:10px; }
-.closet-v2:not(.view-studio) .profile-page-stats div { padding:13px; border-radius:10px; background:rgba(239,240,236,.4); box-shadow:inset 0 0 0 1px rgba(17,19,17,.08); }
-.closet-v2:not(.view-studio) .profile-page-stats dd { font:750 32px/1 Arial,Helvetica,sans-serif; }
-.closet-v2:not(.view-studio) .profile-page-body { margin-top:26px; padding-top:0; border:0; grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr); gap:24px; }
-.closet-v2:not(.view-studio) .profile-page-editor,
-.closet-v2:not(.view-studio) .profile-page-reading {
-  padding:24px;
-  border:1px solid var(--product-highlight);
-  border-radius:18px;
-  background:rgba(229,231,227,.58);
-  box-shadow:inset 0 0 0 1px rgba(17,19,17,.1);
-}
-.closet-v2:not(.view-studio) .profile-page-editor > header h2,
-.closet-v2:not(.view-studio) .profile-page-reading > header h2 { font:750 clamp(36px,4vw,54px)/.92 Arial,Helvetica,sans-serif; letter-spacing:-.06em; }
-.closet-v2:not(.view-studio) .profile-page-fields { margin-top:30px; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.closet-v2:not(.view-studio) .profile-page-fields > label {
-  padding:13px;
-  border-radius:10px;
-  background:rgba(239,240,236,.45);
-  box-shadow:inset 0 0 0 1px rgba(17,19,17,.1);
-}
-.closet-v2:not(.view-studio) .profile-page-fields input,
-.closet-v2:not(.view-studio) .profile-page-fields textarea { margin-top:8px; padding:0; border:0; font:500 17px/1.3 Arial,Helvetica,sans-serif; }
-.closet-v2:not(.view-studio) .profile-page-visibility { margin-top:34px; }
-.closet-v2:not(.view-studio) .profile-page-visibility h3 { font:750 24px/1 Arial,Helvetica,sans-serif; letter-spacing:-.035em; }
-.closet-v2:not(.view-studio) .profile-page-visibility > label { padding:12px; border-radius:10px; background:rgba(239,240,236,.34); }
-.closet-v2:not(.view-studio) .profile-page-save-row { border-color:var(--product-line); }
-.closet-v2:not(.view-studio) .profile-page-save-row button { border:0; border-radius:9px; background:var(--product-ink); color:#f3f4f0; }
-.closet-v2:not(.view-studio) .profile-page-reading { align-self:start; }
-.closet-v2:not(.view-studio) .profile-page-reading li span { font:650 18px/1.1 Arial,Helvetica,sans-serif; }
-.closet-v2:not(.view-studio) .profile-page-exploration > strong { font:750 42px/1 Arial,Helvetica,sans-serif; }
-
 .closet-v2:not(.view-studio) .upload-view { padding:12px 0 40px; }
 .closet-v2:not(.view-studio) .upload-heading { padding:20px 0; border-color:var(--product-line); }
 .closet-v2:not(.view-studio) .upload-heading h2 { font:750 32px/1 Arial,Helvetica,sans-serif; letter-spacing:-.04em; }
@@ -2661,7 +2609,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 @media (max-width:900px) {
   .closet-v2:not(.view-studio) .closet-v2-hero,
   .closet-v2:not(.view-studio) .v2-section-hero { grid-template-columns:1fr; }
-  .closet-v2:not(.view-studio) .profile-page-body { grid-template-columns:1fr; }
   .about-hero { grid-template-columns:1fr; }
   .pricing-page .pricing-plan-list { grid-template-columns:1fr; }
   .pricing-page .pricing-plan-list article.recommended { min-height:440px; margin-top:0; }
@@ -2678,8 +2625,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .route-wordmark { font-size:23px; }
   .route-header nav { gap:12px; }
   .route-header nav a:not(.route-login) { display:none; }
-  .closet-v2:not(.view-studio) .content,
-  .closet-v2:not(.view-studio) .profile-page { padding-left:12px; padding-right:12px; }
+  .closet-v2:not(.view-studio) .content { padding-left:12px; padding-right:12px; }
   .closet-v2:not(.view-studio) .wardrobe-profile { min-height:52px; padding-top:7px; gap:5px; }
   .closet-v2:not(.view-studio) .wardrobe-tabs { min-width:0; flex:1 1 auto; gap:2px; }
   .closet-v2:not(.view-studio) .wardrobe-tabs button { min-width:0; padding:0 7px; font-size:8px; }
@@ -2714,16 +2660,8 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .closet-v2:not(.view-studio) .saved-looks-grid { grid-template-columns:1fr; gap:14px; }
   .closet-v2:not(.view-studio) .looks-view > .week-view,
   .closet-v2:not(.view-studio) .assistant-dialogue,
-  .closet-v2:not(.view-studio) .assistant-view > .insights-view,
-  .closet-v2:not(.view-studio) .profile-page-editor,
-  .closet-v2:not(.view-studio) .profile-page-reading { padding:15px; border-radius:15px; }
+  .closet-v2:not(.view-studio) .assistant-view > .insights-view { padding:15px; border-radius:15px; }
   .closet-v2:not(.view-studio) .assistant-dialogue-copy h2 { font-size:38px; }
-  .closet-v2:not(.view-studio) .profile-page-hero { min-height:0; padding:10px; border-radius:15px; grid-template-columns:1fr; gap:12px; }
-  .closet-v2:not(.view-studio) .profile-page-portrait { min-height:280px; }
-  .closet-v2:not(.view-studio) .profile-page-intro { padding:20px 12px; }
-  .closet-v2:not(.view-studio) .profile-page-intro h1 { font-size:50px; }
-  .closet-v2:not(.view-studio) .profile-page-fields { grid-template-columns:1fr; }
-  .closet-v2:not(.view-studio) .profile-page-bio { grid-column:auto; }
   .closet-v2:not(.view-studio) .profile-drawer,
   .closet-v2:not(.view-studio) .pricing-drawer { width:calc(100% - 12px); height:calc(100dvh - 12px); margin:6px; border-radius:14px; }
   .about-hero { min-height:auto; padding:14px 12px 12px; gap:10px; }
