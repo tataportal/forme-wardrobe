@@ -4180,7 +4180,7 @@ export function WardrobeApp({
                             onPointerMove={moveTransformHandle}
                             onPointerUp={stopTransformHandle}
                             onPointerCancel={stopTransformHandle}
-                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M10 7h7v7M14 17H7v-7" /></svg></button>
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7 17 17M10 17h7v-7" /></svg></button>
                         </>}
                       </div>
                     );
