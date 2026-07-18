@@ -30,12 +30,14 @@ export default function AboutPage() {
       </div>
 
       <figure className="about-v2-outfit" aria-label="Un look creado con prendas digitalizadas en Formé">
+        <div className="about-v2-system-bar" aria-hidden="true"><span>LOOK ACTIVO</span><strong>4 PIEZAS</strong></div>
         <div className="about-v2-outfit-stage">
           <img className="about-v2-piece about-v2-piece-tee" src={`${basePath}/wardrobe/cutouts/basic-white-tee.webp`} alt="Polo blanco digitalizado" />
           <img className="about-v2-piece about-v2-piece-jacket" src={`${basePath}/wardrobe/cutouts/002_DSC01771-open.webp`} alt="Bomber negra abierta digitalizada" />
           <img className="about-v2-piece about-v2-piece-jeans" src={`${basePath}/wardrobe/cutouts/blue-straight-jeans.webp`} alt="Jeans azules digitalizados" />
           <img className="about-v2-piece about-v2-piece-shoes" src={`${basePath}/wardrobe/basics/black-leather-shoes.webp`} alt="Zapatos negros digitalizados" />
         </div>
+        <i className="about-v2-scan" aria-hidden="true" />
         <figcaption><span>UN CLOSET QUE PUEDES USAR</span><strong>Combina antes de vestirte.</strong></figcaption>
       </figure>
     </section>
