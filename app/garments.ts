@@ -1,3 +1,5 @@
+import { importedGarments20260718 } from "./imported-garments-2026-07-18";
+
 export type GarmentAttributes = {
   garmentType: GarmentType;
   colorFamily: string;
@@ -238,6 +240,14 @@ export const starterGarments: Garment[] = [
     id: `archive-${String(index + 1).padStart(3, "0")}`,
     image: `/wardrobe/cutouts/${file}`,
     openImage: openFile ? `/wardrobe/cutouts/${openFile}` : undefined,
+    status: "ghosted" as const,
+    collection: "personal" as const,
+  })),
+  ...importedGarments20260718.map((item, index) => ({
+    ...item,
+    ...classifyGarment(item),
+    id: `import-20260718-${String(index + 1).padStart(3, "0")}`,
+    image: `/wardrobe/imports/2026-07-18/${item.file}`,
     status: "ghosted" as const,
     collection: "personal" as const,
   })),

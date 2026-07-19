@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 async function render(pathname = "/") {
@@ -316,4 +316,21 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(schema, /profilePublic/);
   assert.match(schema, /isPublic/);
   assert.match(schema, /garmentType/);
+});
+
+test("ships the complete July closet import as usable garments", async () => {
+  const [catalog, manifest, files] = await Promise.all([
+    readFile(new URL("../app/imported-garments-2026-07-18.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/wardrobe/imports/2026-07-18/audit/manifest-106.csv", import.meta.url), "utf8"),
+    readdir(new URL("../public/wardrobe/imports/2026-07-18", import.meta.url)),
+  ]);
+
+  assert.equal((catalog.match(/\{ file: "\d{3}_DSC\d+\.webp"/g) ?? []).length, 106);
+  assert.equal(files.filter((file) => /^\d{3}_DSC\d+\.webp$/.test(file)).length, 106);
+  assert.equal(manifest.trim().split("\n").length - 1, 106);
+  assert.doesNotMatch(manifest, /,faltante$|,rechazada$/m);
+  assert.match(catalog, /category: "Bottoms"/);
+  assert.match(catalog, /category: "Tops"/);
+  assert.match(catalog, /category: "Footwear"/);
+  assert.match(catalog, /category: "Accessories"/);
 });
