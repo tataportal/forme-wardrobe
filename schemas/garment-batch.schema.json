@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forme.gallery/schemas/garment-batch.schema.json",
+  "title": "Formé garment source manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["batchId", "expectedCount", "standardVersion", "items"],
+  "properties": {
+    "batchId": { "type": "string", "minLength": 1 },
+    "expectedCount": { "type": "integer", "minimum": 1 },
+    "standardVersion": { "const": "forme-garment-v1" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceId", "sourceSha256", "primarySource", "supportSources", "category", "variant", "protectedDetails", "status"],
+        "properties": {
+          "sourceId": { "type": "string", "minLength": 1 },
+          "sourceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "primarySource": { "type": "string", "minLength": 1 },
+          "supportSources": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "category": { "enum": ["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"] },
+          "garmentType": { "type": "string" },
+          "variant": { "enum": ["open", "closed", "not_applicable"] },
+          "protectedDetails": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["RECEIVED", "INVENTORIED", "SPECCED", "GENERATED", "NORMALIZED", "FIDELITY_PASSED", "TECH_PASSED", "PRESENTATION_PASSED", "RECONCILED", "INTEGRATED", "LIVE_PASSED", "BLOCKED"] }
+        }
+      }
+    }
+  }
+}

@@ -301,6 +301,9 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   ]);
 
   assert.match(worker, /fallback: ImageQuality = "low"/);
+  assert.match(worker, /const MAX_BATCH_GARMENTS = 15/);
+  assert.match(worker, /slice\(0, MAX_BATCH_GARMENTS\)/);
+  assert.doesNotMatch(worker, /slice\(0, 12\)/);
   assert.match(worker, /endpoint: "\/v1\/images\/edits"/);
   assert.match(worker, /status = 'awaiting_cutout'/);
   assert.match(worker, /garment\.category === "Outerwear"/);

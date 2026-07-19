@@ -10,16 +10,14 @@
   --muted:#77746d;
   --canvas-greige:#d9d5cc;
   --garment-sticker-filter:
-    drop-shadow(1.5px 0 0 #f4f4f4)
-    drop-shadow(-1.5px 0 0 #f4f4f4)
-    drop-shadow(0 1.5px 0 #f4f4f4)
-    drop-shadow(0 -1.5px 0 #f4f4f4)
-    drop-shadow(0 9px 10px rgba(17,17,15,.16));
-  --garment-import-sticker-filter:
-    drop-shadow(2.75px 0 0 #f4f4f4)
-    drop-shadow(-2.75px 0 0 #f4f4f4)
-    drop-shadow(0 2.75px 0 #f4f4f4)
-    drop-shadow(0 -2.75px 0 #f4f4f4)
+    drop-shadow(2px 0 0 #f4f4f4)
+    drop-shadow(-2px 0 0 #f4f4f4)
+    drop-shadow(0 2px 0 #f4f4f4)
+    drop-shadow(0 -2px 0 #f4f4f4)
+    drop-shadow(1.4px 1.4px 0 #f4f4f4)
+    drop-shadow(-1.4px 1.4px 0 #f4f4f4)
+    drop-shadow(1.4px -1.4px 0 #f4f4f4)
+    drop-shadow(-1.4px -1.4px 0 #f4f4f4)
     drop-shadow(0 9px 10px rgba(17,17,15,.16));
   /* One compact, legible UI type scale. Editorial contrast lives in the
      display faces below; interface copy should never become microscopic. */
@@ -2644,11 +2642,4 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .forme-app .sticker-tray img,
 .forme-app .closet-specimens img {
   filter:var(--garment-sticker-filter);
-}
-
-/* The July import has a clean alpha edge while the legacy archive already
-   contains a baked paper edge. Give the clean batch the matching screen-space
-   width so both generations read as the same sticker system. */
-img[src*="/wardrobe/imports/2026-07-18/"] {
-  filter:var(--garment-import-sticker-filter) !important;
 }

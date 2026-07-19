@@ -1,0 +1,33 @@
+{
+  "version": "forme-garment-v1",
+  "asset": {
+    "format": "webp",
+    "width": 1024,
+    "height": 1280,
+    "aspectRatio": "4:5",
+    "alphaRequired": true,
+    "bakedOutlineAllowed": false,
+    "bakedShadowAllowed": false
+  },
+  "presentation": {
+    "rendererToken": "--garment-sticker-filter",
+    "outline": "#f4f4f4",
+    "batchOverridesAllowed": false
+  },
+  "generation": {
+    "outerwearPrimaryVariant": "open",
+    "interiorLabelsVisible": false,
+    "hangerVisible": false,
+    "barsVisible": false,
+    "mannequinVisible": false,
+    "maxAutomaticRetries": 2
+  },
+  "categoryTemplates": {
+    "Outerwear": { "anchor": "upper", "scaleClass": "outerwear" },
+    "Tops": { "anchor": "upper", "scaleClass": "top" },
+    "Tailoring": { "anchor": "upper", "scaleClass": "tailoring" },
+    "Bottoms": { "anchor": "lower", "scaleClass": "bottom" },
+    "Footwear": { "anchor": "lower", "scaleClass": "footwear" },
+    "Accessories": { "anchor": "free", "scaleClass": "accessory" }
+  }
+}

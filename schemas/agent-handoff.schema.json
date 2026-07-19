@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forme.gallery/schemas/agent-handoff.schema.json",
+  "title": "Formé garment pipeline handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "batchId",
+    "sourceId",
+    "fromStage",
+    "toStage",
+    "sourceSha256",
+    "artifactSha256",
+    "inputCount",
+    "outputCount",
+    "approvedIds",
+    "rejectedIds",
+    "evidence",
+    "status"
+  ],
+  "properties": {
+    "batchId": { "type": "string", "minLength": 1 },
+    "sourceId": { "type": "string", "minLength": 1 },
+    "fromStage": { "$ref": "#/$defs/stage" },
+    "toStage": { "$ref": "#/$defs/stage" },
+    "sourceSha256": { "$ref": "#/$defs/sha256" },
+    "artifactSha256": { "$ref": "#/$defs/sha256" },
+    "variant": { "enum": ["open", "closed", "not_applicable"] },
+    "promptVersion": { "type": "string" },
+    "styleVersion": { "const": "forme-garment-v1" },
+    "categoryTemplateVersion": { "type": "string" },
+    "inputCount": { "type": "integer", "minimum": 0 },
+    "outputCount": { "type": "integer", "minimum": 0 },
+    "approvedIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "rejectedIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "evidence": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "openIssues": { "type": "array", "items": { "type": "string" } },
+    "status": { "enum": ["PASS", "REJECT", "BLOCKED"] },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "stage": {
+      "enum": [
+        "RECEIVED",
+        "INVENTORIED",
+        "SPECCED",
+        "GENERATED",
+        "NORMALIZED",
+        "FIDELITY_PASSED",
+        "TECH_PASSED",
+        "PRESENTATION_PASSED",
+        "RECONCILED",
+        "INTEGRATED",
+        "LIVE_PASSED"
+      ]
+    }
+  }
+}

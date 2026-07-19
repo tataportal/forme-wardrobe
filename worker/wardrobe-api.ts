@@ -135,6 +135,7 @@ type StyleFamilyRatingPayload = {
 };
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_BATCH_GARMENTS = 15;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
 const garmentTypes = new Set(Object.values(garmentTypesByCategory).flat());
@@ -1403,7 +1404,7 @@ async function createGarmentBatch(
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El procesamiento todavía no está conectado.", 503);
   const body = await request.json().catch(() => null) as { garmentIds?: unknown } | null;
   const garmentIds = Array.isArray(body?.garmentIds)
-    ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))].slice(0, 12)
+    ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))].slice(0, MAX_BATCH_GARMENTS)
     : [];
   if (garmentIds.length < 2) return apiError("El lote necesita al menos dos prendas.", 400);
 
