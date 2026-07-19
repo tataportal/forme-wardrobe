@@ -2652,6 +2652,10 @@ export function WardrobeApp({
   }
 
   function acceptFiles(source: FileList | File[] | undefined) {
+    if (uploadIntakeBatchId) {
+      setUploadError("Termina este lote antes de añadir nuevas fotos.");
+      return;
+    }
     const incoming = Array.from(source ?? []);
     if (!incoming.length) return;
     const existing = new Set(uploadItems.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
@@ -4060,13 +4064,13 @@ export function WardrobeApp({
                   onDragEnter={(event: DragEvent) => { event.preventDefault(); setDraggingUpload(true); }}
                   onDragOver={(event: DragEvent) => event.preventDefault()}
                   onDragLeave={() => setDraggingUpload(false)}
-                  onDrop={(event) => { event.preventDefault(); setDraggingUpload(false); acceptFiles(event.dataTransfer.files); }}
+                  onDrop={(event) => { event.preventDefault(); setDraggingUpload(false); if (!uploadIntakeBatchId) acceptFiles(event.dataTransfer.files); }}
                 >
-                  <input ref={fileInput} type="file" accept="image/*" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFiles(event.target.files ?? undefined)} hidden />
+                  <input ref={fileInput} type="file" accept="image/*" multiple disabled={Boolean(uploadIntakeBatchId)} onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFiles(event.target.files ?? undefined)} hidden />
                   {uploadItems.length > 0
                     ? <div className="upload-preview-grid">{uploadItems.map((item) => <img src={item.preview} alt="" key={item.id} />)}</div>
                     : <div className="dropzone-empty"><span className="upload-icon" aria-hidden="true">↑</span><h3>Arrastra tus fotos aquí</h3><p>o toca para seleccionar</p><small>HASTA {maxBatchFiles} PRENDAS · 20 MB C/U</small></div>}
-                  {uploadItems.length > 0 && !uploadingBatch && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length}/{maxBatchFiles}</span>}
+                  {uploadItems.length > 0 && !uploadingBatch && !uploadIntakeBatchId && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length}/{maxBatchFiles}</span>}
                 </label>
                 <div className="intake-panel bulk-intake">
                   <div className="batch-heading"><span>TUS FOTOS</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
