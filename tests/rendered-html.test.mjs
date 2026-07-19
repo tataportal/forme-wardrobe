@@ -24,8 +24,9 @@ test("keeps the main product areas on stable routes", async () => {
 
   const about = await responses[0].text();
   const pricing = await responses[3].text();
-  assert.match(about, /Vístete con lo que ya tienes/);
-  assert.match(about, /Tu closet, por fin legible/);
+  assert.match(about, /Tu ropa ya/);
+  assert.match(about, /No necesitas más ropa/);
+  assert.match(about, /Conocerte/);
   assert.match(pricing, /Un plan para cada closet/);
 
   const [pricingSource, publicProfileSource, closetSource, looksSource, profileSource] = await Promise.all([
@@ -48,28 +49,34 @@ test("keeps the main product areas on stable routes", async () => {
   assert.doesNotMatch(`${closetSource}${looksSource}${profileSource}`, /closetVariant/);
 });
 
-test("server-renders the FORMÉ wardrobe", async () => {
+test("server-renders the FORMÉ brand entry and wardrobe", async () => {
+  const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(homeSource, /["']use client["']|WardrobeApp/);
+
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>FORMÉ — Tu closet visual<\/title>/i);
-  assert.doesNotMatch(html, /CLOSET DE PRUEBA/);
-  assert.match(html, /Vístete con lo que ya tienes/);
-  assert.match(html, /CLOSET DIGITAL · ASISTENTE DE ESTILO/);
-  assert.match(html, /EXPLORAR EL VESTIDOR/);
-  assert.match(html, /ENTRAR Y SUBIR PRENDAS/);
-  assert.match(html, /Juega con básicos Formé/);
-  assert.match(html, /class="topbar-inner"/);
-  assert.doesNotMatch(html, /＋ Agregar/);
-  assert.match(html, /aria-label="Revisando sesión"/);
+  assert.match(html, /<title>FORMÉ \| Tu ropa, leída de nuevo<\/title>/i);
+  assert.match(html, /class="forme-landing"/);
+  assert.match(html, /Tu ropa ya/);
+  assert.match(html, /No necesitas más ropa/);
+  assert.match(html, /Abrir mi closet/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
+
+  const closetResponse = await render("/closet");
+  assert.equal(closetResponse.status, 200);
+  const closetHtml = await closetResponse.text();
+  assert.doesNotMatch(closetHtml, /CLOSET DE PRUEBA/);
+  assert.match(closetHtml, /class="topbar-inner"/);
+  assert.doesNotMatch(closetHtml, /＋ Agregar/);
+  assert.match(closetHtml, /aria-label="Revisando sesión"/);
 });
 
 test("keeps saved looks and styling recommendations connected to the product", async () => {
   const [page, worker, auth, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/google-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -295,7 +302,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
 
 test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
   const [page, worker, schema] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
   ]);

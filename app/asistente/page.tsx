@@ -1,4 +1,4 @@
-import { WardrobeApp } from "../page";
+import { WardrobeApp } from "../wardrobe-app";
 
 export default function AssistantPage() {
   return <WardrobeApp initialRoute="asistente" />;
