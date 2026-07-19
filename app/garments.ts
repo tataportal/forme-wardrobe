@@ -41,7 +41,7 @@ export type Garment = GarmentAttributes & {
   quality?: "low" | "medium";
   qaStatus?: "pending" | "passed" | "review";
   qaNotes?: string;
-  status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "batch_staged" | "batch_processing" | "cutout_pending" | "ready" | "failed";
+  status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "batch_staged" | "batch_processing" | "cutout_pending" | "ready" | "review" | "failed";
   favorite?: boolean;
   isPublic?: boolean;
 };

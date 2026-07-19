@@ -133,7 +133,7 @@ type WardrobeProfile = {
 type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
 export type WardrobeRoute = "closet" | "looks" | "perfil" | "ajustes" | "asistente";
-type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "failed";
+type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "review" | "failed";
 type UploadItem = {
   id: string;
   file: File;
@@ -144,6 +144,17 @@ type UploadItem = {
   status: UploadStatus;
   garmentId?: string;
   error?: string;
+};
+type IntakeBatchSummary = {
+  clientId: string;
+  status: "uploading" | "processing" | "review" | "ready";
+  expected: number;
+  pending: number;
+  uploaded: number;
+  processing: number;
+  passed: number;
+  review: number;
+  failed: number;
 };
 
 type SavedLook = {
@@ -259,6 +270,7 @@ const uploadStatusLabels: Record<UploadStatus, string> = {
   processing: "PREPARANDO",
   done: "LISTA",
   waiting: "EN ESPERA",
+  review: "NECESITA REVISIÓN",
   failed: "REVISAR",
 };
 
@@ -1992,6 +2004,8 @@ export function WardrobeApp({
   const [garments, setGarments] = useState(formeBasics);
   const [archiveFilters, setArchiveFilters] = useState<WardrobeFilters>(emptyFilters);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
+  const [uploadIntakeBatchId, setUploadIntakeBatchId] = useState<string | null>(null);
+  const [uploadBatchSummary, setUploadBatchSummary] = useState<IntakeBatchSummary | null>(null);
   const [uploadingBatch, setUploadingBatch] = useState(false);
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -2088,7 +2102,7 @@ export function WardrobeApp({
     () => autocompleteOptions(garments.map((item) => item.material), starterMaterialSuggestions),
     [garments],
   );
-  const personalGarments = garments.filter((item) => item.collection !== "forme");
+  const personalGarments = garments.filter((item) => item.collection !== "forme" && (item.status === "ready" || item.status === "ghosted"));
   const sharedBasics = garments.filter((item) => item.collection === "forme");
   const heroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
   const showcaseLooks: SavedLook[] = savedLooks.length
@@ -2123,8 +2137,9 @@ export function WardrobeApp({
     && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
-  const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed").length;
-  const uploadFinishedCount = uploadItems.filter((item) => item.status === "done" || item.status === "waiting" || item.status === "failed").length;
+  const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed" || item.status === "review").length;
+  const uploadFinishedCount = uploadItems.filter((item) => item.status === "done" || item.status === "waiting" || item.status === "review" || item.status === "failed").length;
+  const uploadAllPassed = uploadItems.length > 0 && uploadItems.every((item) => item.status === "done");
   const editorTones = garmentDraft
     ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
     : [];
@@ -2630,6 +2645,8 @@ export function WardrobeApp({
       if (item.preview.startsWith("blob:")) URL.revokeObjectURL(item.preview);
     });
     setUploadItems([]);
+    setUploadIntakeBatchId(null);
+    setUploadBatchSummary(null);
     if (fileInput.current) fileInput.current.value = "";
     setUploadError("");
   }
@@ -2650,6 +2667,8 @@ export function WardrobeApp({
       status: "ready",
     }));
     setUploadItems((items) => [...items, ...accepted]);
+    setUploadIntakeBatchId(null);
+    setUploadBatchSummary(null);
     if (fileInput.current) fileInput.current.value = "";
 
     const oversized = incoming.filter((item) => item.type.startsWith("image/") && item.size > maxUploadBytes).length;
@@ -2671,12 +2690,40 @@ export function WardrobeApp({
     const item = uploadItems.find((candidate) => candidate.id === id);
     if (item?.preview.startsWith("blob:")) URL.revokeObjectURL(item.preview);
     setUploadItems((items) => items.filter((candidate) => candidate.id !== id));
+    setUploadIntakeBatchId(null);
+    setUploadBatchSummary(null);
     setUploadError("");
   }
 
   async function ghostGarments() {
-    const pending = uploadItems.filter((item) => item.status === "ready" || item.status === "failed");
+    const pending = uploadItems.filter((item) => item.status === "ready" || item.status === "failed" || item.status === "review");
     if (!pending.length) return;
+    let intakeBatchId = uploadIntakeBatchId;
+    if (!intakeBatchId) {
+      const nextBatchId = crypto.randomUUID();
+      try {
+        const intakeResponse = await fetch("/api/intake-batches", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            clientId: nextBatchId,
+            items: uploadItems.map((item) => ({
+              clientItemId: item.id,
+              filename: item.file.name,
+              fingerprint: `${item.file.name}:${item.file.size}:${item.file.lastModified}`,
+            })),
+          }),
+        });
+        const intakeResult = await intakeResponse.json().catch(() => null) as { batch?: IntakeBatchSummary; error?: string } | null;
+        if (!intakeResponse.ok || !intakeResult?.batch) throw new Error(intakeResult?.error || "No se pudo registrar el lote.");
+        intakeBatchId = nextBatchId;
+        setUploadIntakeBatchId(nextBatchId);
+        setUploadBatchSummary(intakeResult.batch);
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "No se pudo registrar el lote.");
+        return;
+      }
+    }
     setUploadingBatch(true);
     setUploadError("");
     pending.forEach((item) => updateUploadItem(item.id, { status: "uploading", error: undefined }));
@@ -2706,6 +2753,8 @@ export function WardrobeApp({
         const body = new FormData();
         body.append("file", processingFile);
         body.append("original", item.file);
+        body.append("intakeBatchId", intakeBatchId);
+        body.append("intakeItemId", item.id);
         if (useDiscountedBatch) body.append("processingMode", "batch");
         body.append("name", custom.name);
         body.append("category", item.category);
@@ -2728,7 +2777,15 @@ export function WardrobeApp({
         }
       } catch (error) {
         failedCount += 1;
-        updateUploadItem(item.id, { status: "failed", error: error instanceof Error ? error.message : "No se pudo cargar" });
+        const message = error instanceof Error ? error.message : "No se pudo cargar";
+        updateUploadItem(item.id, { status: "failed", error: message });
+        if (!item.garmentId) {
+          await fetch(`/api/intake-batches/${encodeURIComponent(intakeBatchId)}/items/${encodeURIComponent(item.id)}/fail`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ error: message }),
+          }).catch(() => null);
+        }
       }
     }
 
@@ -2776,6 +2833,10 @@ export function WardrobeApp({
         if (updatedGarment.status === "ready") {
           updateUploadItem(localId, { status: "done", error: undefined });
           remote.delete(localId);
+        } else if (updatedGarment.status === "review" || statusResult.job?.status === "review") {
+          failedCount += 1;
+          updateUploadItem(localId, { status: "review", error: updatedGarment.qaNotes || statusResult.job?.error || "La imagen no coincide con la prenda original" });
+          remote.delete(localId);
         } else if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
           failedCount += 1;
           updateUploadItem(localId, { status: "failed", error: statusResult.job?.error || "No se pudo preparar la imagen" });
@@ -2787,6 +2848,11 @@ export function WardrobeApp({
       timedOut = true;
       remote.forEach((_, localId) => updateUploadItem(localId, { status: "processing", error: "Continúa en segundo plano" }));
     }
+    try {
+      const summaryResponse = await fetch(`/api/intake-batches/${encodeURIComponent(intakeBatchId)}`, { cache: "no-store" });
+      const summaryResult = await summaryResponse.json().catch(() => null) as { batch?: IntakeBatchSummary } | null;
+      if (summaryResponse.ok && summaryResult?.batch) setUploadBatchSummary(summaryResult.batch);
+    } catch { /* El estado individual sigue visible aunque falle el resumen. */ }
     if (failedCount) setUploadError(`${failedCount} ${failedCount === 1 ? "prenda necesita" : "prendas necesitan"} revisión.`);
     else if (waitingCount) setUploadError(waitingCount === 1 ? "La prenda quedó guardada y se procesará cuando el servicio esté disponible." : `${waitingCount} prendas quedaron guardadas y se procesarán cuando el servicio esté disponible.`);
     else if (timedOut) setUploadError("Las prendas siguen preparándose y aparecerán en tu closet al terminar.");
@@ -4006,7 +4072,7 @@ export function WardrobeApp({
                   <div className="batch-heading"><span>TUS FOTOS</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
                   {uploadItems.length > 0
                     ? <div className="upload-queue">{uploadItems.map((item, index) => {
-                      const editable = !uploadingBatch && (item.status === "ready" || item.status === "failed");
+                      const editable = !uploadingBatch && !uploadIntakeBatchId && (item.status === "ready" || item.status === "failed" || item.status === "review");
                       return <article className={`upload-item status-${item.status}`} key={item.id}>
                         <img className="upload-item-thumb" src={item.preview} alt="" />
                         <div className="upload-item-fields">
@@ -4023,9 +4089,16 @@ export function WardrobeApp({
                     })}</div>
                     : <div className="queue-empty"><p>Selecciona varias fotos. Podrás corregir el nombre y el tipo antes de procesarlas.</p></div>}
                   {uploadError && <p className={`upload-status ${uploadItems.some((item) => item.status === "failed") ? "error" : ""}`}>{uploadError}</p>}
-                  {uploadItems.length > 0 && uploadRetryableCount === 0 && !uploadingBatch
+                  {uploadBatchSummary && <p className={`upload-status batch-summary ${uploadBatchSummary.status === "review" ? "error" : ""}`}>
+                    {uploadBatchSummary.passed}/{uploadBatchSummary.expected} listas
+                    {uploadBatchSummary.processing + uploadBatchSummary.uploaded > 0 ? ` · ${uploadBatchSummary.processing + uploadBatchSummary.uploaded} procesando` : ""}
+                    {uploadBatchSummary.review > 0 ? ` · ${uploadBatchSummary.review} en revisión` : ""}
+                    {uploadBatchSummary.failed > 0 ? ` · ${uploadBatchSummary.failed} fallaron` : ""}
+                    {uploadBatchSummary.pending > 0 ? ` · ${uploadBatchSummary.pending} pendientes` : ""}
+                  </p>}
+                  {uploadAllPassed && !uploadingBatch
                     ? <button className="primary-action ready" onClick={() => { resetUpload(); setClosetMode("browse"); }}>VER EN MI CLOSET <span>→</span></button>
-                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadItems.some((item) => item.status === "failed") ? `REINTENTAR ${uploadRetryableCount}` : `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}`}<span>→</span></button>}
+                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadRetryableCount > 0 && uploadItems.some((item) => item.status === "failed" || item.status === "review") ? `REINTENTAR ${uploadRetryableCount}` : uploadRetryableCount > 0 ? `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}` : "PROCESANDO EL LOTE"}<span>→</span></button>}
                 </div>
               </div>
             </section>

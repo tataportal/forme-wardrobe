@@ -90,6 +90,38 @@ export const processingJobs = sqliteTable("processing_jobs", {
   index("processing_jobs_batch_idx").on(table.batchId),
 ]);
 
+export const intakeBatches = sqliteTable("intake_batches", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  clientId: text("client_id").notNull(),
+  expectedCount: integer("expected_count").notNull(),
+  status: text("status").notNull().default("draft"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  completedAt: text("completed_at"),
+}, (table) => [
+  uniqueIndex("intake_batches_owner_client_unique").on(table.ownerId, table.clientId),
+  index("intake_batches_owner_status_idx").on(table.ownerId, table.status),
+]);
+
+export const intakeBatchItems = sqliteTable("intake_batch_items", {
+  id: text("id").primaryKey(),
+  batchId: text("batch_id").notNull().references(() => intakeBatches.id, { onDelete: "cascade" }),
+  clientItemId: text("client_item_id").notNull(),
+  originalFilename: text("original_filename").notNull(),
+  sourceFingerprint: text("source_fingerprint").notNull(),
+  garmentId: text("garment_id").references(() => garments.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("pending"),
+  error: text("error"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("intake_batch_items_batch_client_unique").on(table.batchId, table.clientItemId),
+  uniqueIndex("intake_batch_items_batch_fingerprint_unique").on(table.batchId, table.sourceFingerprint),
+  index("intake_batch_items_batch_status_idx").on(table.batchId, table.status),
+  index("intake_batch_items_garment_idx").on(table.garmentId),
+]);
+
 export const outfits = sqliteTable("outfits", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
