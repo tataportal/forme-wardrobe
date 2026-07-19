@@ -985,6 +985,20 @@ async function processGarment(
 
     const visualQa = await reviewGeneratedGarment(env, garment, sourceBytes, contentType, generated);
     if (!visualQa.passed) {
+      const attempt = await db.prepare("SELECT attempt FROM processing_jobs WHERE id = ? AND owner_id = ? LIMIT 1")
+        .bind(jobId, ownerId).first<{ attempt: number }>();
+      if (Number(attempt?.attempt || 0) < 2) {
+        await env.WARDROBE_MEDIA.delete(generatedKey);
+        await db.batch([
+          db.prepare("UPDATE garments SET status = 'processing', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            .bind(`Reintentando automáticamente: ${visualQa.notes}`.slice(0, 500), garmentId, ownerId),
+          db.prepare("UPDATE processing_jobs SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            .bind(visualQa.notes, jobId, ownerId),
+        ]);
+        await syncIntakeItem(db, garmentId, "processing", "Reintentando el control visual.");
+        await processGarment(env, db, ownerId, garmentId, jobId, quality, presentation, outputVariant);
+        return;
+      }
       const reviewUpdate = outputVariant === "open"
         ? db.prepare(`
           UPDATE garments SET generated_open_image_key = ?, status = 'review', quality = ?, qa_status = 'review',
@@ -1531,17 +1545,16 @@ async function reconcileGarmentBatches(
           ? await reviewGeneratedGarment(env, garment, await source.arrayBuffer(), source.httpMetadata?.contentType || "image/jpeg", generated)
           : { passed: false, score: 0, notes: "La imagen original no está disponible para el control visual." };
         if (!visualQa.passed) {
-          const reviewGarment = outputVariant === "open"
-            ? db.prepare("UPDATE garments SET generated_open_image_key = ?, status = 'review', quality = ?, qa_status = 'review', qa_notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-              .bind(generatedKey, quality, visualQa.notes, garment.id, identity.id)
-            : db.prepare("UPDATE garments SET generated_image_key = ?, status = 'review', quality = ?, qa_status = 'review', qa_notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-              .bind(generatedKey, quality, visualQa.notes, garment.id, identity.id);
+          await env.WARDROBE_MEDIA.delete(generatedKey);
+          const retryJob = await createProcessingJob(db, identity.id, garment.id, true, quality, outputVariant === "open" ? "open" : "closed", outputVariant);
           await db.batch([
-            reviewGarment,
-            db.prepare("UPDATE processing_jobs SET status = 'review', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+            db.prepare("UPDATE processing_jobs SET status = 'retrying', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
               .bind(visualQa.notes, job.id, identity.id),
+            db.prepare("UPDATE processing_jobs SET attempt = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+              .bind(retryJob.id, identity.id),
           ]);
-          await syncIntakeItem(db, garment.id, "review", visualQa.notes);
+          await syncIntakeItem(db, garment.id, "processing", "Reintentando el control visual.");
+          ctx.waitUntil(processGarment(env, db, identity.id, garment.id, retryJob.id, quality, outputVariant === "open" ? "open" : "closed", outputVariant));
           continue;
         }
         const updateGarment = outputVariant === "open"
