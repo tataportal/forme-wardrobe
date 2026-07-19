@@ -9,6 +9,12 @@
   --line:rgba(17,17,15,.18);
   --muted:#77746d;
   --canvas-greige:#d9d5cc;
+  --garment-sticker-filter:
+    drop-shadow(1.5px 0 0 #f4f4f4)
+    drop-shadow(-1.5px 0 0 #f4f4f4)
+    drop-shadow(0 1.5px 0 #f4f4f4)
+    drop-shadow(0 -1.5px 0 #f4f4f4)
+    drop-shadow(0 9px 10px rgba(17,17,15,.16));
   /* One compact, legible UI type scale. Editorial contrast lives in the
      display faces below; interface copy should never become microscopic. */
   --type-kicker:11px;
@@ -2617,4 +2623,19 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 
 @media (prefers-reduced-motion:reduce) {
   .public-profile-loading i { animation:none; }
+}
+
+/* One cutout treatment everywhere: a neutral paper edge and the same soft
+   sticker shadow. Asset-specific shadows/outlines must not change the look. */
+.about-app-piece,
+.public-look-preview img,
+.public-garments-grid article > div > img,
+.forme-app .image-wrap img,
+.forme-app .saved-look-preview img,
+.forme-app .versatile-grid img,
+.forme-app .garment-editor-image img,
+.forme-app .canvas-piece img,
+.forme-app .sticker-tray img,
+.forme-app .closet-specimens img {
+  filter:var(--garment-sticker-filter);
 }
