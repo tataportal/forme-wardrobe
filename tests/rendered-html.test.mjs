@@ -75,8 +75,9 @@ test("server-renders the FORMÉ brand entry and wardrobe", async () => {
 });
 
 test("keeps saved looks and styling recommendations connected to the product", async () => {
-  const [page, worker, auth, css] = await Promise.all([
+  const [page, shell, worker, auth, css] = await Promise.all([
     readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-app-shell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/google-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -98,7 +99,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /sessionStatus === "checking" \? "ENTRANDO…"/);
   assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
   assert.doesNotMatch(page, /signin-with-chatgpt/);
-  assert.match(page, /aria-label="Entrar con Google"/);
+  assert.match(shell, /aria-label="Entrar con Google"/);
   assert.match(auth, /AUTHORIZATION_ENDPOINT/);
   assert.match(auth, /TOKEN_ENDPOINT/);
   assert.match(auth, /USERINFO_ENDPOINT/);
@@ -112,7 +113,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Básicos Formé/);
   assert.match(page, /visiblePersonalGarments/);
   assert.match(page, /visibleFormeBasics/);
-  assert.match(page, /＋ Agregar/);
+  assert.match(page, /className="closet-add"[\s\S]*?>Agregar</);
   assert.match(page, /function buildDemoRecommendations/);
   assert.match(page, /footwear-white-sneakers/);
   assert.match(page, /accessory-black-sunglasses/);
@@ -203,7 +204,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Lo que Formé entiende de ti/);
   assert.match(page, /GUARDAR CAMBIOS/);
   assert.match(page, /activeRoute === "perfil"/);
-  assert.match(page, /REVISAR MI CALIBRACIÓN/);
+  assert.match(page, /AJUSTAR ESTILO/);
   assert.match(page, /CUÁNTO QUIERES EXPERIMENTAR/);
   assert.match(page, /type="range"/);
   assert.match(page, /function saveExplorationPreference/);
@@ -217,7 +218,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-identity"/);
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
-  assert.match(page, /className="wardrobe-tab-actions"/);
+  assert.match(page, /className="closet-entry closet-manage-actions"/);
+  assert.doesNotMatch(page, /className="wardrobe-tab-actions"/);
   assert.doesNotMatch(page, /closetVariant|isRetroCloset/);
   assert.match(page, /site-shell view-\$\{view\} forme-app/);
   assert.match(page, /className="closet-hero"/);
@@ -331,13 +333,13 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
 test("ships the complete July closet import as usable garments", async () => {
   const [catalog, manifest, files] = await Promise.all([
     readFile(new URL("../app/imported-garments-2026-07-18.ts", import.meta.url), "utf8"),
-    readFile(new URL("../public/wardrobe/imports/2026-07-18/audit/manifest-106.csv", import.meta.url), "utf8"),
+    readFile(new URL("../public/wardrobe/imports/2026-07-18/audit/manifest-104.csv", import.meta.url), "utf8"),
     readdir(new URL("../public/wardrobe/imports/2026-07-18", import.meta.url)),
   ]);
 
-  assert.equal((catalog.match(/\{ file: "\d{3}_DSC\d+\.webp"/g) ?? []).length, 106);
-  assert.equal(files.filter((file) => /^\d{3}_DSC\d+\.webp$/.test(file)).length, 106);
-  assert.equal(manifest.trim().split("\n").length - 1, 106);
+  assert.equal((catalog.match(/\{ file: "\d{3}_DSC\d+\.webp"/g) ?? []).length, 104);
+  assert.equal(files.filter((file) => /^\d{3}_DSC\d+\.webp$/.test(file)).length, 104);
+  assert.equal(manifest.trim().split("\n").length - 1, 104);
   assert.doesNotMatch(manifest, /,faltante$|,rechazada$/m);
   assert.match(catalog, /category: "Bottoms"/);
   assert.match(catalog, /category: "Tops"/);

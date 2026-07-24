@@ -11,8 +11,8 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import { classifyGarment, formeBasics, Garment, garmentTypesByCategory, starterGarments } from "./garments";
+import { FormeAppHeader, FormeMobileNav } from "./forme-app-shell";
 
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
@@ -2179,6 +2179,7 @@ export function WardrobeApp({
           sessionAuthenticated = true;
           setDemoMode(false);
           setSessionStatus("authenticated");
+          setAccountDataReady(true);
           setProfile(cachedProfile);
           if (profileOpen) setProfileDraft(profileDraftFrom(cachedProfile));
         }
@@ -2211,6 +2212,7 @@ export function WardrobeApp({
         sessionAuthenticated = true;
         setDemoMode(false);
         setSessionStatus("authenticated");
+        setAccountDataReady(true);
         setProfile(session.user);
         if (profileOpen) setProfileDraft(profileDraftFrom(session.user));
         cacheSessionProfile(session.user);
@@ -2549,16 +2551,6 @@ export function WardrobeApp({
       setGarments((items) => [item, ...items]);
       setWardrobeError(error instanceof Error ? error.message : "No se pudo eliminar la prenda.");
     }
-  }
-
-  function openWardrobe(panel?: WardrobePanel) {
-    const targetPanel = panel ?? (view === "studio" ? studioReturnPanel : wardrobePanel);
-    setView("wardrobe");
-    setWardrobePanel(targetPanel);
-    setClosetMode("browse");
-    setLibraryOpen(false);
-    setSavedLooksOpen(false);
-    setProfileOpen(false);
   }
 
   function routeForPanel(panel: WardrobePanel): "closet" | "looks" | "asistente" {
@@ -3591,6 +3583,7 @@ export function WardrobeApp({
         setActiveOutfitId(outfitId);
         setActiveLookName(lookName);
         setSaved(true);
+        if (studioReturnPanel === "looks") navigateWardrobeRoute("looks");
       }
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el look.");
@@ -3677,28 +3670,72 @@ export function WardrobeApp({
         onClose={() => { setStyleOnboardingOpen(false); if (styleProfile?.completed) setProfileOpen(true); }}
         onSave={saveStyleCalibration}
       />}
-      {demoMode && sessionStatus === "guest" && (activeRoute === "perfil" || activeRoute === "ajustes") && <div className="profile-drawer-backdrop" role="presentation">
-        <aside className="profile-drawer account-gate" role="dialog" aria-modal="true" aria-label="Entrar a mi cuenta">
-          <header><span>{activeRoute === "perfil" ? "MI PERFIL" : "AJUSTES"}</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar">×</button></header>
-          <div><p>TU CUENTA</p><h2>Entra para abrir {activeRoute === "perfil" ? "tu perfil" : "tus ajustes"}.</h2><span>Tu closet, looks y preferencias viven en tu cuenta de Formé.</span><button type="button" onClick={beginGoogleSignIn}>ENTRAR CON GOOGLE →</button></div>
-        </aside>
-      </div>}
-      {!demoMode && profileOpen && activeRoute === "ajustes" && <div className="profile-drawer-backdrop" role="presentation" onPointerDown={closeProfileRoute}>
-        <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label="Ajustes" onPointerDown={(event) => event.stopPropagation()}>
-          <header><span>AJUSTES</span><button type="button" onClick={closeProfileRoute} aria-label="Cerrar ajustes">×</button></header>
-          <div className="profile-drawer-identity">
-            <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
-            <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
+      <FormeAppHeader
+        activeRoute={activeRoute}
+        view={view}
+        sessionStatus={sessionStatus}
+        demoMode={demoMode}
+        profileImage={profileImage}
+        profileImageClass={profileImageClass}
+        onNavigate={navigateWardrobeRoute}
+        onOpenCanvas={() => openStudio(wardrobePanel)}
+        onSignIn={beginGoogleSignIn}
+        onOpenPricing={() => window.location.assign("/pricing")}
+      />
+
+      {sessionStatus === "checking" && (activeRoute === "perfil" || activeRoute === "ajustes") && (
+        <section className="account-route-loading" aria-label="Abriendo tu cuenta">
+          <span />
+          <span />
+          <span />
+        </section>
+      )}
+
+      {demoMode && sessionStatus === "guest" && (activeRoute === "perfil" || activeRoute === "ajustes") && (
+        <section className="account-page-gate" aria-labelledby="account-gate-title">
+          <div>
+            <p>{activeRoute === "perfil" ? "Tu perfil" : "Tus preferencias"}</p>
+            <h1 id="account-gate-title">
+              {activeRoute === "perfil" ? "Tu identidad dentro de Formé." : "Una lectura que se adapta a ti."}
+            </h1>
+            <span>Entra para guardar tu closet, tus looks y las decisiones que afinan las recomendaciones.</span>
+            <button type="button" onClick={beginGoogleSignIn}>Entrar con Google</button>
           </div>
-          <section className="profile-style-summary">
-            <p>TU ESTILO</p>
-            <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(", ") : "Todavía estamos conociéndote."}</h3>
-            <span>{profileTopStyles.length
-              ? "Estas son las direcciones que más aparecen en tus recomendaciones."
-              : "Elige lo que te representa para recibir recomendaciones más tuyas."}</span>
-            {profileTopStyles.length > 0 && <div className="profile-style-tags">{profileTopStyles.map((family) => <span key={family.id}>{family.label} <b>{family.rating?.affinity}%</b></span>)}</div>}
-            <div className="profile-exploration">
-              <div><span>CUÁNTO QUIERES EXPERIMENTAR</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
+          <aside aria-hidden="true">
+            <strong>FORMÉ</strong>
+            <span>{activeRoute === "perfil" ? "Perfil, closet y looks públicos." : "Preferencias, restricciones y calibración."}</span>
+          </aside>
+        </section>
+      )}
+
+      {!demoMode && accountDataReady && activeRoute === "ajustes" && (
+        <section className="settings-page" aria-labelledby="settings-title">
+          <header className="settings-page-heading">
+            <div>
+              <p>Preferencias</p>
+              <h1 id="settings-title">Ajustes</h1>
+              <span>Controla cómo Formé interpreta tu estilo y cuánto quieres explorar.</span>
+            </div>
+            <button type="button" onClick={() => navigateWardrobeRoute("perfil")}>Ver perfil</button>
+          </header>
+
+          <div className="settings-page-grid">
+            <section className="settings-identity">
+              <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
+              <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
+            </section>
+
+            <section className="profile-style-summary">
+              <p>Tu lectura actual</p>
+              <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(", ") : "Todavía estamos conociéndote."}</h3>
+              <span>{profileTopStyles.length
+                ? "Estas direcciones aparecen con más fuerza en tus recomendaciones."
+                : "Elige lo que te representa para recibir recomendaciones más tuyas."}</span>
+              {profileTopStyles.length > 0 && <div className="profile-style-tags">{profileTopStyles.map((family) => <span key={family.id}>{family.label} <b>{family.rating?.affinity}%</b></span>)}</div>}
+            </section>
+
+            <section className="profile-exploration settings-exploration">
+              <div><span>Cuánto quieres experimentar</span><strong>{styleProfile?.exploration ?? 35}%</strong></div>
               <input
                 type="range"
                 min="0"
@@ -3711,30 +3748,16 @@ export function WardrobeApp({
                 onBlur={(event) => void saveExplorationPreference(Number(event.currentTarget.value))}
                 aria-label="Cuánto quiero experimentar"
               />
-              <div className="profile-exploration-labels"><small>FAMILIAR</small><small>EXPERIMENTAL</small></div>
-              <small>Controla cuánto se alejan las sugerencias de lo que ya usas.</small>
-            </div>
-            <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}><span>{styleProfile?.completed ? "REVISAR MI CALIBRACIÓN" : "CONFIGURAR MI ESTILO"}</span><b>→</b></button>
-          </section>
-        </aside>
-      </div>}
-      <header className="topbar">
-        <div className="topbar-inner">
-          <button className="wordmark" onClick={() => navigateWardrobeRoute("closet")} aria-label="Volver al closet">FORMÉ<span>®</span></button>
-          <nav className="zone-nav" aria-label="Secciones principales">
-            <button className={view === "wardrobe" ? "active" : ""} onClick={() => navigateWardrobeRoute("closet")}>Closet</button>
-            <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}>Canvas</button>
-          </nav>
-          {sessionStatus === "checking"
-            ? <span className="session-checking" aria-label="Revisando sesión" />
-            : demoMode
-            ? <button className="google-login" aria-label="Entrar con Google" onClick={beginGoogleSignIn}><span>G</span>ENTRAR</button>
-            : <div className="topbar-account">
-              <button className="pricing-entry" type="button" onClick={() => window.location.assign("/pricing")}>PLANES</button>
-              <button className="avatar" onClick={() => navigateWardrobeRoute("perfil")} aria-label="Abrir mi perfil"><img className={profileImageClass} src={profileImage} alt="" /></button>
-            </div>}
-        </div>
-      </header>
+              <div className="profile-exploration-labels"><small>Familiar</small><small>Experimental</small></div>
+              <p>Controla cuánto se alejan las sugerencias de lo que ya usas.</p>
+            </section>
+
+            <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}>
+              <span>{styleProfile?.completed ? "Revisar mi calibración" : "Configurar mi estilo"}</span><b>→</b>
+            </button>
+          </div>
+        </section>
+      )}
 
       {view === "wardrobe" && activeRoute === "perfil" && !demoMode && !accountDataReady && <section className="profile-page profile-page-loading" aria-label="Cargando perfil">
         <div className="profile-page-loading-hero">
@@ -3815,19 +3838,8 @@ export function WardrobeApp({
         </div>
       </section>}
 
-      {view === "wardrobe" && activeRoute !== "perfil" && (
+      {view === "wardrobe" && activeRoute !== "perfil" && activeRoute !== "ajustes" && (
         <section className="content wardrobe-view">
-          {!demoMode && <section className="wardrobe-profile">
-            <nav className="wardrobe-tabs" aria-label="Mi closet">
-              <button className={wardrobePanel === "closet" ? "active" : ""} onClick={() => navigateWardrobeRoute("closet")}>Mi closet</button>
-              <button className={wardrobePanel === "looks" ? "active" : ""} onClick={() => navigateWardrobeRoute("looks")}>Looks</button>
-              <button className={wardrobePanel === "assistant" ? "active" : ""} onClick={() => navigateWardrobeRoute("asistente")}>Asistente</button>
-            </nav>
-            {wardrobePanel === "closet" && closetMode === "browse" && <div className="wardrobe-tab-actions">
-              <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` · ${archiveFilterCount}` : ""}</button>
-              <button className="closet-add" onClick={demoMode ? beginGoogleSignIn : () => setClosetMode("upload")}>＋ Agregar</button>
-            </div>}
-          </section>}
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
@@ -3840,6 +3852,10 @@ export function WardrobeApp({
                   {demoMode && <div className="closet-entry">
                     <button type="button" onClick={openDemoCanvas}>EXPLORAR CANVAS →</button>
                     <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
+                  </div>}
+                  {!demoMode && <div className="closet-entry closet-manage-actions">
+                    <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` (${archiveFilterCount})` : ""}</button>
+                    <button className="closet-add" onClick={() => setClosetMode("upload")}>Agregar</button>
                   </div>}
                   <dl className="closet-hero-metrics">
                     <div><dt>Prendas</dt><dd>{demoMode ? sharedBasics.length : personalGarments.length}</dd></div>
@@ -3859,23 +3875,6 @@ export function WardrobeApp({
                 </figure>
               </header>
               {demoMode ? <div className="guest-closet">
-                <section className="guest-welcome">
-                  <div className="guest-welcome-copy">
-                    <p>CLOSET DIGITAL · ASISTENTE DE ESTILO</p>
-                    <h1>Vístete con lo que ya tienes.</h1>
-                    <span className="guest-welcome-summary">Formé digitaliza tus prendas para que puedas combinarlas, guardar looks y recibir recomendaciones según tu estilo.</span>
-                    <small className="guest-choice-label">¿QUÉ QUIERES HACER?</small>
-                    <div className="guest-entry-choices">
-                      <button className="primary" type="button" onClick={openDemoCanvas}><span><strong>EXPLORAR EL VESTIDOR</strong><small>Prueba con prendas Formé, sin crear una cuenta.</small></span><b>→</b></button>
-                      <button type="button" onClick={beginGoogleSignIn}><span><strong>ENTRAR Y SUBIR PRENDAS</strong><small>Crea tu closet con tus propias fotos.</small></span><b>→</b></button>
-                    </div>
-                    <nav className="guest-public-links" aria-label="Conocer Formé"><Link href="/about">QUÉ ES FORMÉ</Link><Link href="/pricing">PLANES</Link></nav>
-                  </div>
-                  <button className="guest-welcome-preview" type="button" onClick={openDemoCanvas} aria-label="Probar este look en el canvas">
-                    <LookPreview look={{ id: "guest-demo", name: "Demo Formé", items: initialDemoCanvas }} garmentById={garmentById} />
-                    <span>VESTIDOR DE PRUEBA · MUEVE CADA PIEZA ↗</span>
-                  </button>
-                </section>
                 <section className="guest-basics forme-group">
                   <div className="guest-basics-heading">
                     <div><p>DEMO ABIERTO</p><h2>Juega con básicos Formé.</h2><span>Prueba 16 prendas en el canvas sin crear una cuenta.</span></div>
@@ -4369,10 +4368,11 @@ export function WardrobeApp({
         </div>
       )}
 
-      <nav className="mobile-nav" aria-label="Secciones principales">
-        <button className={view === "wardrobe" ? "active" : ""} onClick={() => view === "studio" ? openWardrobe() : navigateWardrobeRoute("closet")}><span>▦</span>Closet</button>
-        <button className={view === "studio" ? "active" : ""} onClick={() => openStudio(wardrobePanel)}><span>◫</span>Canvas</button>
-      </nav>
+      <FormeMobileNav
+        activeRoute={activeRoute}
+        view={view}
+        onNavigate={(route) => navigateWardrobeRoute(route)}
+      />
     </main>
   );
 }

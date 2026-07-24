@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FormePublicHeader } from "./forme-public-header";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const asset = (path: string) => `${basePath}${path}`;
@@ -9,7 +10,7 @@ const storyScenes = [
     verb: "Digitaliza",
     line: <>Convierte tu ropa en un <em>archivo vivo.</em></>,
     body: "Sube una foto. Formé separa la prenda del fondo y conserva su forma, color y detalles.",
-    image: "/wardrobe/cutouts/037_DSC01850.webp",
+    image: "/wardrobe/clean/037_DSC01850.webp",
     alt: "Chaqueta transparente digitalizada en Formé",
   },
   {
@@ -17,7 +18,7 @@ const storyScenes = [
     verb: "Combina",
     line: <>Mira un look antes de <em>ponértelo.</em></>,
     body: "Mueve, escala y superpone prendas en un canvas libre. Guarda las combinaciones que sí se sienten tuyas.",
-    image: "/wardrobe/cutouts/022_DSC01810-open.webp",
+    image: "/wardrobe/clean/022_DSC01810-open.webp",
     alt: "Chaqueta de fleece digitalizada y abierta en Formé",
   },
   {
@@ -25,7 +26,7 @@ const storyScenes = [
     verb: "Entiende",
     line: <>Descubre lo que repites y <em>por qué funciona.</em></>,
     body: "Formé lee tus elecciones para recomendar desde tu propio closet, no desde una tendencia genérica.",
-    image: "/wardrobe/cutouts/045_DSC01875.webp",
+    image: "/wardrobe/clean/045_DSC01875.webp",
     alt: "Chaqueta clara digitalizada en Formé",
   },
 ];
@@ -33,24 +34,14 @@ const storyScenes = [
 export function FormeLanding() {
   return (
     <main className="forme-landing">
-      <header className="landing-header">
-        <Link className="landing-wordmark" href="/" aria-label="Formé, inicio">
-          FORMÉ<span>®</span>
-        </Link>
-        <nav className="landing-header-nav" aria-label="Navegación principal">
-          <a href="#como-funciona">Cómo funciona</a>
-          <Link href="/pricing">Planes</Link>
-        </nav>
-        <Link className="landing-entry" href="/closet">
-          Abrir mi closet
-        </Link>
-      </header>
+      <FormePublicHeader tone="coral" />
 
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
           <p>Closet visual y asistente de estilo</p>
           <h1 id="landing-title">
-            Tu ropa ya <em>sabe</em><br />quién eres.
+            <span className="landing-title-line landing-title-line-one">Tu ropa ya</span>
+            <span className="landing-title-line landing-title-line-two"><em>sabe</em> quién eres.</span>
           </h1>
           <span>Digitaliza lo que tienes, crea looks y descubre el sistema que ya existe en tu forma de vestir.</span>
         </div>
@@ -60,30 +51,10 @@ export function FormeLanding() {
           role="img"
           aria-label="Prendas digitalizadas flotando en el espacio de Formé"
         >
-          <span className="landing-orbit landing-orbit-a" aria-hidden="true" />
-          <span className="landing-orbit landing-orbit-b" aria-hidden="true" />
           <img
             className="landing-garment landing-garment-main"
-            src={asset("/wardrobe/cutouts/037_DSC01850.webp")}
-            alt="Chaqueta transparente Nike digitalizada en Formé"
-            width="1024"
-            height="1280"
-            loading="eager"
-          />
-          <img
-            className="landing-garment landing-garment-left"
-            src={asset("/wardrobe/cutouts/022_DSC01810-open.webp")}
-            alt=""
-            aria-hidden="true"
-            width="1024"
-            height="1280"
-            loading="eager"
-          />
-          <img
-            className="landing-garment landing-garment-right"
-            src={asset("/wardrobe/cutouts/045_DSC01875.webp")}
-            alt=""
-            aria-hidden="true"
+            src={asset("/wardrobe/clean/015_DSC01797-open.webp")}
+            alt="Blazer gráfico negro digitalizado en Formé"
             width="1024"
             height="1280"
             loading="eager"
@@ -94,13 +65,13 @@ export function FormeLanding() {
 
       <section className="landing-statement" aria-label="La idea de Formé">
         <p>
-          No necesitas más ropa.<br />
-          Necesitas <em>ver mejor</em><br />
-          la que ya tienes.
+          <span>No necesitas más ropa.</span>
+          <span>Necesitas <em>ver mejor</em></span>
+          <span>la que ya tienes.</span>
         </p>
         <img
-          src={asset("/wardrobe/cutouts/015_DSC01797.webp")}
-          alt="Blazer gráfico digitalizado en Formé"
+          src={asset("/wardrobe/imports/2026-07-18/031_DSC01967.webp")}
+          alt="Kimono estampado digitalizado en Formé"
           width="1024"
           height="1280"
           loading="lazy"
@@ -116,7 +87,7 @@ export function FormeLanding() {
         <div className="landing-story-layout">
           <div className="landing-story-visual" aria-hidden="true">
             <span className="landing-visual-field" />
-            <img src={asset("/wardrobe/cutouts/037_DSC01850.webp")} alt="" width="1024" height="1280" loading="lazy" />
+            <img src={asset("/wardrobe/clean/037_DSC01850.webp")} alt="" width="1024" height="1280" loading="lazy" />
           </div>
 
           <div className="landing-story-scenes">
@@ -141,16 +112,16 @@ export function FormeLanding() {
           <span>Prueba proporciones, capas y contrastes antes de abrir el closet físico.</span>
         </div>
         <figure className="landing-outfit" aria-label="Look completo compuesto con prendas digitalizadas">
-          <img className="landing-outfit-top" src={asset("/wardrobe/cutouts/basic-white-tee.webp")} alt="Polo blanco" width="1024" height="1280" loading="lazy" />
-          <img className="landing-outfit-jacket" src={asset("/wardrobe/cutouts/002_DSC01771-open.webp")} alt="Bomber negra abierta" width="1024" height="1280" loading="lazy" />
-          <img className="landing-outfit-bottom" src={asset("/wardrobe/cutouts/blue-straight-jeans.webp")} alt="Jeans azules" width="1024" height="1280" loading="lazy" />
+          <img className="landing-outfit-top" src={asset("/wardrobe/clean/basic-white-tee.webp")} alt="Polo blanco" width="1024" height="1280" loading="lazy" />
+          <img className="landing-outfit-jacket" src={asset("/wardrobe/clean/002_DSC01771-open.webp")} alt="Bomber negra abierta" width="1024" height="1280" loading="lazy" />
+          <img className="landing-outfit-bottom" src={asset("/wardrobe/clean/blue-straight-jeans.webp")} alt="Jeans azules" width="1024" height="1280" loading="lazy" />
           <img className="landing-outfit-shoes" src={asset("/wardrobe/basics/white-sneakers.webp")} alt="Zapatillas blancas" width="1024" height="1280" loading="lazy" />
         </figure>
       </section>
 
       <section className="landing-final" aria-labelledby="landing-final-title">
         <div className="landing-final-sculpture" aria-hidden="true">
-          <img src={asset("/wardrobe/cutouts/045_DSC01875.webp")} alt="" width="1024" height="1280" loading="lazy" />
+          <img src={asset("/wardrobe/clean/045_DSC01875.webp")} alt="" width="1024" height="1280" loading="lazy" />
           <span />
         </div>
         <p>Lo que eliges también habla.</p>

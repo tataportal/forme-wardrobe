@@ -8,7 +8,8 @@ export type ImportedGarmentEntry = {
   brand?: string;
 };
 
-// Lote completo auditado contra las 106 prendas fuente de Pants & Sneakers.
+// Lote reconciliado contra 104 prendas físicas únicas de Pants & Sneakers.
+// DSC01916/DSC01917 y DSC01927/DSC01930 eran tomas repetidas del mismo objeto.
 // Los nombres son descriptivos y se pueden corregir desde la ficha de prenda.
 export const importedGarments20260718: ImportedGarmentEntry[] = [
   { file: "001_DSC01931.webp", name: "Short negro recto", category: "Bottoms", color: "Black" },
@@ -102,8 +103,7 @@ export const importedGarments20260718: ImportedGarmentEntry[] = [
   { file: "089_DSC01913.webp", name: "Short celeste", category: "Bottoms", color: "Light blue" },
   { file: "090_DSC01914.webp", name: "Short verde", category: "Bottoms", color: "Green" },
   { file: "091_DSC01915.webp", name: "Short crema", category: "Bottoms", color: "Cream" },
-  { file: "092_DSC01916.webp", name: "Short gris carbón", category: "Bottoms", color: "Charcoal grey" },
-  { file: "093_DSC01917.webp", name: "Short sastre gris", category: "Bottoms", color: "Grey" },
+  { file: "093_DSC01917.webp", name: "Short denim gris", category: "Bottoms", color: "Grey" },
   { file: "094_DSC01918.webp", name: "Jogger blanco rayado", category: "Bottoms", color: "White / Light blue" },
   { file: "095_DSC01919.webp", name: "Pantalón camel", category: "Bottoms", color: "Camel" },
   { file: "096_DSC01920.webp", name: "Pantalón gris recto", category: "Bottoms", color: "Grey" },
@@ -112,7 +112,6 @@ export const importedGarments20260718: ImportedGarmentEntry[] = [
   { file: "099_DSC01924.webp", name: "Pantalón negro plisado", category: "Bottoms", color: "Black" },
   { file: "100_DSC01925.webp", name: "Pantalón negro amplio", category: "Bottoms", color: "Black" },
   { file: "101_DSC01926.webp", name: "Jogger negro", category: "Bottoms", color: "Black" },
-  { file: "102_DSC01927.webp", name: "Cargo camuflado", category: "Bottoms", color: "Camouflage" },
   { file: "103_DSC01928.webp", name: "Cargo jogger gris", category: "Bottoms", color: "Grey" },
   { file: "104_DSC01930.webp", name: "Cargo camuflado oscuro", category: "Bottoms", color: "Dark camouflage" },
   { file: "105_DSC01932.webp", name: "Short negro deportivo", category: "Bottoms", color: "Black" },
