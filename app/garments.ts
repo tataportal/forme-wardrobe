@@ -179,7 +179,6 @@ const archive: ArchiveEntry[] = [
     category: "Outerwear",
     color: "Black",
     favorite: true,
-    qaStatus: "review",
     qaNotes: "La foto completa tiene etiqueta interior, borde blanco y artefactos de calado. No publicar hasta reemplazarla.",
   },
   { file: "002_DSC01771.webp", openFile: "002_DSC01771-open.webp", name: "WFP Bomber", category: "Outerwear", color: "Black" },
