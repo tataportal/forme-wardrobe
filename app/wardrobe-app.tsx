@@ -456,7 +456,7 @@ const valueTranslations: Record<string, string> = {
   Sweatshirt: "Polera",
   Hoodie: "Hoodie",
   Top: "Top",
-  Jacket: "Casaca",
+  Jacket: "Chaqueta",
   Coat: "Abrigo",
   Parka: "Parka",
   Bomber: "Bomber",
@@ -597,6 +597,13 @@ const garmentNameTranslations: Record<string, string> = {
 
 const translateValue = (value: string) => valueTranslations[value] ?? value;
 const translateGarmentName = (name: string) => garmentNameTranslations[name] ?? name;
+const canonicalTranslatedAutocompleteValue = (value: string, options: string[]) => {
+  const trimmed = value.trim();
+  return options.find((option) => (
+    option.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
+    || translateValue(option).toLocaleLowerCase() === trimmed.toLocaleLowerCase()
+  )) ?? trimmed;
+};
 
 function readCachedSessionProfile(): WardrobeProfile | null {
   try {
@@ -2408,7 +2415,11 @@ export function WardrobeApp({
   ) {
     setGarmentDraft((current) => {
       if (!current) return current;
-      const next = canonicalAutocompleteValue(current[key], options) || fallback;
+      const next = (
+        key === "brand"
+          ? canonicalAutocompleteValue(current[key], options)
+          : canonicalTranslatedAutocompleteValue(current[key], options)
+      ) || fallback;
       if (key !== "colorFamily") return { ...current, [key]: next };
       const availableTones = filterOptions.tonesByColor[next] ?? [];
       const currentToneIsValid = availableTones.some((tone) => tone.toLocaleLowerCase() === current.tone.toLocaleLowerCase());
@@ -2444,9 +2455,9 @@ export function WardrobeApp({
       ...edit,
       name: edit.name.trim() || "Prenda sin nombre",
       brand: canonicalAutocompleteValue(edit.brand, brandOptions),
-      colorFamily: canonicalAutocompleteValue(edit.colorFamily, colorOptions) || "Other",
+      colorFamily: canonicalTranslatedAutocompleteValue(edit.colorFamily, colorOptions) || "Other",
       tone: edit.tone.trim() || "Unclassified",
-      material: canonicalAutocompleteValue(edit.material, materialOptions) || "Other",
+      material: canonicalTranslatedAutocompleteValue(edit.material, materialOptions) || "Other",
     };
     setGarments((items) => items.map((item) => item.id === id
       ? { ...item, ...normalized, color: normalized.tone }
@@ -4227,15 +4238,15 @@ export function WardrobeApp({
                     setGarmentSaveError("");
                   }}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                   <label>TIPO<select value={garmentDraft.garmentType} onChange={(event) => updateGarmentDraft("garmentType", event.target.value as Garment["garmentType"])}>{editorGarmentTypes.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>COLOR<input list="forme-color-options" value={garmentDraft.colorFamily} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} placeholder="Escribe o elige un color" autoComplete="off" /></label>
+                  <label>COLOR<input list="forme-color-options" value={translateValue(garmentDraft.colorFamily)} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} placeholder="Escribe o elige un color" autoComplete="off" /></label>
                   <label>TONO<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>MATERIAL<input list="forme-material-options" value={garmentDraft.material} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} placeholder="Escribe o elige un material" autoComplete="off" /></label>
+                  <label>MATERIAL<input list="forme-material-options" value={translateValue(garmentDraft.material)} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} placeholder="Escribe o elige un material" autoComplete="off" /></label>
                   <label>ACABADO<select value={garmentDraft.finish} onChange={(event) => updateGarmentDraft("finish", event.target.value)}>{filterOptions.finish.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                   <label>CORTE<select value={garmentDraft.silhouette} onChange={(event) => updateGarmentDraft("silhouette", event.target.value)}>{filterOptions.silhouette.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                 </div>
                 <datalist id="forme-brand-options">{brandOptions.map((option) => <option value={option} key={option} />)}</datalist>
-                <datalist id="forme-color-options">{colorOptions.map((option) => <option value={option} label={translateValue(option)} key={option} />)}</datalist>
-                <datalist id="forme-material-options">{materialOptions.map((option) => <option value={option} label={translateValue(option)} key={option} />)}</datalist>
+                <datalist id="forme-color-options">{colorOptions.map((option) => <option value={translateValue(option)} key={option} />)}</datalist>
+                <datalist id="forme-material-options">{materialOptions.map((option) => <option value={translateValue(option)} key={option} />)}</datalist>
 
                 <div className="custom-tag-editor">
                   <div><span>ETIQUETAS</span><small>Agrega tu propia forma de organizarla.</small></div>

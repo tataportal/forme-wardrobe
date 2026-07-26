@@ -233,7 +233,8 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /function autocompleteOptions/);
   assert.match(page, /garmentTypesByCategory/);
   assert.match(page, /Sweatshirt: "Polera"/);
-  assert.match(page, /Jacket: "Casaca"/);
+  assert.match(page, /Jacket: "Chaqueta"/);
+  assert.match(page, /canonicalTranslatedAutocompleteValue/);
   assert.match(page, /const brandOptions = useMemo/);
   assert.match(page, /forme-brand-options/);
   assert.match(page, /forme-color-options/);

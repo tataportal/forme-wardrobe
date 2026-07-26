@@ -1,6 +1,6 @@
 /*
- * Formé minimal pilot
- * Scope: Portada + Closet.
+ * Formé minimal product system
+ * Scope: public pages and the complete product.
  * Rule: garments stay visible; interface appears only when it is needed.
  */
 
@@ -30,7 +30,7 @@
 .forme-landing .public-header {
   min-height: 64px;
   padding: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
 }
 
 .forme-landing .public-wordmark,
@@ -2848,5 +2848,90 @@
   .forme-app *,
   .public-app * {
     scroll-behavior: auto !important;
+  }
+}
+
+/* Final consistency pass: one navigation language, no decorative frames. */
+.forme-landing .public-navigation,
+.public-app .public-navigation {
+  justify-self: center;
+}
+
+.forme-landing .public-header-balance,
+.public-app .public-header-balance {
+  min-width: 96px;
+  justify-self: end;
+}
+
+.forme-app .assistant-preset-list > button.active {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fs-signal);
+}
+
+.forme-app .assistant-followup-list button.active {
+  outline: 0;
+  box-shadow: none;
+}
+
+.forme-app .assistant-preset-list > button:focus-visible,
+.forme-app .assistant-followup-list button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.forme-app .styling-recommendation .saved-look-preview {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.forme-app .style-exploration-control {
+  padding: 20px 0 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.forme-app .settings-page-heading > button {
+  min-height: 36px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fs-ink);
+}
+
+.forme-app .settings-page-heading > button:hover {
+  color: var(--fs-signal);
+}
+
+@media (max-width: 900px) {
+  .forme-landing .public-header,
+  .public-app .public-header {
+    grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
+  }
+
+  .forme-landing .public-navigation,
+  .public-app .public-navigation {
+    display: flex;
+    gap: 14px;
+  }
+
+  .forme-landing .public-navigation a,
+  .public-app .public-navigation a {
+    min-height: 36px;
+    font-size: 11px;
+  }
+
+  .forme-app .looks-commandbar nav,
+  .forme-app .closet-commandbar nav {
+    gap: 8px;
   }
 }
