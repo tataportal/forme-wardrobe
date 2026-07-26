@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./forme-system.css";
+import "./forme-pilot.css";
 
 const title = "FORMÉ | Tu ropa, leída de nuevo";
 const description = "Digitaliza lo que tienes, crea looks y descubre el sistema que ya existe en tu forma de vestir.";

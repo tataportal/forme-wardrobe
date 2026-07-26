@@ -1,4 +1,5 @@
 type ProductRoute = "closet" | "looks" | "asistente";
+type PrimaryDestination = "closet" | "canvas" | "asistente";
 
 type FormeAppHeaderProps = {
   activeRoute: string;
@@ -13,10 +14,10 @@ type FormeAppHeaderProps = {
   onOpenPricing: () => void;
 };
 
-const primaryRoutes: Array<{ route: ProductRoute; label: string }> = [
-  { route: "closet", label: "Closet" },
-  { route: "looks", label: "Looks" },
-  { route: "asistente", label: "Asistente" },
+const primaryDestinations: Array<{ destination: PrimaryDestination; label: string }> = [
+  { destination: "closet", label: "Closet" },
+  { destination: "canvas", label: "Canvas" },
+  { destination: "asistente", label: "Asistente" },
 ];
 
 export function FormeAppHeader({
@@ -39,11 +40,19 @@ export function FormeAppHeader({
         </button>
 
         <nav className="zone-nav" aria-label="Secciones principales">
-          {primaryRoutes.map(({ route, label }) => (
+          {primaryDestinations.map(({ destination, label }) => (
             <button
-              key={route}
-              className={view === "wardrobe" && activeRoute === route ? "active" : ""}
-              onClick={() => onNavigate(route)}
+              key={destination}
+              className={
+                destination === "canvas"
+                  ? view === "studio" ? "active" : ""
+                  : view === "wardrobe" && (
+                    destination === "closet"
+                      ? activeRoute === "closet" || activeRoute === "looks"
+                      : activeRoute === destination
+                  ) ? "active" : ""
+              }
+              onClick={() => destination === "canvas" ? onOpenCanvas() : onNavigate(destination)}
             >
               {label}
             </button>
@@ -51,9 +60,6 @@ export function FormeAppHeader({
         </nav>
 
         <div className="topbar-actions">
-          <button className={view === "studio" ? "canvas-entry active" : "canvas-entry"} onClick={onOpenCanvas}>
-            Canvas
-          </button>
           {sessionStatus === "checking" ? (
             <span className="session-checking" aria-label="Revisando sesión" />
           ) : demoMode ? (
@@ -78,20 +84,30 @@ export function FormeMobileNav({
   activeRoute,
   view,
   onNavigate,
+  onOpenCanvas,
 }: {
   activeRoute: string;
   view: "wardrobe" | "studio";
   onNavigate: (route: ProductRoute) => void;
+  onOpenCanvas: () => void;
 }) {
   return (
     <nav className="mobile-nav" aria-label="Secciones principales">
-      {primaryRoutes.map(({ route, label }) => (
+      {primaryDestinations.map(({ destination, label }, index) => (
         <button
-          key={route}
-          className={view === "wardrobe" && activeRoute === route ? "active" : ""}
-          onClick={() => onNavigate(route)}
+          key={destination}
+          className={
+            destination === "canvas"
+              ? view === "studio" ? "active" : ""
+              : view === "wardrobe" && (
+                destination === "closet"
+                  ? activeRoute === "closet" || activeRoute === "looks"
+                  : activeRoute === destination
+              ) ? "active" : ""
+          }
+          onClick={() => destination === "canvas" ? onOpenCanvas() : onNavigate(destination)}
         >
-          <span aria-hidden="true">{route === "closet" ? "01" : route === "looks" ? "02" : "03"}</span>
+          <span aria-hidden="true">0{index + 1}</span>
           {label}
         </button>
       ))}

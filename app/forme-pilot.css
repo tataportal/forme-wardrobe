@@ -1,0 +1,2852 @@
+/*
+ * Formé minimal pilot
+ * Scope: Portada + Closet.
+ * Rule: garments stay visible; interface appears only when it is needed.
+ */
+
+.forme-landing,
+.forme-app.view-wardrobe.route-closet {
+  --fs-canvas: #f1f1ec;
+  --fs-ink: #111310;
+  --fs-muted: rgba(17, 19, 16, 0.56);
+  --fs-signal: #f0442f;
+  --fs-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --fs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fs-garment-shadow: drop-shadow(0 12px 18px rgba(17, 19, 16, 0.12));
+  --garment-sticker-filter: var(--fs-garment-shadow);
+  color: var(--fs-ink);
+  font-family: var(--fs-font);
+}
+
+/* Shared shell */
+.forme-landing .public-header,
+.forme-app.view-wardrobe.route-closet .topbar {
+  border: 0 !important;
+  background: color-mix(in srgb, var(--fs-canvas) 88%, transparent);
+  box-shadow: none !important;
+  backdrop-filter: blur(18px);
+}
+
+.forme-landing .public-header {
+  min-height: 64px;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.forme-landing .public-wordmark,
+.forme-app.view-wardrobe.route-closet .wordmark {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 800 29px/1 var(--fs-font);
+  letter-spacing: -0.07em;
+}
+
+.forme-landing .public-menu {
+  position: relative;
+  justify-self: end;
+}
+
+.forme-landing .public-menu summary {
+  padding: 10px 0;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.forme-landing .public-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.forme-landing .public-menu nav {
+  min-width: 132px;
+  padding: 8px 0 12px;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  background: var(--fs-signal);
+}
+
+.forme-landing .public-menu nav a {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forme-landing .public-menu summary:focus-visible,
+.forme-landing .public-menu a:focus-visible,
+.forme-landing .landing-primary:focus-visible,
+.forme-app.view-wardrobe.route-closet button:focus-visible,
+.forme-app.view-wardrobe.route-closet select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+/* Portada */
+.forme-landing {
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--fs-signal);
+}
+
+.forme-landing .public-header-coral {
+  background: color-mix(in srgb, var(--fs-signal) 90%, transparent);
+}
+
+.forme-landing .landing-hero {
+  min-height: 100dvh;
+  padding: 64px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(360px, 0.96fr);
+  align-items: center;
+  gap: clamp(18px, 3vw, 54px);
+  overflow: hidden;
+}
+
+.forme-landing .landing-hero-copy {
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.forme-landing .landing-hero-copy > p {
+  margin: 0 0 26px;
+  color: rgba(17, 19, 16, 0.68);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.forme-landing .landing-hero-copy h1 {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--fs-ink);
+  font: 500 clamp(72px, 8.8vw, 150px)/0.82 var(--fs-font);
+  letter-spacing: -0.085em;
+}
+
+.forme-landing .landing-title-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.forme-landing .landing-title-line-two {
+  align-self: flex-start;
+}
+
+.forme-landing .landing-hero-copy h1 em {
+  font-style: italic;
+  font-weight: 300;
+}
+
+.forme-landing .landing-hero-copy > span {
+  width: min(480px, 76%);
+  margin-top: 28px;
+  color: rgba(17, 19, 16, 0.74);
+  font-size: 17px;
+  line-height: 1.38;
+}
+
+.forme-landing .landing-primary {
+  margin-top: 28px;
+  color: var(--fs-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-underline-offset: 5px;
+}
+
+.forme-landing .landing-sculpture-hero {
+  width: 100%;
+  height: min(78dvh, 780px);
+  position: relative;
+  inset: auto;
+  pointer-events: none;
+  transform: none;
+  animation: none;
+}
+
+.forme-landing .landing-garment-main {
+  width: min(78%, 570px);
+  height: 100%;
+  position: absolute;
+  inset: 0 auto auto 50%;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: var(--fs-garment-shadow);
+  animation: none;
+}
+
+/* Closet shell */
+.forme-app.view-wardrobe.route-closet {
+  background: var(--fs-canvas);
+}
+
+.forme-app.view-wardrobe.route-closet .topbar {
+  height: 64px;
+}
+
+.forme-app.view-wardrobe.route-looks .topbar {
+  height: 64px;
+}
+
+.forme-app.view-wardrobe.route-closet .topbar-inner {
+  max-width: none;
+  padding: 0;
+}
+
+.forme-app.view-wardrobe.route-looks .topbar-inner {
+  max-width: none;
+  padding: 0;
+}
+
+.forme-app.view-wardrobe.route-closet .zone-nav {
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  gap: 24px;
+}
+
+.forme-app.view-wardrobe.route-looks .zone-nav {
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  gap: 24px;
+}
+
+.forme-app.view-wardrobe.route-closet .zone-nav button,
+.forme-app.view-wardrobe.route-closet .canvas-entry,
+.forme-app.view-wardrobe.route-closet .pricing-entry,
+.forme-app.view-wardrobe.route-closet .google-login {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+}
+
+.forme-app.view-wardrobe.route-looks .zone-nav button,
+.forme-app.view-wardrobe.route-looks .pricing-entry,
+.forme-app.view-wardrobe.route-looks .google-login {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+}
+
+.forme-app.view-wardrobe.route-closet .zone-nav button.active,
+.forme-app.view-wardrobe.route-closet .zone-nav button:hover,
+.forme-app.view-wardrobe.route-closet .canvas-entry:hover,
+.forme-app.view-wardrobe.route-closet .canvas-entry.active {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-wardrobe.route-looks .zone-nav button.active,
+.forme-app.view-wardrobe.route-looks .zone-nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app .pricing-entry {
+  display: none;
+}
+
+.forme-app.view-wardrobe.route-closet .avatar {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.forme-app.view-wardrobe.route-looks .avatar {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.forme-app.view-wardrobe.route-closet .content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 96px;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar {
+  min-height: 108px;
+  padding: 22px 0 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar h1 {
+  margin: 0;
+  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.forme-app .closet-looks-nav {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.forme-app .closet-looks-nav button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.forme-app .closet-looks-nav > span {
+  color: var(--fs-muted);
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav {
+  gap: 0;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button,
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav > span {
+  min-height: 0;
+  color: var(--fs-muted);
+  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button.active,
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button,
+.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav > span {
+  min-height: 0;
+  color: var(--fs-muted);
+  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+  text-transform: none;
+}
+
+.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button.active,
+.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar span {
+  color: var(--fs-muted);
+  font-size: 12px;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-commandbar button:hover,
+.forme-app.view-wardrobe.route-closet .closet-commandbar button.active,
+.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-add {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-wardrobe.route-closet .wardrobe-catalog {
+  padding: 0 0 72px;
+  gap: 28px;
+}
+
+.forme-app.view-wardrobe.route-closet .guest-closet {
+  padding: 0;
+}
+
+.forme-app.view-wardrobe.route-closet .guest-basics {
+  margin: 0;
+  padding-bottom: 72px;
+}
+
+.forme-app.view-wardrobe.route-closet .filter-sidebar.open {
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app.view-wardrobe.route-closet .filter-sidebar-header,
+.forme-app.view-wardrobe.route-closet .attribute-filters label {
+  border: 0 !important;
+}
+
+.forme-app.view-wardrobe.route-closet .filter-sidebar-header {
+  padding: 0 0 12px;
+  color: var(--fs-muted);
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app.view-wardrobe.route-closet .attribute-filters label,
+.forme-app.view-wardrobe.route-closet .reset-filters {
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app.view-wardrobe.route-closet .attribute-filters select {
+  color: var(--fs-ink);
+  font: 500 14px/1.2 var(--fs-font);
+}
+
+/* Garments are the permanent layer. Everything else is contextual. */
+.forme-app.view-wardrobe.route-closet .garment-grid {
+  gap: 10px;
+}
+
+.forme-app.view-wardrobe.route-closet .garment-card,
+.forme-app.view-wardrobe.route-closet .garment-card:hover {
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none;
+}
+
+.forme-app.view-wardrobe.route-closet .image-wrap {
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app.view-wardrobe.route-closet .image-wrap::after {
+  content: none;
+}
+
+.forme-app.view-wardrobe.route-closet .image-wrap img {
+  width: 100%;
+  height: 100%;
+  padding: clamp(10px, 7%, 26px);
+  object-fit: contain;
+  object-position: center;
+  filter: var(--fs-garment-shadow);
+  transition: transform 180ms var(--fs-ease);
+}
+
+.forme-app.view-wardrobe.route-closet .garment-card:hover .image-wrap img,
+.forme-app.view-wardrobe.route-closet .garment-card:focus-within .image-wrap img {
+  transform: translateY(-2px);
+}
+
+.forme-app.view-wardrobe.route-closet .card-hover-row {
+  position: absolute;
+  z-index: 4;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.forme-app.view-wardrobe.route-closet .card-meta {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  position: static;
+  flex: 1 1 auto;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.forme-app.view-wardrobe.route-closet .card-meta > span {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.forme-app.view-wardrobe.route-closet .card-meta strong {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--fs-ink);
+  font: 600 13px/1.12 var(--fs-font);
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forme-app.view-wardrobe.route-closet .card-meta small {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--fs-muted);
+  font: 500 10px/1.2 var(--fs-font);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.forme-app.view-wardrobe.route-closet .card-hover-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.forme-app.view-wardrobe.route-closet .heart {
+  width: 28px;
+  height: 28px;
+  top: 0;
+  right: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  color: var(--fs-muted);
+  opacity: 0;
+  pointer-events: none;
+  transform: none;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.forme-app.view-wardrobe.route-closet .heart.active {
+  color: var(--fs-signal);
+}
+
+.forme-app.view-wardrobe.route-closet .card-edit-open,
+.forme-app.view-wardrobe.route-closet .card-studio-add {
+  width: max-content;
+  min-height: 0;
+  padding: 0;
+  position: static;
+  z-index: 4;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  font: 600 11px/1.12 var(--fs-font);
+  letter-spacing: -0.01em;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  cursor: pointer;
+}
+
+.forme-app.view-wardrobe.route-closet .card-edit-open {
+  color: var(--fs-muted);
+}
+
+.forme-app.view-wardrobe.route-closet .card-studio-add {
+  color: var(--fs-signal);
+}
+
+.forme-app.view-wardrobe.route-closet .garment-card:hover .heart,
+.forme-app.view-wardrobe.route-closet .garment-card:focus-within .heart {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.forme-app.view-wardrobe.route-closet .garment-card:hover .card-hover-row,
+.forme-app.view-wardrobe.route-closet .garment-card:focus-within .card-hover-row {
+  opacity: 1;
+}
+
+.forme-app.view-wardrobe.route-closet .garment-card:hover .card-hover-actions,
+.forme-app.view-wardrobe.route-closet .garment-card:focus-within .card-hover-actions {
+  pointer-events: auto;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-group + .closet-group {
+  margin-top: 64px;
+  padding-top: 0;
+  border: 0 !important;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-group-heading {
+  min-height: 46px;
+  padding: 0;
+  border: 0 !important;
+  align-items: center;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-group-heading h3 {
+  margin: 0;
+  font: 600 15px/1 var(--fs-font);
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-group-heading > span {
+  color: var(--fs-muted);
+  font: 500 11px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app.view-wardrobe.route-closet .closet-empty-personal {
+  min-height: 240px;
+  padding: 24px 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+/* Photo roles remain internal operational metadata. */
+.forme-app .garment-photo-switch {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.forme-app .garment-photo-switch button {
+  min-height: 28px;
+  padding: 0 0 5px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--forme-muted);
+  font: 600 9px/1 var(--forme-mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.forme-app .garment-photo-switch button.active {
+  border-bottom-color: var(--forme-signal);
+  color: var(--forme-ink);
+}
+
+@media (hover: none) {
+  .forme-app.view-wardrobe.route-closet .card-hover-row,
+  .forme-app.view-wardrobe.route-closet .heart {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .forme-landing .public-header {
+    padding: 0;
+  }
+
+  .forme-landing .landing-hero {
+    min-height: 100dvh;
+    padding: 92px 0 8px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(280px, 1fr);
+    align-content: stretch;
+    gap: 12px;
+    overflow: hidden;
+  }
+
+  .forme-landing .landing-hero-copy > p {
+    margin-bottom: 18px;
+    font-size: 10px;
+  }
+
+  .forme-landing .landing-hero-copy h1 {
+    font-size: clamp(48px, 13.4vw, 64px);
+    line-height: 0.86;
+  }
+
+  .forme-landing .landing-hero-copy > span {
+    width: min(100%, 340px);
+    margin-top: 20px;
+    font-size: 15px;
+  }
+
+  .forme-landing .landing-primary {
+    margin-top: 22px;
+    font-size: 13px;
+  }
+
+  .forme-landing .landing-sculpture-hero {
+    height: 100%;
+    min-height: 280px;
+  }
+
+  .forme-landing .landing-garment-main {
+    width: min(72%, 300px);
+  }
+
+  .forme-app.view-wardrobe.route-closet .topbar-inner {
+    padding: 0;
+  }
+
+  .forme-app.view-wardrobe.route-looks .topbar-inner {
+    padding: 0;
+  }
+
+  .forme-app.view-wardrobe.route-closet .content {
+    padding-inline: 0;
+  }
+
+  .forme-app.view-wardrobe.route-closet .closet-commandbar {
+    min-height: 88px;
+    padding: 14px 0;
+  }
+
+  .forme-app.view-wardrobe.route-closet .closet-commandbar h1,
+  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button,
+  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav > span {
+    font-size: 40px;
+  }
+
+  .forme-app.view-wardrobe.route-closet .closet-commandbar nav {
+    gap: 14px;
+  }
+
+  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav {
+    gap: 0;
+  }
+
+  .forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button,
+  .forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav > span {
+    font-size: 40px;
+  }
+
+  .forme-app.view-wardrobe.route-closet .wardrobe-catalog {
+    padding-top: 0;
+  }
+
+  .forme-app.view-wardrobe.route-closet .garment-grid {
+    gap: 6px;
+  }
+
+  .forme-app.view-wardrobe.route-closet .image-wrap img {
+    padding: 5%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forme-landing .landing-garment,
+  .forme-app.view-wardrobe.route-closet .image-wrap img,
+  .forme-app.view-wardrobe.route-closet .card-hover-row,
+  .forme-app.view-wardrobe.route-closet .heart,
+  .forme-app.view-wardrobe.route-closet .card-edit-open,
+  .forme-app.view-wardrobe.route-closet .card-studio-add {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/*
+ * Approved product-wide minimal system
+ * Scope: every Formé route.
+ */
+.forme-app,
+.public-app,
+.forme-landing {
+  --fs-canvas: #f1f1ec;
+  --fs-surface: #e7e8e3;
+  --fs-ink: #111310;
+  --fs-muted: rgba(17, 19, 16, 0.56);
+  --fs-line: rgba(17, 19, 16, 0.16);
+  --fs-signal: #f0442f;
+  --fs-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --fs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fs-garment-shadow: drop-shadow(0 12px 18px rgba(17, 19, 16, 0.12));
+  --garment-sticker-filter: var(--fs-garment-shadow);
+  background: var(--fs-canvas);
+  color: var(--fs-ink);
+  font-family: var(--fs-font);
+}
+
+.forme-app .topbar,
+.public-app .public-header {
+  height: 64px;
+  min-height: 64px;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--fs-canvas) 90%, transparent);
+  box-shadow: none !important;
+  backdrop-filter: blur(18px);
+}
+
+.forme-app .topbar::after {
+  content: none !important;
+}
+
+.forme-app .topbar-inner,
+.public-app .public-header {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+.forme-app .wordmark,
+.public-app .public-wordmark {
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  font: 800 29px/1 var(--fs-font);
+  letter-spacing: -0.07em;
+}
+
+.forme-app .zone-nav {
+  min-width: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  gap: 24px;
+  backdrop-filter: none;
+}
+
+.forme-app .zone-nav button,
+.forme-app .google-login,
+.forme-app .pricing-entry {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .zone-nav button:hover,
+.forme-app .zone-nav button.active,
+.forme-app .google-login:hover {
+  background: transparent !important;
+  color: var(--fs-ink);
+  box-shadow: none !important;
+}
+
+.forme-app .pricing-entry {
+  display: none;
+}
+
+.forme-app .avatar,
+.forme-app .session-checking {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 96px;
+}
+
+.forme-app button {
+  border-radius: 0;
+}
+
+.forme-app button:active,
+.public-app button:active,
+.public-app a:active {
+  transform: translateY(1px);
+}
+
+.public-app .public-header {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  color: var(--fs-ink);
+}
+
+.public-app .public-navigation {
+  gap: 24px;
+}
+
+.public-app .public-navigation a,
+.public-app .public-entry {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  display: inline-flex;
+  align-items: center;
+  font: 600 12px/1 var(--fs-font);
+  text-decoration: none;
+}
+
+.public-app .public-navigation a:hover,
+.public-app .public-entry:hover {
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  transform: none;
+}
+
+.public-app .public-entry {
+  justify-self: end;
+  color: var(--fs-ink);
+}
+
+/* Closet / Looks */
+.forme-app.view-wardrobe.route-looks .content,
+.forme-app.view-wardrobe.route-asistente .content {
+  padding: 0 0 96px;
+}
+
+.forme-app .looks-commandbar,
+.forme-app .assistant-commandbar {
+  min-height: 108px;
+  padding: 22px 0 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.forme-app .looks-commandbar > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.forme-app .looks-commandbar .closet-looks-nav button,
+.forme-app .looks-commandbar .closet-looks-nav > span {
+  min-height: 0;
+  color: var(--fs-muted);
+  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.forme-app .looks-commandbar .closet-looks-nav button.active,
+.forme-app .looks-commandbar .closet-looks-nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app .looks-commandbar > div > span {
+  color: var(--fs-muted);
+  font-size: 12px;
+}
+
+.forme-app .looks-commandbar nav,
+.forme-app .closet-commandbar nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.forme-app .looks-commandbar nav button,
+.forme-app .closet-commandbar nav button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+  cursor: pointer;
+}
+
+.forme-app .looks-commandbar nav button:last-child,
+.forme-app .closet-commandbar nav button:last-child,
+.forme-app .looks-commandbar nav button:hover,
+.forme-app .closet-commandbar nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app .saved-looks-grid {
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 42px 10px;
+}
+
+.forme-app .saved-look-card,
+.forme-app .saved-look-card:hover {
+  min-width: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  transform: none;
+}
+
+.forme-app .saved-look-open,
+.forme-app .saved-look-preview {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .saved-look-open > span {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 0;
+  border: 0;
+  background: color-mix(in srgb, var(--fs-canvas) 92%, transparent);
+  color: var(--fs-ink);
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .saved-look-meta {
+  padding-top: 10px;
+  align-items: baseline;
+}
+
+.forme-app .saved-look-meta strong {
+  font: 600 14px/1.1 var(--fs-font);
+  letter-spacing: -0.02em;
+}
+
+.forme-app .saved-look-meta small {
+  margin-top: 4px;
+  color: var(--fs-muted);
+  font: 500 10px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .saved-look-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.forme-app .saved-look-card:hover .saved-look-actions,
+.forme-app .saved-look-card:focus-within .saved-look-actions {
+  opacity: 1;
+}
+
+.forme-app .saved-look-meta button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 600 10px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .saved-look-meta button:hover,
+.forme-app .saved-look-meta .share-look,
+.forme-app .saved-look-meta .visibility-toggle.public {
+  color: var(--fs-ink);
+}
+
+.forme-app .looks-empty {
+  min-height: 320px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent;
+}
+
+.forme-app .looks-empty p,
+.forme-app .looks-empty button {
+  font-family: var(--fs-font);
+}
+
+/* Weekly planner */
+.forme-app .looks-view > .week-view {
+  margin-top: 96px;
+  padding: 0;
+}
+
+.forme-app .app-section-heading {
+  padding: 0 0 24px;
+  border: 0 !important;
+}
+
+.forme-app .app-section-heading h2 {
+  font: 600 clamp(32px, 3.2vw, 48px)/0.92 var(--fs-font);
+  letter-spacing: -0.055em;
+}
+
+.forme-app .app-section-heading span {
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+}
+
+.forme-app .week-progress i {
+  display: none !important;
+}
+
+.forme-app .week-progress strong {
+  font: 600 24px/1 var(--fs-font);
+}
+
+.forme-app .week-progress span,
+.forme-app .week-auto-plan {
+  color: var(--fs-muted);
+  font: 600 10px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .week-auto-plan {
+  min-height: 36px;
+  border: 0;
+  color: var(--fs-ink);
+}
+
+.forme-app .week-strip {
+  gap: 8px;
+  padding: 0;
+}
+
+.forme-app .week-strip > button {
+  min-height: 208px;
+  padding: 0 0 12px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .week-strip-preview {
+  margin-bottom: 10px;
+  background: transparent !important;
+}
+
+.forme-app .week-strip > button.active {
+  background: transparent;
+  box-shadow: none !important;
+  color: var(--fs-signal);
+}
+
+.forme-app .week-strip > button > span,
+.forme-app .week-strip > button > strong,
+.forme-app .week-strip > button > small {
+  margin-left: 0;
+  margin-right: 0;
+  font-family: var(--fs-font);
+}
+
+.forme-app .week-workspace {
+  padding-top: 44px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 56px;
+}
+
+.forme-app .day-plan-card,
+.forme-app .week-look-grid > button {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .day-plan-header {
+  padding: 0;
+}
+
+.forme-app .day-plan-empty {
+  min-height: 360px;
+  padding: 0;
+}
+
+.forme-app .day-plan-empty > span {
+  border: 0;
+  border-radius: 0;
+}
+
+.forme-app .occasion-row {
+  gap: 16px;
+}
+
+.forme-app .occasion-row button {
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .occasion-row button.active {
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+}
+
+.forme-app .week-look-grid {
+  gap: 22px 8px;
+}
+
+.forme-app .week-look-grid > button > span {
+  padding: 8px 0;
+}
+
+/* Assistant */
+.forme-app .assistant-commandbar {
+  align-items: flex-end;
+}
+
+.forme-app .assistant-commandbar h1,
+.forme-app .assistant-commandbar p {
+  margin: 0;
+}
+
+.forme-app .assistant-commandbar h1 {
+  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.forme-app .assistant-commandbar p {
+  max-width: 520px;
+  margin-top: 12px;
+  color: var(--fs-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.forme-app .assistant-commandbar > span {
+  color: var(--fs-muted);
+  font: 600 11px/1 var(--fs-font);
+}
+
+.forme-app .assistant-dialogue {
+  padding: 52px 0 0;
+  border: 0;
+  background: transparent;
+  gap: 44px;
+}
+
+.forme-app .assistant-dialogue-copy h2 {
+  margin: 0;
+  font: 600 clamp(30px, 3vw, 44px)/0.95 var(--fs-font);
+  letter-spacing: -0.05em;
+}
+
+.forme-app .assistant-dialogue-copy > span {
+  margin-top: 10px;
+  font-family: var(--fs-font);
+}
+
+.forme-app .assistant-question-flow {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 56px;
+}
+
+.forme-app .assistant-preset-list > p,
+.forme-app .assistant-followup-list > p,
+.forme-app .assistant-data-gap p {
+  margin-bottom: 12px;
+  color: var(--fs-muted);
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .assistant-preset-list {
+  gap: 0;
+}
+
+.forme-app .assistant-preset-list > button {
+  min-height: 64px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+}
+
+.forme-app .assistant-preset-list > button.active {
+  color: var(--fs-signal);
+}
+
+.forme-app .assistant-preset-list strong,
+.forme-app .assistant-preset-list small,
+.forme-app .assistant-preset-list b {
+  font-family: var(--fs-font);
+}
+
+.forme-app .assistant-preset-list strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.forme-app .assistant-followup-list > div {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 10px;
+}
+
+.forme-app .assistant-followup-list button {
+  min-height: 84px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-ink);
+}
+
+.forme-app .assistant-followup-list button.active {
+  background: transparent;
+  color: var(--fs-signal);
+}
+
+.forme-app .assistant-followup-list button strong,
+.forme-app .assistant-followup-list button small {
+  font-family: var(--fs-font);
+}
+
+.forme-app .assistant-data-readiness {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.forme-app .assistant-data-gap {
+  margin: 0;
+}
+
+.forme-app .assistant-data-gap button {
+  border: 0;
+  color: var(--fs-ink);
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .assistant-response {
+  margin-top: 72px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  gap: 34px;
+}
+
+.forme-app .assistant-response-copy p,
+.forme-app .assistant-response-copy small {
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .assistant-response-copy h2 {
+  font: 600 clamp(30px, 3vw, 46px)/0.95 var(--fs-font);
+  letter-spacing: -0.05em;
+}
+
+.forme-app .assistant-response-copy > span {
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+}
+
+.forme-app .assistant-response-signals {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  border: 0;
+}
+
+.forme-app .assistant-response-signals article {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  display: block;
+}
+
+.forme-app .assistant-response-signals article span {
+  display: none;
+}
+
+.forme-app .assistant-response-signals article p {
+  color: var(--fs-ink);
+  font: 500 14px/1.5 var(--fs-font);
+}
+
+.forme-app .assistant-response-actions button {
+  border: 0;
+  color: var(--fs-ink);
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .styling-results {
+  padding-top: 96px;
+}
+
+.forme-app .styling-results-heading {
+  padding-bottom: 24px;
+}
+
+.forme-app .styling-results-heading p {
+  display: none;
+}
+
+.forme-app .styling-results-heading h2 {
+  font: 600 clamp(28px, 3vw, 44px)/0.95 var(--fs-font);
+  letter-spacing: -0.05em;
+}
+
+.forme-app .styling-results-meta span,
+.forme-app .styling-results-meta button {
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .styling-recommendation-grid {
+  padding-top: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 42px 10px;
+}
+
+.forme-app .styling-recommendation {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: block;
+}
+
+.forme-app .styling-recommendation-copy {
+  padding: 10px 0 0;
+}
+
+.forme-app .styling-recommendation-copy > span {
+  display: none;
+}
+
+.forme-app .styling-recommendation-copy h3 {
+  margin: 0 0 6px;
+  font: 600 15px/1.1 var(--fs-font);
+}
+
+.forme-app .styling-recommendation-copy p {
+  font-family: var(--fs-font);
+}
+
+.forme-app .styling-recommendation-copy button {
+  margin-top: 16px;
+  padding: 0;
+  color: var(--fs-ink);
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+}
+
+/* Canvas */
+.forme-app.view-studio {
+  --studio-rail-left: clamp(248px, 18vw, 320px);
+  --studio-rail-right: clamp(200px, 15vw, 260px);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--fs-canvas);
+}
+
+.forme-app.view-studio .topbar {
+  height: 64px;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--fs-canvas) 88%, transparent);
+  box-shadow: none !important;
+  backdrop-filter: blur(18px);
+}
+
+.forme-app.view-studio .topbar::after {
+  display: none;
+}
+
+.forme-app.view-studio .topbar-inner {
+  max-width: none;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 16px;
+}
+
+.forme-app.view-studio .wordmark {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  font: 800 29px/1 var(--fs-font);
+  letter-spacing: -0.07em;
+}
+
+.forme-app.view-studio .zone-nav {
+  min-width: 0;
+  padding: 0;
+  justify-self: center;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  gap: 24px;
+}
+
+.forme-app.view-studio .zone-nav button,
+.forme-app.view-studio .zone-nav button.active {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app.view-studio .zone-nav button.active,
+.forme-app.view-studio .zone-nav button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-studio .studio-view {
+  position: fixed;
+  inset: 64px 0 0;
+  padding: 0;
+}
+
+.forme-app.view-studio .studio-layout {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--studio-rail-left) minmax(0, 1fr) var(--studio-rail-right);
+  grid-template-areas: "library canvas looks";
+  background: var(--fs-canvas);
+}
+
+.forme-app.view-studio .canvas-column {
+  grid-area: canvas;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.forme-app.view-studio .look-canvas {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--fs-canvas);
+}
+
+.forme-app.view-studio .look-artboard {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  transform: none;
+}
+
+.forme-app.view-studio .snapshot-frame {
+  width: auto;
+  height: min(calc(100cqh - 132px), 150cqw);
+  max-width: calc(100cqw - 96px);
+  aspect-ratio: 2 / 3;
+  border: 1px dashed rgba(17, 19, 16, 0.18);
+  background: transparent;
+  box-shadow: none;
+}
+
+.forme-app.view-studio .snapshot-frame span {
+  padding: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 500 10px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app.view-studio .snapshot-frame::before,
+.forme-app.view-studio .snapshot-frame::after {
+  border-color: rgba(17, 19, 16, 0.38);
+}
+
+.forme-app.view-studio .empty-canvas h2,
+.forme-app.view-studio .empty-canvas p {
+  font-family: var(--fs-font);
+}
+
+.forme-app.view-studio .empty-canvas h2 {
+  font-weight: 600;
+}
+
+.forme-app.view-studio .look-controls,
+.forme-app.view-studio .saved-looks-panel {
+  width: auto;
+  height: auto;
+  position: relative;
+  inset: auto;
+  padding: 16px 12px;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--fs-ink) 2.5%, var(--fs-canvas));
+  box-shadow: none !important;
+  backdrop-filter: none;
+  transform: none !important;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.forme-app.view-studio .look-controls {
+  grid-area: library;
+}
+
+.forme-app.view-studio .saved-looks-panel {
+  grid-area: looks;
+}
+
+.forme-app.view-studio .floating-panel-toggle {
+  display: none;
+}
+
+.forme-app.view-studio .floating-panel-header {
+  min-height: 32px;
+  padding: 0 0 10px;
+  border: 0;
+  color: var(--fs-muted);
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app.view-studio .floating-panel-header button {
+  display: none;
+}
+
+.forme-app.view-studio .studio-library-filters {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  display: flex;
+  gap: 12px;
+}
+
+.forme-app.view-studio .studio-library-filters button {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 500 11px/1 var(--fs-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app.view-studio .studio-library-filters button:hover,
+.forme-app.view-studio .studio-library-filters button.active {
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+}
+
+.forme-app.view-studio .tray-heading {
+  padding: 8px 0;
+}
+
+.forme-app.view-studio .tray-heading h3,
+.forme-app.view-studio .tray-heading p {
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app.view-studio .sticker-tray-section + .sticker-tray-section {
+  margin-top: 24px;
+  padding-top: 0;
+  border: 0;
+}
+
+.forme-app.view-studio .sticker-tray {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 6px;
+}
+
+.forme-app.view-studio .sticker-tray img,
+.forme-app.view-studio .sticker-tray button:hover img,
+.forme-app.view-studio .sticker-tray button:focus-visible img {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  filter: var(--fs-garment-shadow);
+}
+
+.forme-app.view-studio .sticker-tray span {
+  padding-top: 4px;
+  font: 500 11px/1.15 var(--fs-font);
+}
+
+.forme-app.view-studio .library-utilities {
+  padding-top: 12px;
+  border: 0;
+}
+
+.forme-app.view-studio .clear-look {
+  border: 0;
+  font: 600 10px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app.view-studio .saved-look-panel-list {
+  padding: 0;
+}
+
+.forme-app.view-studio .saved-look-panel-card {
+  min-height: 96px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.forme-app.view-studio .saved-look-panel-card.active {
+  box-shadow: none;
+  color: var(--fs-signal);
+}
+
+.forme-app.view-studio .saved-look-panel-card .saved-look-preview {
+  border: 0;
+  background: transparent;
+}
+
+.forme-app.view-studio .saved-look-panel-card strong,
+.forme-app.view-studio .saved-look-panel-card small,
+.forme-app.view-studio .saved-look-panel-empty p,
+.forme-app.view-studio .saved-look-panel-empty small {
+  font-family: var(--fs-font);
+}
+
+.forme-app.view-studio .canvas-action-bar {
+  width: auto;
+  min-width: 0;
+  min-height: 48px;
+  left: var(--studio-rail-left);
+  right: var(--studio-rail-right);
+  bottom: 0;
+  transform: none;
+  padding: 0 18px;
+  border: 0 !important;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
+  box-shadow: none !important;
+  backdrop-filter: blur(16px);
+  grid-template-columns: repeat(4, auto);
+  justify-content: center;
+  gap: 32px;
+}
+
+.forme-app.view-studio .canvas-action-bar button,
+.forme-app.view-studio .canvas-action-bar .save-look-action,
+.forme-app.view-studio .canvas-action-bar .save-look-action.saved,
+.forme-app.view-studio .canvas-action-bar .mix-look-action,
+.forme-app.view-studio .canvas-action-bar .share-look-action {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 600 11px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app.view-studio .canvas-action-bar .save-look-action,
+.forme-app.view-studio .canvas-action-bar button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app.view-studio .canvas-action-bar .mix-look-action {
+  color: var(--fs-signal);
+}
+
+.forme-app.view-studio .canvas-action-bar button b {
+  font-family: var(--fs-font);
+}
+
+.forme-app.view-studio .canvas-piece img {
+  filter: var(--fs-garment-shadow);
+}
+
+.forme-app.view-studio .transform-handle {
+  border: var(--piece-outline-width) solid var(--fs-ink);
+  background: var(--fs-canvas);
+  box-shadow: none;
+}
+
+/* Profile and settings */
+.forme-app .profile-page,
+.forme-app .settings-page,
+.forme-app .account-page-gate {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 36px 0 96px;
+}
+
+.forme-app .profile-page-hero {
+  min-height: 0;
+  padding: 0 0 72px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 32px;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.forme-app .profile-page-hero::before {
+  content: none;
+}
+
+.forme-app .profile-page-portrait {
+  width: 180px;
+  height: 220px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.forme-app .profile-page-intro > span,
+.forme-app .profile-page-intro h1,
+.forme-app .profile-page-intro > p,
+.forme-app .profile-page-stats dt,
+.forme-app .profile-page-stats dd {
+  font-family: var(--fs-font);
+}
+
+.forme-app .profile-page-intro > span {
+  color: var(--fs-muted);
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-intro h1 {
+  margin-top: 6px;
+  font: 600 clamp(40px, 5vw, 72px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.forme-app .profile-page-links {
+  gap: 8px 20px;
+}
+
+.forme-app .profile-page-links button,
+.forme-app .profile-page-reading > button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 600 10px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-links button:hover,
+.forme-app .profile-page-reading > button:hover {
+  color: var(--fs-ink);
+}
+
+.forme-app .profile-page-stats {
+  width: auto;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 28px;
+}
+
+.forme-app .profile-page-stats dt {
+  color: var(--fs-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.forme-app .profile-page-stats dd {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.forme-app .profile-page-body {
+  margin-top: 0;
+  padding-top: 0;
+  border: 0;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: 80px;
+}
+
+.forme-app .profile-page-editor,
+.forme-app .profile-page-reading {
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.forme-app .profile-page-editor > header h2,
+.forme-app .profile-page-reading > header h2,
+.forme-app .profile-page-fields input,
+.forme-app .profile-page-fields textarea,
+.forme-app .profile-page-fields .profile-handle-input,
+.forme-app .profile-page-reading li span,
+.forme-app .profile-page-reading > header p {
+  font-family: var(--fs-font);
+}
+
+.forme-app .profile-page-editor > header h2,
+.forme-app .profile-page-reading > header h2 {
+  font: 600 clamp(30px, 3vw, 46px)/0.95 var(--fs-font);
+  letter-spacing: -0.05em;
+}
+
+.forme-app .profile-page-fields {
+  margin-top: 36px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 24px;
+}
+
+.forme-app .profile-page-fields > label {
+  font-family: var(--fs-font);
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-fields input,
+.forme-app .profile-page-fields textarea {
+  padding: 8px 0;
+  border: 0 !important;
+  border-bottom: 1px solid var(--fs-line) !important;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 18px;
+  box-shadow: none;
+}
+
+.forme-app .profile-page-fields .profile-handle-input {
+  border: 0 !important;
+  border-bottom: 1px solid var(--fs-line) !important;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.forme-app .profile-page-visibility {
+  margin-top: 48px;
+}
+
+.forme-app .profile-page-visibility > label {
+  margin-top: 0;
+  padding: 16px 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.forme-app .profile-page-visibility h3,
+.forme-app .profile-page-visibility strong,
+.forme-app .profile-page-visibility small {
+  font-family: var(--fs-font);
+}
+
+.forme-app .profile-page-visibility h3 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.forme-app .profile-page-visibility strong {
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-save-row {
+  border: 0;
+}
+
+.forme-app .profile-page-save-row span,
+.forme-app .profile-page-save-row strong,
+.forme-app .profile-page-save-row button {
+  font-family: var(--fs-font);
+}
+
+.forme-app .profile-page-save-row span {
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-save-row button {
+  width: auto;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  letter-spacing: 0;
+}
+
+.forme-app .profile-page-save-row button:hover,
+.forme-app .profile-page-save-row button.saved {
+  border: 0;
+  background: transparent;
+  color: var(--fs-signal);
+}
+
+.forme-app .profile-page-reading {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .profile-page-reading li span {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.forme-app .profile-page-exploration {
+  border: 0;
+}
+
+.forme-app .settings-page-heading,
+.forme-app .settings-page-grid,
+.forme-app .account-page-gate {
+  border: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .settings-page-heading h1,
+.forme-app .settings-page-heading p,
+.forme-app .settings-page-heading span,
+.forme-app .settings-page-grid h2,
+.forme-app .settings-page-grid h3,
+.forme-app .settings-page-grid p,
+.forme-app .settings-page-grid span,
+.forme-app .settings-page-grid small {
+  font-family: var(--fs-font);
+}
+
+.forme-app .settings-page-grid > section,
+.forme-app .settings-page-grid > button {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+/* About */
+.about-page {
+  min-height: 100dvh;
+}
+
+.about-minimal-hero {
+  min-height: 100dvh;
+  padding: 64px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
+  align-items: center;
+  gap: 48px;
+}
+
+.about-minimal-hero h1,
+.about-minimal-hero p {
+  margin: 0;
+}
+
+.about-minimal-hero h1 {
+  max-width: 820px;
+  font: 600 clamp(64px, 8vw, 132px)/0.82 var(--fs-font);
+  letter-spacing: -0.08em;
+}
+
+.about-minimal-hero p {
+  max-width: 500px;
+  margin-top: 28px;
+  color: var(--fs-muted);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.about-minimal-hero a,
+.about-minimal-system a {
+  margin-top: 24px;
+  display: inline-block;
+  color: var(--fs-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-underline-offset: 5px;
+}
+
+.about-minimal-hero figure {
+  height: min(76dvh, 760px);
+  margin: 0;
+}
+
+.about-minimal-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: var(--fs-garment-shadow);
+}
+
+.about-minimal-system {
+  min-height: 84dvh;
+  padding: 96px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1.2fr);
+  gap: 80px;
+}
+
+.about-minimal-system h2 {
+  max-width: 620px;
+  margin: 0;
+  font: 600 clamp(46px, 5vw, 78px)/0.88 var(--fs-font);
+  letter-spacing: -0.065em;
+}
+
+.about-minimal-system > div {
+  display: grid;
+  align-content: end;
+  gap: 42px;
+}
+
+.about-minimal-system article {
+  max-width: 560px;
+  padding: 0;
+  border: 0;
+}
+
+.about-minimal-system h3,
+.about-minimal-system p {
+  margin: 0;
+}
+
+.about-minimal-system h3 {
+  font: 600 22px/1 var(--fs-font);
+  letter-spacing: -0.03em;
+}
+
+.about-minimal-system p {
+  max-width: 480px;
+  margin-top: 9px;
+  color: var(--fs-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Pricing */
+.pricing-page-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 140px 0 96px;
+}
+
+.pricing-page .pricing-intro {
+  padding: 0;
+}
+
+.pricing-page .pricing-intro h1 {
+  max-width: 900px;
+  margin: 0;
+  font: 600 clamp(58px, 7vw, 104px)/0.84 var(--fs-font);
+  letter-spacing: -0.075em;
+}
+
+.pricing-page .pricing-intro span {
+  max-width: 520px;
+  margin-top: 24px;
+  color: var(--fs-muted);
+  font-family: var(--fs-font);
+}
+
+.pricing-page .pricing-cycle {
+  margin: 48px 0 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 24px;
+}
+
+.pricing-page.forme-app.public-app .pricing-cycle {
+  width: max-content;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.pricing-page.forme-app.public-app .pricing-cycle button,
+.pricing-page.forme-app.public-app .pricing-cycle button.active {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--fs-muted);
+}
+
+.pricing-page.forme-app.public-app .pricing-cycle button.active {
+  color: var(--fs-ink);
+}
+
+.pricing-page.forme-app.public-app .pricing-cycle button:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 -2px var(--fs-signal);
+}
+
+.pricing-page .pricing-cycle button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  font: 600 12px/1 var(--fs-font);
+  letter-spacing: 0;
+}
+
+.pricing-page .pricing-cycle button.active {
+  background: transparent;
+  color: var(--fs-ink);
+}
+
+.pricing-page .pricing-cycle button.active b,
+.pricing-page .pricing-cycle b {
+  color: var(--fs-signal);
+}
+
+.pricing-page .pricing-plan-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 64px;
+}
+
+.pricing-page .pricing-plan-list article,
+.pricing-page .pricing-plan-list article.recommended {
+  min-height: 390px;
+  padding: 48px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  box-shadow: none;
+}
+
+.pricing-page.forme-app.public-app .pricing-plan-list > article,
+.pricing-page.forme-app.public-app .pricing-plan-list > article.recommended {
+  min-height: 390px;
+  padding: 48px 0 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--fs-ink);
+  box-shadow: none !important;
+}
+
+.pricing-page .pricing-plan-heading h3,
+.pricing-page .pricing-plan-price strong,
+.pricing-page .pricing-plan-price span,
+.pricing-page .pricing-plan-description,
+.pricing-page .pricing-plan-list li,
+.pricing-page .pricing-plan-list article > small,
+.pricing-page .pricing-plan-list article > button {
+  font-family: var(--fs-font);
+}
+
+.pricing-page .pricing-plan-heading h3 {
+  margin: 0;
+  font: 600 clamp(32px, 3vw, 48px)/0.95 var(--fs-font);
+  letter-spacing: -0.05em;
+}
+
+.pricing-page .pricing-plan-price strong {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.pricing-page .pricing-plan-description,
+.pricing-page .pricing-plan-list article.recommended .pricing-plan-description,
+.pricing-page .pricing-plan-list article.recommended .pricing-plan-price span {
+  color: var(--fs-muted);
+}
+
+.pricing-page .pricing-plan-list ul {
+  margin-top: 28px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.pricing-page .pricing-plan-list li {
+  padding-left: 0;
+}
+
+.pricing-page .pricing-plan-list li::before {
+  content: none;
+}
+
+.pricing-page .pricing-plan-list article > button,
+.pricing-page .pricing-plan-list article.recommended > button {
+  width: auto;
+  min-height: 36px;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  letter-spacing: 0;
+}
+
+.pricing-page .pricing-beta-note {
+  margin-top: 64px;
+  color: var(--fs-muted);
+  text-align: left;
+}
+
+/* Upload and garment editing */
+.forme-app .upload-view {
+  padding-top: 32px;
+}
+
+.forme-app .upload-heading {
+  padding: 0 0 32px;
+  border: 0;
+}
+
+.forme-app .upload-heading h2,
+.forme-app .upload-heading button {
+  font-family: var(--fs-font);
+}
+
+.forme-app .upload-heading h2 {
+  font: 600 clamp(34px, 4vw, 56px)/0.9 var(--fs-font);
+  letter-spacing: -0.06em;
+}
+
+.forme-app .upload-heading button {
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  letter-spacing: 0;
+}
+
+.forme-app .upload-layout {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 48px;
+}
+
+.forme-app .dropzone,
+.forme-app .intake-panel,
+.forme-app .upload-item {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.forme-app .dropzone {
+  background: rgba(17, 19, 16, 0.035);
+}
+
+.forme-app .dropzone h3,
+.forme-app .dropzone p,
+.forme-app .dropzone small,
+.forme-app .batch-heading,
+.forme-app .upload-item-fields label,
+.forme-app .upload-item-fields input,
+.forme-app .upload-item-fields select,
+.forme-app .upload-item-state,
+.forme-app .primary-action {
+  font-family: var(--fs-font);
+}
+
+.forme-app .intake-panel {
+  padding: 0;
+}
+
+.forme-app .upload-item {
+  padding: 10px 0;
+}
+
+.forme-app .upload-item-fields input,
+.forme-app .upload-item-fields select {
+  border: 0;
+  border-bottom: 1px solid var(--fs-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.forme-app .primary-action {
+  border: 0;
+  background: transparent;
+  color: var(--fs-ink);
+  letter-spacing: 0;
+}
+
+.forme-app .garment-editor-backdrop {
+  background: rgba(17, 19, 16, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.forme-app .garment-editor {
+  border: 0 !important;
+  border-radius: 0;
+  background: var(--fs-canvas);
+  box-shadow: none !important;
+}
+
+.forme-app .garment-editor-header,
+.forme-app .garment-editor-intro,
+.forme-app .garment-editor-fields label,
+.forme-app .custom-tag-editor,
+.forme-app .processing-options,
+.forme-app .garment-editor-actions {
+  border-color: var(--fs-line);
+}
+
+.forme-app .garment-editor-header span,
+.forme-app .garment-editor-intro h2,
+.forme-app .garment-editor-intro span,
+.forme-app .garment-editor-fields label,
+.forme-app .garment-editor-fields input,
+.forme-app .garment-editor-fields select,
+.forme-app .custom-tag-editor,
+.forme-app .processing-options,
+.forme-app .garment-editor-actions button {
+  font-family: var(--fs-font);
+}
+
+.forme-app .garment-editor-image {
+  border: 0;
+  background: transparent;
+}
+
+.forme-app .garment-editor-image img {
+  filter: var(--fs-garment-shadow);
+}
+
+.forme-app .garment-tag-preview span,
+.forme-app .custom-tag-list button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.forme-app .editor-canvas-add,
+.forme-app .processing-option-actions button,
+.forme-app .tag-input-row button,
+.forme-app .garment-editor-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--fs-muted);
+  letter-spacing: 0;
+}
+
+.forme-app .editor-canvas-add,
+.forme-app .garment-editor-actions button:last-child {
+  color: var(--fs-ink);
+}
+
+.forme-app .garment-editor-actions {
+  background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+@media (max-width: 900px) {
+  .forme-app .topbar-inner,
+  .public-app .public-header {
+    padding: 0;
+  }
+
+  .public-app .public-navigation {
+    display: none;
+  }
+
+  .public-app .public-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .forme-app .content {
+    padding: 0 0 calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .forme-app .mobile-nav {
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: 0;
+    background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
+    box-shadow: none;
+    backdrop-filter: blur(18px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .forme-app .mobile-nav button {
+    border: 0;
+    background: transparent;
+    color: var(--fs-muted);
+    font: 600 11px/1 var(--fs-font);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .forme-app .mobile-nav button span {
+    display: none;
+  }
+
+  .forme-app .mobile-nav button.active {
+    color: var(--fs-ink);
+  }
+
+  .forme-app .closet-commandbar,
+  .forme-app .looks-commandbar,
+  .forme-app .assistant-commandbar {
+    min-height: 88px;
+    padding: 14px 0;
+  }
+
+  .forme-app .closet-commandbar .closet-looks-nav button,
+  .forme-app .closet-commandbar .closet-looks-nav > span,
+  .forme-app .looks-commandbar .closet-looks-nav button,
+  .forme-app .looks-commandbar .closet-looks-nav > span,
+  .forme-app .assistant-commandbar h1 {
+    font-size: 40px;
+  }
+
+  .forme-app .looks-commandbar nav,
+  .forme-app .closet-commandbar nav {
+    gap: 14px;
+  }
+
+  .forme-app .saved-looks-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 6px;
+  }
+
+  .forme-app .saved-look-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    opacity: 1;
+  }
+
+  .forme-app .looks-view > .week-view {
+    margin-top: 64px;
+    padding: 0;
+  }
+
+  .forme-app .week-heading {
+    gap: 18px;
+  }
+
+  .forme-app .week-strip {
+    grid-template-columns: repeat(7, 140px);
+    padding-right: 16px;
+  }
+
+  .forme-app .week-strip > button {
+    min-width: 140px;
+  }
+
+  .forme-app .week-workspace {
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+
+  .forme-app .assistant-commandbar {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .forme-app .assistant-commandbar p {
+    max-width: 360px;
+    font-size: 13px;
+  }
+
+  .forme-app .assistant-commandbar > span {
+    display: none;
+  }
+
+  .forme-app .assistant-dialogue {
+    margin: 0;
+    padding: 48px 0 0;
+  }
+
+  .forme-app .assistant-question-flow,
+  .forme-app .assistant-followup-list > div {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .forme-app .assistant-followup-list > div {
+    gap: 18px;
+  }
+
+  .forme-app .assistant-response {
+    padding: 0;
+  }
+
+  .forme-app .assistant-response-signals,
+  .forme-app .styling-recommendation-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .forme-app .styling-results-heading {
+    gap: 18px;
+  }
+
+  .forme-app .profile-page,
+  .forme-app .settings-page,
+  .forme-app .account-page-gate {
+    padding: 24px 0 calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .forme-app .profile-page-hero {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .forme-app .profile-page-portrait {
+    width: 96px;
+    height: 128px;
+  }
+
+  .forme-app .profile-page-intro h1 {
+    font-size: 44px;
+  }
+
+  .forme-app .profile-page-stats {
+    grid-column: 1 / -1;
+  }
+
+  .forme-app .profile-page-body,
+  .forme-app .profile-page-fields {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+
+  .forme-app .profile-page-fields {
+    gap: 28px;
+  }
+
+  .forme-app .profile-page-bio {
+    grid-column: auto;
+  }
+
+  .forme-app .profile-page-save-row button {
+    width: auto;
+  }
+
+  .about-minimal-hero {
+    min-height: 100dvh;
+    padding: 96px 0 24px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(280px, 1fr);
+    gap: 18px;
+  }
+
+  .about-minimal-hero h1 {
+    font-size: clamp(50px, 14vw, 68px);
+  }
+
+  .about-minimal-hero p {
+    margin-top: 20px;
+    font-size: 15px;
+  }
+
+  .about-minimal-hero figure {
+    height: 100%;
+    min-height: 300px;
+  }
+
+  .about-minimal-hero img {
+    width: min(76%, 340px);
+    margin: 0 auto;
+    display: block;
+  }
+
+  .about-minimal-system {
+    min-height: auto;
+    padding: 72px 0;
+    grid-template-columns: 1fr;
+    gap: 72px;
+  }
+
+  .about-minimal-system h2 {
+    font-size: 48px;
+  }
+
+  .pricing-page-content {
+    padding: 112px 0 calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .pricing-page .pricing-intro h1 {
+    font-size: 54px;
+  }
+
+  .pricing-page .pricing-plan-list {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .pricing-page .pricing-plan-list article,
+  .pricing-page .pricing-plan-list article.recommended {
+    min-height: 0;
+    padding: 36px 0;
+  }
+
+  .forme-app .upload-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .forme-app.view-studio {
+    --studio-rail-left: 0px;
+    --studio-rail-right: 0px;
+  }
+
+  .forme-app.view-studio .studio-view {
+    inset: 64px 0 calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .forme-app.view-studio .studio-layout {
+    display: block;
+  }
+
+  .forme-app.view-studio .canvas-column {
+    width: 100%;
+    height: 100%;
+  }
+
+  .forme-app.view-studio .look-controls,
+  .forme-app.view-studio .saved-looks-panel {
+    width: auto;
+    height: min(58vh, 520px);
+    position: fixed;
+    z-index: 82;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: calc(124px + env(safe-area-inset-bottom));
+    padding: 14px 12px;
+    background: color-mix(in srgb, var(--fs-canvas) 96%, transparent);
+    backdrop-filter: blur(18px);
+    transition: transform 220ms var(--fs-ease), opacity 160ms ease;
+  }
+
+  .forme-app.view-studio .look-controls.panel-closed,
+  .forme-app.view-studio .saved-looks-panel.panel-closed {
+    transform: translateY(calc(100% + 140px)) !important;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .forme-app.view-studio .floating-panel-header button {
+    display: block;
+  }
+
+  .forme-app.view-studio .floating-panel-toggle {
+    min-width: 86px;
+    height: 32px;
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    display: flex;
+    color: var(--fs-muted);
+    font-family: var(--fs-font);
+  }
+
+  .forme-app.view-studio .library-panel-toggle {
+    left: 12px;
+  }
+
+  .forme-app.view-studio .saved-panel-toggle {
+    right: 12px;
+  }
+
+  .forme-app.view-studio .canvas-action-bar {
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    min-height: 56px;
+    padding: 0 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .forme-app.view-studio .canvas-action-bar button,
+  .forme-app.view-studio .canvas-action-bar .save-look-action,
+  .forme-app.view-studio .canvas-action-bar .mix-look-action,
+  .forme-app.view-studio .canvas-action-bar .share-look-action {
+    justify-content: center;
+    font-size: 9px;
+  }
+
+  .forme-app.view-studio .canvas-action-bar button b {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .forme-app .saved-look-open > span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forme-app *,
+  .public-app * {
+    scroll-behavior: auto !important;
+  }
+}

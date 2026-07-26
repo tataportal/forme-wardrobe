@@ -6,6 +6,7 @@ export type ImportedGarmentEntry = {
   category: GarmentCategory;
   color: string;
   brand?: string;
+  status?: "ghosted" | "review";
 };
 
 // Lote reconciliado contra 104 prendas físicas únicas de Pants & Sneakers.
@@ -39,7 +40,7 @@ export const importedGarments20260718: ImportedGarmentEntry[] = [
   { file: "025_DSC01960.webp", name: "T-shirt turquesa gráfica", category: "Tops", color: "Teal" },
   { file: "026_DSC01961.webp", name: "T-shirt negra gráfica", category: "Tops", color: "Black" },
   { file: "027_DSC01962.webp", name: "T-shirt roja gráfica", category: "Tops", color: "Red" },
-  { file: "028_DSC01963.webp", name: "T-shirt crema The Child", category: "Tops", color: "Cream" },
+  { file: "028_DSC01963.webp", name: "T-shirt crema The Child", category: "Tops", color: "Cream", status: "review" },
   { file: "029_DSC01965.webp", name: "Camisa tartán sin mangas", category: "Tops", color: "Red / Black" },
   { file: "030_DSC01966.webp", name: "Camisa abstracta rosada", category: "Tops", color: "Pink / Black" },
   { file: "031_DSC01967.webp", name: "Sobrecamisa gráfica larga", category: "Outerwear", color: "Multicolor" },

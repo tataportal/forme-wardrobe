@@ -11,7 +11,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { classifyGarment, formeBasics, Garment, garmentTypesByCategory, starterGarments } from "./garments";
+import {
+  classifyGarment,
+  formeBasics,
+  Garment,
+  GarmentPhotoRole,
+  garmentPhotoFor,
+  garmentTypesByCategory,
+  starterGarments,
+} from "./garments";
 import { FormeAppHeader, FormeMobileNav } from "./forme-app-shell";
 
 type View = "wardrobe" | "studio";
@@ -132,7 +140,7 @@ type WardrobeProfile = {
 };
 type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
 type SessionStatus = "checking" | "guest" | "authenticated";
-export type WardrobeRoute = "closet" | "looks" | "perfil" | "ajustes" | "asistente";
+export type WardrobeRoute = "closet" | "looks" | "canvas" | "perfil" | "ajustes" | "asistente";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "review" | "failed";
 type UploadItem = {
   id: string;
@@ -1441,16 +1449,6 @@ function buildAssistantAnswer({
   };
 }
 
-function versatilityScore(garment: Garment): number {
-  let score = garment.favorite ? 3 : 0;
-  if (["Black", "White", "Grey", "Blue", "Brown"].includes(garment.colorFamily)) score += 4;
-  if (["Regular", "Relaxed"].includes(garment.silhouette)) score += 3;
-  if (["Matte", "Low sheen"].includes(garment.finish)) score += 2;
-  if (["Tops", "Bottoms", "Footwear"].includes(garment.category)) score += 2;
-  if (["ready", "ghosted"].includes(garment.status)) score += 1;
-  return score;
-}
-
 function centeredLookPreviewItems(look: SavedLook, garmentById: Map<string, Garment>) {
   const items = look.items.flatMap((piece) => {
     const garment = garmentById.get(piece.garmentId);
@@ -1675,7 +1673,7 @@ function WeeklyPlanView({
         <div><h2>Tu semana</h2><span>Deja listo qué vas a usar cada día.</span></div>
         <div className="week-heading-actions">
           <div className="week-progress"><strong>{plannedCount}/7</strong><span>DÍAS LISTOS</span><i style={{ "--progress": `${plannedCount / 7 * 100}%` } as CSSProperties} /></div>
-          <button className="week-auto-plan" type="button" onClick={onAutoPlan} disabled={busy || savedLooks.length === 0}>{busy ? "ORGANIZANDO…" : plannedCount ? "REPLANTEAR SEMANA ↻" : "PLANEAR SEMANA →"}</button>
+          {savedLooks.length > 0 && <button className="week-auto-plan" type="button" onClick={onAutoPlan} disabled={busy}>{busy ? "ORGANIZANDO…" : plannedCount ? "REPLANTEAR SEMANA ↻" : "PLANEAR SEMANA →"}</button>}
         </div>
       </div>
 
@@ -1702,7 +1700,7 @@ function WeeklyPlanView({
             </button>
             <div className="day-look-meta"><div><p>LOOK DEL DÍA</p><h3>{selectedLook.name}</h3><span>{selectedLook.items.length} piezas · {weeklyOccasionLabels[selectedEntry.occasion]}</span></div><button type="button" onClick={() => onToggleWorn(selectedEntry)}>{selectedEntry.worn ? "DESMARCAR" : "YA LO USÉ ✓"}</button></div>
             <button className="week-remove" type="button" onClick={() => onRemove(selectedDate)}>QUITAR DEL DÍA</button>
-          </> : <div className="day-plan-empty"><span>＋</span><h3>Aún no elegiste un look</h3><p>Elige uno de tus looks guardados o crea uno nuevo.</p><button type="button" onClick={onCreateLook}>CREAR UN LOOK →</button></div>}
+          </> : <div className="day-plan-empty"><span>＋</span><h3>Aún no elegiste un look</h3><p>{savedLooks.length ? "Elige uno de tus looks guardados." : "Guarda tu primer look para empezar a planear."}</p>{savedLooks.length > 0 && <button type="button" onClick={onCreateLook}>CREAR OTRO LOOK →</button>}</div>}
         </section>
 
         <aside className="week-look-library">
@@ -1715,95 +1713,10 @@ function WeeklyPlanView({
               <LookPreview look={look} garmentById={garmentById} />
               <span><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></span>
             </button>)}
-            {savedLooks.length === 0 && <div className="week-library-empty"><p>Guarda tu primer look para empezar a planear.</p><button type="button" onClick={onCreateLook}>IR AL CANVAS →</button></div>}
+            {savedLooks.length === 0 && <div className="week-library-empty"><p>Cuando guardes un look, aparecerá aquí para asignarlo a un día.</p></div>}
           </div>
         </aside>
       </div>
-    </section>
-  );
-}
-
-function WardrobeInsightsView({
-  garments,
-  savedLooks,
-  entries,
-  weekDays,
-  onOpenGarment,
-  onGoToLooks,
-  onGoToPieces,
-}: {
-  garments: Garment[];
-  savedLooks: SavedLook[];
-  entries: WeeklyPlanEntry[];
-  weekDays: WeekDay[];
-  onOpenGarment: (garment: Garment) => void;
-  onGoToLooks: () => void;
-  onGoToPieces: () => void;
-}) {
-  const categoryCounts = countGarments(garments, (garment) => garment.category);
-  const colorCounts = countGarments(garments, (garment) => garment.colorFamily);
-  const materialCounts = countGarments(garments, (garment) => garment.material);
-  const essentialCategories = ["Tops", "Bottoms", "Outerwear", "Footwear", "Accessories"];
-  const presentEssentials = essentialCategories.filter((category) => categoryCounts.some(([name, count]) => name === category && count > 0)).length;
-  const readyCount = garments.filter((garment) => ["ready", "ghosted"].includes(garment.status)).length;
-  const readyRatio = garments.length ? readyCount / garments.length : 0;
-  const wardrobeScore = Math.round(presentEssentials / essentialCategories.length * 65 + readyRatio * 20 + Math.min(savedLooks.length, 3) / 3 * 15);
-  const weekKeys = new Set(weekDays.map((day) => day.key));
-  const plannedEntries = entries.filter((entry) => weekKeys.has(entry.date));
-  const wornEntries = plannedEntries.filter((entry) => entry.worn);
-  const topColorCount = colorCounts[0]?.[1] ?? 0;
-  const dominantColorShare = garments.length ? Math.round(topColorCount / garments.length * 100) : 0;
-  const maxCategoryCount = Math.max(...categoryCounts.map(([, count]) => count), 1);
-  const versatileGarments = [...garments].sort((a, b) => versatilityScore(b) - versatilityScore(a) || a.name.localeCompare(b.name)).slice(0, 4);
-  const missingCategory = essentialCategories.find((category) => !categoryCounts.some(([name, count]) => name === category && count > 0));
-  const insights = [
-    colorCounts.length > 0
-      ? `${translateValue(colorCounts[0][0])} concentra ${dominantColorShare}% de tu paleta. ${dominantColorShare > 45 ? "Úsalo como base y rota acentos para que los looks no se sientan repetidos." : "La paleta está suficientemente repartida para crear contraste sin comprar más."}`
-      : "Añade prendas para construir una lectura real de tu paleta.",
-    missingCategory
-      ? `Hay espacio para sumar ${translateValue(missingCategory).toLocaleLowerCase()}. Una pieza de esa categoría te daría más opciones que repetir otra de las que ya tienes.`
-      : "Ya tienes las categorías necesarias para armar looks completos con lo que hay en tu closet.",
-    savedLooks.length > 0
-      ? `Tienes ${savedLooks.length} ${savedLooks.length === 1 ? "look guardado" : "looks guardados"}. Planificar la semana hará visible cuáles piezas sí rotas y cuáles se quedan quietas.`
-      : "Aún no hay looks guardados. Empieza con una base simple y usa Mezclar para probar cinco direcciones.",
-  ];
-
-  return (
-    <section className="insights-view">
-      <div className="app-section-heading insights-heading"><div><h2>Lo que dice tu closet</h2><span>Patrones útiles para vestirte mejor con lo que ya tienes.</span></div><button type="button" onClick={onGoToPieces}>VER PRENDAS →</button></div>
-      <div className="insights-dashboard">
-        <article className="wardrobe-score-card">
-          <div className="score-ring" style={{ "--score": `${wardrobeScore * 3.6}deg` } as CSSProperties}><span><strong>{wardrobeScore}</strong><small>/100</small></span></div>
-          <div><p>QUÉ TAN FÁCIL ES ARMAR LOOKS</p><h3>{wardrobeScore >= 80 ? "Tienes muchas opciones" : wardrobeScore >= 55 ? "Tienes una buena base" : "Aún faltan algunas bases"}</h3><span>Sube cuando cubres más categorías y guardas looks que puedes repetir.</span></div>
-        </article>
-        <div className="insight-metric-grid">
-          <article><span>PRENDAS</span><strong>{garments.length}</strong><small>{readyCount} listas para usar</small></article>
-          <article><span>SEMANA</span><strong>{plannedEntries.length}/7</strong><small>{wornEntries.length} marcadas como usadas</small></article>
-          <article><span>LOOKS</span><strong>{savedLooks.length}</strong><button type="button" onClick={onGoToLooks}>VER GUARDADOS →</button></article>
-        </div>
-      </div>
-
-      <div className="insight-content-grid">
-        <section className="composition-panel">
-          <div className="insight-panel-heading"><h3>Tus categorías</h3></div>
-          <div className="composition-list">{categoryCounts.map(([category, count]) => <div key={category}><span>{translateValue(category)}</span><i><b style={{ width: `${count / maxCategoryCount * 100}%` }} /></i><strong>{count}</strong></div>)}</div>
-        </section>
-        <section className="palette-panel">
-          <div className="insight-panel-heading"><h3>Colores y materiales</h3></div>
-          <div className="palette-list">{colorCounts.slice(0, 5).map(([color, count], index) => <span key={color}><i className={`palette-swatch palette-${color.toLocaleLowerCase().replace(/[^a-z]+/g, "-")}`} />{translateValue(color)}<small>{count}</small>{index === 0 && <b>BASE</b>}</span>)}</div>
-          <div className="material-list">{materialCounts.slice(0, 5).map(([material, count]) => <span key={material}>{translateValue(material)} <b>{count}</b></span>)}</div>
-        </section>
-      </div>
-
-      <section className="insight-notes">
-        <div className="insight-panel-heading"><h3>Qué probar ahora</h3></div>
-        <div>{insights.map((insight, index) => <article key={insight}><span>0{index + 1}</span><p>{insight}</p></article>)}</div>
-      </section>
-
-      <section className="versatile-section">
-        <div className="insight-panel-heading"><h3>Tus prendas más versátiles</h3><span>Son las que combinan con más cosas de tu closet.</span></div>
-        <div className="versatile-grid">{versatileGarments.map((garment) => <button type="button" onClick={() => onOpenGarment(garment)} key={garment.id}><img src={imageSrc(garment.image)} alt={translateGarmentName(garment.name)} /><span><strong>{translateGarmentName(garment.name)}</strong><small>{translateValue(garment.tone)} · {translateValue(garment.silhouette)}</small></span></button>)}</div>
-      </section>
     </section>
   );
 }
@@ -1826,17 +1739,47 @@ function ClosetGarmentGrid({
   return <div className="garment-grid">
     {garments.map((item) => <article className="garment-card" key={item.id}>
       <div className="image-wrap">
-        <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} loading="lazy" />
+        <img src={imageSrc(garmentPhotoFor(item, "complete").image)} alt={translateGarmentName(item.name)} loading="lazy" data-photo-role="complete" />
         {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">PREPARANDO PRENDA</span>}
         {item.status === "failed" && <span className="processing-badge failed">NECESITA REVISIÓN</span>}
-        <button className="card-detail-open" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span>{item.collection === "forme" ? "PROBAR EN CANVAS ↗" : "EDITAR ↗"}</span></button>
+        <button
+          className="card-detail-open"
+          onClick={() => item.collection === "forme" ? onAdd(item) : onOpen(item)}
+          aria-label={`${item.collection === "forme" ? "Añadir al Canvas" : "Editar"}: ${translateGarmentName(item.name)}`}
+        />
         {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
-        <button className="card-studio-add" onClick={() => onAdd(item)}>AÑADIR AL CANVAS <span>＋</span></button>
+        <div className="card-hover-row">
+          <div className="card-meta" aria-hidden="true">
+            <span>
+              <strong>{translateGarmentName(item.name)}</strong>
+              {item.brand && <small>{item.brand}</small>}
+            </span>
+          </div>
+          <div className="card-hover-actions">
+            {item.collection !== "forme" && <button type="button" className="card-edit-open" onClick={() => onOpen(item)}>Editar</button>}
+            <button type="button" className="card-studio-add" onClick={() => onAdd(item)} aria-label={`Añadir al Canvas: ${translateGarmentName(item.name)}`}>Añadir</button>
+          </div>
+        </div>
       </div>
-      <button className="card-meta" onClick={() => onOpen(item)} aria-label={`${item.collection === "forme" ? "Probar" : "Editar"} ${translateGarmentName(item.name)}`}><span><strong>{translateGarmentName(item.name)}</strong><small>{item.collection === "forme" ? "FORMÉ · " : item.brand ? `${item.brand} · ` : ""}{translateValue(item.garmentType)} · {translateValue(item.tone)}</small></span><b>↗</b></button>
     </article>)}
     {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>LIMPIAR FILTROS</button></div>}
   </div>;
+}
+
+function ClosetLooksNav({
+  active,
+  onNavigate,
+}: {
+  active: "closet" | "looks";
+  onNavigate: (route: "closet" | "looks") => void;
+}) {
+  return (
+    <nav className="closet-looks-nav" aria-label="Closet y Looks">
+      <button type="button" className={active === "closet" ? "active" : ""} aria-current={active === "closet" ? "page" : undefined} onClick={() => onNavigate("closet")}>Closet</button>
+      <span aria-hidden="true">/</span>
+      <button type="button" className={active === "looks" ? "active" : ""} aria-current={active === "looks" ? "page" : undefined} onClick={() => onNavigate("looks")}>Looks</button>
+    </nav>
+  );
 }
 
 function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
@@ -1996,7 +1939,7 @@ export function WardrobeApp({
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [accountDataReady, setAccountDataReady] = useState(false);
   const [activeRoute, setActiveRoute] = useState<WardrobeRoute>(initialRoute);
-  const [view, setView] = useState<View>("wardrobe");
+  const [view, setView] = useState<View>(initialRoute === "canvas" ? "studio" : "wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>(initialWardrobePanel);
   const [closetMode, setClosetMode] = useState<ClosetMode>("browse");
   const [studioLibraryFilter, setStudioLibraryFilter] = useState<StudioLibraryFilter>("all");
@@ -2052,6 +1995,7 @@ export function WardrobeApp({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [savedLooksOpen, setSavedLooksOpen] = useState(false);
   const [garmentDraft, setGarmentDraft] = useState<GarmentDraft | null>(null);
+  const [editorPhotoRole, setEditorPhotoRole] = useState<GarmentPhotoRole>("complete");
   const [tagInput, setTagInput] = useState("");
   const [garmentSaved, setGarmentSaved] = useState(false);
   const [garmentSaveError, setGarmentSaveError] = useState("");
@@ -2068,7 +2012,15 @@ export function WardrobeApp({
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const marqueeSession = useRef<MarqueeSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
-  const profileReturnRoute = useRef<"closet" | "looks" | "asistente">(initialWardrobePanel === "looks" ? "looks" : initialWardrobePanel === "assistant" ? "asistente" : "closet");
+  const profileReturnRoute = useRef<"closet" | "looks" | "canvas" | "asistente">(
+    initialRoute === "canvas"
+      ? "canvas"
+      : initialWardrobePanel === "looks"
+        ? "looks"
+        : initialWardrobePanel === "assistant"
+          ? "asistente"
+          : "closet",
+  );
   const [weekAnchor] = useState(() => new Date());
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
@@ -2104,14 +2056,6 @@ export function WardrobeApp({
   );
   const personalGarments = garments.filter((item) => item.collection !== "forme" && (item.status === "ready" || item.status === "ghosted"));
   const sharedBasics = garments.filter((item) => item.collection === "forme");
-  const heroPreviewGarments = (personalGarments.length ? personalGarments : sharedBasics).slice(0, 3);
-  const showcaseLooks: SavedLook[] = savedLooks.length
-    ? savedLooks.slice(0, 3)
-    : [{ id: "showcase-look", name: "Demo Formé", items: initialDemoCanvas }];
-  const plannedDaysCount = weekDays.filter((day) => weeklyPlan.some((entry) => entry.date === day.key)).length;
-  const readyGarmentsCount = personalGarments.filter((item) => item.status === "ready" || item.status === "ghosted").length;
-  const favoriteGarmentsCount = personalGarments.filter((item) => item.favorite).length;
-  const insightGarments = demoMode ? sharedBasics : personalGarments;
   const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
   const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
   const assistantGarments = useMemo(() => {
@@ -2137,6 +2081,7 @@ export function WardrobeApp({
     && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
+  const editorPhoto = editingGarment ? garmentPhotoFor(editingGarment, editorPhotoRole) : undefined;
   const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed" || item.status === "review").length;
   const uploadFinishedCount = uploadItems.filter((item) => item.status === "done" || item.status === "waiting" || item.status === "review" || item.status === "failed").length;
   const uploadAllPassed = uploadItems.length > 0 && uploadItems.every((item) => item.status === "done");
@@ -2235,7 +2180,9 @@ export function WardrobeApp({
           ? (await styleProfileResponse.json() as { profile: StyleProfile }).profile
           : { audience: "hombre" as const, exploration: 35, completed: false, ratings: [] };
         if (!active) return;
-        const baseGarments = session.user.isOwner ? starterGarments : formeBasics;
+        const isLocalOwnerPreview = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+        const ownerCatalogEnabled = Boolean(session.user.isOwner || isLocalOwnerPreview);
+        const baseGarments = ownerCatalogEnabled ? starterGarments : formeBasics;
         const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments);
         const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
         const normalizedLooks = outfits.outfits.map((look) => ({
@@ -2257,7 +2204,7 @@ export function WardrobeApp({
           setActiveLookName(savedLook.name);
           setSaved(true);
         } else {
-          setCanvasPieces(session.user.isOwner ? initialCanvas : initialDemoCanvas);
+          setCanvasPieces(ownerCatalogEnabled ? initialCanvas : initialDemoCanvas);
           setActiveOutfitId(null);
           setActiveLookName("Nuevo look");
           setSaved(false);
@@ -2280,7 +2227,7 @@ export function WardrobeApp({
     const syncRouteFromHistory = () => {
       const routePath = window.location.pathname.replace(/^\//, "");
       const route = routePath as WardrobeRoute;
-      if (["closet", "looks", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
+      if (["closet", "looks", "canvas", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
     };
     window.addEventListener("popstate", syncRouteFromHistory);
     return () => window.removeEventListener("popstate", syncRouteFromHistory);
@@ -2428,6 +2375,7 @@ export function WardrobeApp({
   }
 
   function openGarmentEditor(item: Garment) {
+    setEditorPhotoRole("complete");
     setGarmentDraft({
       id: item.id,
       name: translateGarmentName(item.name),
@@ -2559,6 +2507,11 @@ export function WardrobeApp({
 
   function applyWardrobeRoute(route: WardrobeRoute) {
     setActiveRoute(route);
+    if (route === "canvas") {
+      setProfileOpen(false);
+      setView("studio");
+      return;
+    }
     if (route === "perfil" || route === "ajustes") {
       if (route === "perfil") setView("wardrobe");
       setProfileOpen(true);
@@ -2574,7 +2527,7 @@ export function WardrobeApp({
 
   function navigateWardrobeRoute(route: WardrobeRoute) {
     if (route === "perfil" || route === "ajustes") {
-      if (!profileOpen) profileReturnRoute.current = routeForPanel(wardrobePanel);
+      if (!profileOpen) profileReturnRoute.current = view === "studio" ? "canvas" : routeForPanel(wardrobePanel);
     }
     applyWardrobeRoute(route);
     const nextPath = `/${route}`;
@@ -2589,16 +2542,8 @@ export function WardrobeApp({
     setStudioReturnPanel(returnPanel);
     setProfileOpen(false);
     setView("studio");
-  }
-
-  function openDemoCanvas() {
-    setCanvasPieces(initialDemoCanvas);
-    setActiveOutfitId(null);
-    setActiveLookName("Demo Formé");
-    setSelectedId("");
-    setSelectedGroupIds([]);
-    setSaved(false);
-    openStudio("closet");
+    setActiveRoute("canvas");
+    if (window.location.pathname !== "/canvas") window.history.pushState({ formeRoute: "canvas" }, "", "/canvas");
   }
 
   async function finalizeCutoutVariant(item: ApiGarment, outputVariant: "closed" | "open"): Promise<ApiGarment> {
@@ -3662,7 +3607,7 @@ export function WardrobeApp({
   }
 
   return (
-    <main className={`site-shell view-${view} forme-app`}>
+    <main className={`site-shell view-${view} route-${activeRoute} forme-app`}>
       {!demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -3780,6 +3725,7 @@ export function WardrobeApp({
               {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PÁGINA PÚBLICA</button>}
               {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>COMPARTIR</button>}
               <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTAR ESTILO</button>
+              <button type="button" onClick={() => window.location.assign("/pricing")}>PLANES</button>
             </nav>
           </div>
           <dl className="profile-page-stats">
@@ -3844,42 +3790,30 @@ export function WardrobeApp({
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
             <section className="pieces-section">
-              <header className="closet-hero">
-                <div className="closet-hero-copy">
-                  <span>{demoMode ? "ARCHIVO ABIERTO" : "ARCHIVO PERSONAL"}</span>
-                  <h1>{demoMode ? "Closet" : "Mi closet"}</h1>
-                  <p>{demoMode ? "Prueba el vestidor con prendas Formé o entra para construir tu propio archivo." : "Explora, filtra y combina las prendas que ya tienes."}</p>
-                  {demoMode && <div className="closet-entry">
-                    <button type="button" onClick={openDemoCanvas}>EXPLORAR CANVAS →</button>
-                    <button type="button" onClick={beginGoogleSignIn}>CREAR MI CLOSET</button>
-                  </div>}
-                  {!demoMode && <div className="closet-entry closet-manage-actions">
-                    <button className={filtersOpen || archiveFilterCount > 0 ? "active" : ""} onClick={() => setFiltersOpen((open) => !open)}>Filtros{archiveFilterCount > 0 ? ` (${archiveFilterCount})` : ""}</button>
-                    <button className="closet-add" onClick={() => setClosetMode("upload")}>Agregar</button>
-                  </div>}
-                  <dl className="closet-hero-metrics">
-                    <div><dt>Prendas</dt><dd>{demoMode ? sharedBasics.length : personalGarments.length}</dd></div>
-                    <div><dt>{demoMode ? "En demo" : "Listas"}</dt><dd>{demoMode ? sharedBasics.length : readyGarmentsCount}</dd></div>
-                    <div><dt>Favoritas</dt><dd>{demoMode ? 0 : favoriteGarmentsCount}</dd></div>
-                  </dl>
+              <header className="closet-commandbar">
+                <div>
+                  <ClosetLooksNav active="closet" onNavigate={navigateWardrobeRoute} />
+                  <span aria-label={`${demoMode ? sharedBasics.length : personalGarments.length} prendas`}>
+                    {demoMode ? sharedBasics.length : personalGarments.length}
+                  </span>
                 </div>
-                <figure className="closet-scanner" aria-label="Vista previa de prendas del closet">
-                  <figcaption><span>VISTA DE ARCHIVO</span><strong>{heroPreviewGarments.length} EN FOCO</strong></figcaption>
-                  <div className="closet-specimens">
-                    {heroPreviewGarments.map((item, index) => <div key={item.id} style={{ "--slot": index } as CSSProperties}>
-                      <img src={imageSrc(item.image)} alt={translateGarmentName(item.name)} />
-                      <span>{translateValue(item.garmentType)}</span>
-                    </div>)}
-                  </div>
-                  <i aria-hidden="true" />
-                </figure>
+                {demoMode ? (
+                  <button type="button" onClick={beginGoogleSignIn}>Crear mi closet</button>
+                ) : (
+                  <nav aria-label="Acciones del closet">
+                    <button
+                      className={filtersOpen || archiveFilterCount > 0 ? "active" : ""}
+                      aria-expanded={filtersOpen}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                    >
+                      Filtrar{archiveFilterCount > 0 ? ` ${archiveFilterCount}` : ""}
+                    </button>
+                    <button className="closet-add" onClick={() => setClosetMode("upload")}>Agregar</button>
+                  </nav>
+                )}
               </header>
               {demoMode ? <div className="guest-closet">
                 <section className="guest-basics forme-group">
-                  <div className="guest-basics-heading">
-                    <div><p>DEMO ABIERTO</p><h2>Juega con básicos Formé.</h2><span>Prueba 16 prendas en el canvas sin crear una cuenta.</span></div>
-                    <button type="button" onClick={openDemoCanvas}>ABRIR DEMO →</button>
-                  </div>
                   <ClosetGarmentGrid garments={sharedBasics} emptyLabel="" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
                 </section>
               </div> : <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
@@ -3902,28 +3836,15 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
-              <header className="archive-hero looks-hero">
-                <div className="archive-hero-copy">
-                  <span>ARCHIVO PERSONAL / LOOKS</span>
-                  <h1>Looks</h1>
-                  <p>Guarda combinaciones, vuelve a editarlas y deja lista tu semana.</p>
-                  <button type="button" onClick={generateLooksQuickly}>GENERAR LOOKS →</button>
-                  <dl className="archive-hero-metrics">
-                    <div><dt>Guardados</dt><dd>{savedLooks.length}</dd></div>
-                    <div><dt>Esta semana</dt><dd>{plannedDaysCount}/7</dd></div>
-                    <div><dt>Públicos</dt><dd>{savedLooks.filter((look) => look.isPublic).length}</dd></div>
-                  </dl>
+              <header className="closet-commandbar looks-commandbar">
+                <div>
+                  <ClosetLooksNav active="looks" onNavigate={navigateWardrobeRoute} />
+                  <span aria-label={`${savedLooks.length} looks`}>{savedLooks.length}</span>
                 </div>
-                <figure className="looks-showcase" aria-label="Vista previa de looks guardados">
-                  <figcaption><span>COMPOSICIONES</span><strong>{showcaseLooks.length} EN FOCO</strong></figcaption>
-                  <div>
-                    {showcaseLooks.map((look, index) => <article key={look.id} style={{ "--look-slot": index } as CSSProperties}>
-                      <LookPreview look={look} garmentById={garmentById} />
-                      <span>{look.name}</span>
-                    </article>)}
-                  </div>
-                  <i aria-hidden="true" />
-                </figure>
+                <nav aria-label="Acciones de Looks">
+                  <button type="button" onClick={generateLooksQuickly}>Generar</button>
+                  <button type="button" onClick={() => openStudio("looks")}>Crear look</button>
+                </nav>
               </header>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
@@ -3943,7 +3864,7 @@ export function WardrobeApp({
                     </div>
                   </article>
                 ))}
-                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p><button type="button" onClick={() => openStudio("looks")}>CREAR UN LOOK →</button></div>}
+                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p></div>}
               </div>
               <WeeklyPlanView
                 weekDays={weekDays}
@@ -3963,26 +3884,11 @@ export function WardrobeApp({
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
-              <header className="archive-hero assistant-hero">
-                <div className="archive-hero-copy">
-                  <span>LECTURA PERSONAL / ASISTENTE</span>
+              <header className="assistant-commandbar">
+                <div>
                   <h1>Asistente</h1>
-                  <p>Pregunta desde una ocasión concreta. Formé cruza tu perfil con las prendas y looks que ya tienes.</p>
-                  <dl className="archive-hero-metrics">
-                    <div><dt>Perfil</dt><dd>{assistantProfileReady ? "OK" : "Pendiente"}</dd></div>
-                    <div><dt>Prendas</dt><dd>{assistantGarments.length}</dd></div>
-                    <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
-                  </dl>
+                  <p>Pregunta desde una ocasión. Formé responde usando tu perfil, tus prendas y tus looks.</p>
                 </div>
-                <figure className="assistant-showcase" aria-label="Fuentes que usa el asistente">
-                  <figcaption><span>LECTURA ACTIVA</span><strong>{assistantDataGaps.length ? "POR COMPLETAR" : "LISTA"}</strong></figcaption>
-                  <div className="assistant-showcase-nodes">
-                    <article className={assistantProfileReady ? "ready" : ""}><span>01</span><strong>Perfil</strong><small>Preferencias y estilo</small></article>
-                    <article className={assistantClosetReady ? "ready" : ""}><span>02</span><strong>Closet</strong><small>Prendas disponibles</small></article>
-                    <article className={savedLooks.length > 0 ? "ready" : ""}><span>03</span><strong>Looks</strong><small>Lo que guardas</small></article>
-                    <div className="assistant-showcase-output"><span>FORMÉ</span><strong>Una respuesta para ti</strong></div>
-                  </div>
-                </figure>
               </header>
               <section className="assistant-dialogue">
                 <div className="assistant-dialogue-copy">
@@ -4044,15 +3950,6 @@ export function WardrobeApp({
                 </div>
               </section>}
 
-              <WardrobeInsightsView
-                garments={insightGarments}
-                savedLooks={savedLooks}
-                entries={weeklyPlan}
-                weekDays={weekDays}
-                onOpenGarment={(garment) => garment.collection === "forme" ? addAndOpenStudio(garment.id) : openGarmentEditor(garment)}
-                onGoToLooks={() => setWardrobePanel("looks")}
-                onGoToPieces={() => { setWardrobePanel("closet"); setClosetMode("browse"); }}
-              />
             </section>
           ) : (
             <section className="upload-view">
@@ -4134,6 +4031,7 @@ export function WardrobeApp({
                     const garment = garmentById.get(piece.garmentId);
                     if (!garment) return null;
                     const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
+                    const piecePhotoRole: GarmentPhotoRole = piece.variant === "open" && garment.openImage ? "canvas" : "complete";
                     const canvasImage = cleanCanvasImage(pieceImage);
                     const expandedHitbox = garment.category === "Accessories" && (piece.scale <= 0.2 || garment.id.includes("sunglasses"));
                     const safeScale = Math.max(piece.scale, 0.08);
@@ -4153,13 +4051,14 @@ export function WardrobeApp({
                         className={`canvas-piece ${expandedHitbox ? "expanded-hitbox" : ""} ${selectedId === piece.instanceId ? "selected" : ""} ${selectedGroupIdSet.has(piece.instanceId) ? "group-selected" : ""}`}
                         key={piece.instanceId}
                         data-instance-id={piece.instanceId}
+                        data-photo-role={piecePhotoRole}
                         onPointerDown={(event) => startMoving(event, piece.instanceId)}
                         onPointerMove={movePiece}
                         onPointerUp={stopMoving}
                         onPointerCancel={(event) => stopMoving(event, true)}
                         style={pieceStyle}
                       >
-                        <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
+                        <img src={imageSrc(canvasImage)} alt={`${translateGarmentName(garment.name)}, foto ${piecePhotoRole === "canvas" ? "para Canvas" : "completa"}`} draggable={false} />
                         {selectedId === piece.instanceId && <>
                           <span className="canvas-selection-box" aria-hidden="true" />
                           <button
@@ -4236,23 +4135,25 @@ export function WardrobeApp({
                 {!demoMode && <section className="sticker-tray-section">
                   <div className="tray-heading"><h3>MIS PRENDAS</h3><p>{studioPersonalGarments.length}</p></div>
                   {studioPersonalGarments.length > 0
-                    ? <div className="sticker-tray">{studioPersonalGarments.map((item) => (
-                      <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
-                        <img src={imageSrc(item.image)} alt="" loading="lazy" />
+                    ? <div className="sticker-tray">{studioPersonalGarments.map((item) => {
+                      const photo = garmentPhotoFor(item, "complete");
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                        <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
                         <span>{translateGarmentName(item.name)}</span>
-                      </button>
-                    ))}</div>
+                      </button>;
+                    })}</div>
                     : <p className="sticker-tray-empty">No tienes prendas en esta categoría.</p>}
                 </section>}
                 <section className="sticker-tray-section forme-basics-section">
                   <div className="tray-heading"><h3>BÁSICOS FORMÉ</h3><p>{studioBasicGarments.length}</p></div>
                   {studioBasicGarments.length > 0
-                    ? <div className="sticker-tray">{studioBasicGarments.map((item) => (
-                      <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
-                        <img src={imageSrc(item.image)} alt="" loading="lazy" />
+                    ? <div className="sticker-tray">{studioBasicGarments.map((item) => {
+                      const photo = garmentPhotoFor(item, "complete");
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                        <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
                         <span>{translateGarmentName(item.name)}</span>
-                      </button>
-                    ))}</div>
+                      </button>;
+                    })}</div>
                     : <p className="sticker-tray-empty">No hay básicos en esta categoría.</p>}
                 </section>
               </div>
@@ -4299,7 +4200,11 @@ export function WardrobeApp({
             </header>
             <div className="garment-editor-body">
               <div className="garment-editor-visual">
-                <div className="garment-editor-image"><img src={imageSrc(editingGarment.image)} alt={garmentDraft.name} /></div>
+                <div className="garment-photo-switch" role="tablist" aria-label="Tipo de foto">
+                  <button className={editorPhotoRole === "complete" ? "active" : ""} type="button" role="tab" aria-selected={editorPhotoRole === "complete"} onClick={() => setEditorPhotoRole("complete")}>PRINCIPAL</button>
+                  {editingGarment.openImage && <button className={editorPhotoRole === "canvas" ? "active" : ""} type="button" role="tab" aria-selected={editorPhotoRole === "canvas"} onClick={() => setEditorPhotoRole("canvas")}>PARA CAPAS</button>}
+                </div>
+                {editorPhoto && <div className="garment-editor-image"><img src={imageSrc(editorPhoto.image)} alt={`${garmentDraft.name}, foto ${editorPhoto.role === "canvas" ? "para capas" : "principal"}`} data-photo-role={editorPhoto.role} /></div>}
                 <div className="garment-tag-preview" aria-label="Etiquetas actuales">
                   {[garmentDraft.garmentType, garmentDraft.tone, garmentDraft.material, garmentDraft.finish, garmentDraft.silhouette].map((tag) => <span key={tag}>{translateValue(tag)}</span>)}
                   {garmentDraft.tags.map((tag) => <span key={tag}>#{tag}</span>)}
@@ -4372,6 +4277,7 @@ export function WardrobeApp({
         activeRoute={activeRoute}
         view={view}
         onNavigate={(route) => navigateWardrobeRoute(route)}
+        onOpenCanvas={() => openStudio(wardrobePanel)}
       />
     </main>
   );

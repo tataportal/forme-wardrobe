@@ -10,6 +10,11 @@ export type GarmentAttributes = {
 };
 
 export type GarmentCategory = "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories";
+export type GarmentPhotoRole = "complete" | "canvas";
+export type GarmentPhoto = {
+  role: GarmentPhotoRole;
+  image: string;
+};
 export type GarmentType =
   | "T-shirt" | "Shirt" | "Sweater" | "Sweatshirt" | "Hoodie" | "Top"
   | "Jacket" | "Coat" | "Parka" | "Bomber" | "Cape" | "Poncho"
@@ -47,6 +52,17 @@ export type Garment = GarmentAttributes & {
   favorite?: boolean;
   isPublic?: boolean;
 };
+
+export function garmentPhotoFor(garment: Pick<Garment, "image" | "openImage">, requestedRole: GarmentPhotoRole): GarmentPhoto {
+  if (requestedRole === "canvas" && garment.openImage) {
+    return { role: "canvas", image: garment.openImage };
+  }
+  return { role: "complete", image: garment.image };
+}
+
+export function garmentPhotoRoles(garment: Pick<Garment, "openImage">): GarmentPhotoRole[] {
+  return garment.openImage ? ["complete", "canvas"] : ["complete"];
+}
 
 type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status" | keyof GarmentAttributes> & {
   file: string;
@@ -248,7 +264,7 @@ export const starterGarments: Garment[] = [
     ...classifyGarment(item),
     id: `import-20260718-${item.file.slice(0, 3)}`,
     image: `/wardrobe/imports/2026-07-18/${item.file}`,
-    status: "ghosted" as const,
+    status: item.status ?? "ghosted",
     collection: "personal" as const,
   })),
   ...formeBasics,

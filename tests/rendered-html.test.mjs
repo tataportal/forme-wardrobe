@@ -15,7 +15,7 @@ async function render(pathname = "/") {
 }
 
 test("keeps the main product areas on stable routes", async () => {
-  const routes = ["/about", "/closet", "/looks", "/pricing", "/perfil", "/ajustes", "/asistente"];
+  const routes = ["/about", "/closet", "/looks", "/canvas", "/pricing", "/perfil", "/ajustes", "/asistente"];
   const responses = await Promise.all(routes.map((route) => render(route)));
   for (const [index, response] of responses.entries()) {
     assert.equal(response.status, 200, `${routes[index]} should render`);
@@ -23,17 +23,19 @@ test("keeps the main product areas on stable routes", async () => {
   }
 
   const about = await responses[0].text();
-  const pricing = await responses[3].text();
+  const pricing = await responses[4].text();
   assert.match(about, /Tu ropa ya/);
-  assert.match(about, /No necesitas más ropa/);
-  assert.match(about, /Conocerte/);
-  assert.match(pricing, /Un plan para cada closet/);
+  assert.match(about, /Digitaliza/);
+  assert.match(about, /Combina/);
+  assert.match(about, /Entiende/);
+  assert.match(pricing, /Elige cuánto quieres guardar/);
 
-  const [pricingSource, publicProfileSource, closetSource, looksSource, profileSource] = await Promise.all([
+  const [pricingSource, publicProfileSource, closetSource, looksSource, canvasSource, profileSource] = await Promise.all([
     readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/[handle]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/closet/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/looks/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/canvas/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/perfil/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
@@ -45,8 +47,9 @@ test("keeps the main product areas on stable routes", async () => {
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
   assert.match(closetSource, /WardrobeApp initialRoute="closet"/);
   assert.match(looksSource, /WardrobeApp initialRoute="looks"/);
+  assert.match(canvasSource, /WardrobeApp initialRoute="canvas"/);
   assert.match(profileSource, /WardrobeApp initialRoute="perfil"/);
-  assert.doesNotMatch(`${closetSource}${looksSource}${profileSource}`, /closetVariant/);
+  assert.doesNotMatch(`${closetSource}${looksSource}${canvasSource}${profileSource}`, /closetVariant/);
 });
 
 test("server-renders the FORMÉ brand entry and wardrobe", async () => {
@@ -61,7 +64,6 @@ test("server-renders the FORMÉ brand entry and wardrobe", async () => {
   assert.match(html, /<title>FORMÉ \| Tu ropa, leída de nuevo<\/title>/i);
   assert.match(html, /class="forme-landing"/);
   assert.match(html, /Tu ropa ya/);
-  assert.match(html, /No necesitas más ropa/);
   assert.match(html, /Abrir mi closet/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 
@@ -75,12 +77,13 @@ test("server-renders the FORMÉ brand entry and wardrobe", async () => {
 });
 
 test("keeps saved looks and styling recommendations connected to the product", async () => {
-  const [page, shell, worker, auth, css] = await Promise.all([
+  const [page, shell, worker, auth, css, pilotCss] = await Promise.all([
     readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/forme-app-shell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/google-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-pilot.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /type WardrobePanel = "closet" \| "looks" \| "assistant"/);
@@ -124,7 +127,6 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /Experimental/);
   assert.match(page, /Día/);
   assert.match(page, /Noche/);
-  assert.match(page, /Qué probar ahora/);
   assert.match(page, /Seguro/);
   assert.match(page, /Contraste/);
   assert.match(page, /Protagonista/);
@@ -139,7 +141,7 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /recommendationHistory/);
   assert.match(page, /function saveStylingRecommendation/);
   assert.match(page, /function generateLooksQuickly/);
-  assert.match(page, /GENERAR LOOKS →/);
+  assert.match(page, />Generar</);
   assert.match(page, /GUARDAR COMO LOOK/);
   assert.match(page, /type StyleFamilyId = "classic"/);
   assert.match(page, /function StyleOnboarding/);
@@ -189,6 +191,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /timeZone: "UTC"/);
   assert.match(page, /PLANEAR SEMANA/);
   assert.match(page, /REPLANTEAR SEMANA/);
+  assert.equal((page.match(/Todavía no guardaste ningún look\./g) ?? []).length, 2);
+  assert.doesNotMatch(page, /<div className="looks-empty">[\s\S]*?CREAR UN LOOK/);
+  assert.doesNotMatch(page, /Falta información" : "Listo para responder/);
   assert.match(page, /fetch\("\/api\/week", \{\s*method: "POST"/);
   assert.match(page, /function createLookFromWeek\(\)[\s\S]*?openStudio\("looks"\)/);
   assert.match(page, /function centeredLookPreviewItems/);
@@ -196,7 +201,6 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /navigator\.share/);
   assert.match(page, /COMPARTIR ↗/);
   assert.match(page, /Instagram Stories/);
-  assert.match(page, /profile-drawer/);
   assert.match(page, /className="profile-page"/);
   assert.match(page, /profile-page-loading/);
   assert.match(page, /accountDataReady/);
@@ -218,12 +222,12 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.doesNotMatch(page, /className="profile-identity"/);
   assert.doesNotMatch(page, /className="profile-stats"/);
   assert.doesNotMatch(page, /Mi colección/);
-  assert.match(page, /className="closet-entry closet-manage-actions"/);
+  assert.match(page, /className="closet-commandbar"/);
   assert.doesNotMatch(page, /className="wardrobe-tab-actions"/);
   assert.doesNotMatch(page, /closetVariant|isRetroCloset/);
-  assert.match(page, /site-shell view-\$\{view\} forme-app/);
-  assert.match(page, /className="closet-hero"/);
-  assert.match(page, /ARCHIVO PERSONAL/);
+  assert.match(page, /site-shell view-\$\{view\} route-\$\{activeRoute\} forme-app/);
+  assert.match(page, /function ClosetLooksNav/);
+  assert.match(page, /className="closet-commandbar looks-commandbar"/);
   assert.doesNotMatch(page, /ABRIR VERSIÓN CLÁSICA/);
   assert.doesNotMatch(page, /routePath === "closet-v2"/);
   assert.match(page, /function autocompleteOptions/);
@@ -237,6 +241,9 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(page, /normalizeGarmentMetadata/);
   assert.doesNotMatch(page, /className="catalog-toolbar"/);
   assert.match(page, /expanded-hitbox/);
+  assert.equal((page.match(/garmentPhotoFor\(item, "complete"\)/g) ?? []).length, 3);
+  assert.doesNotMatch(page, /garmentPhotoFor\(item, "canvas"\)/);
+  assert.match(page, /piece\.variant === "open" && garment\.openImage \? garment\.openImage : garment\.image/);
   assert.match(page, /type TransformHandleSession/);
   assert.match(page, /function startTransformHandle/);
   assert.match(page, /className="transform-handle rotate-handle"/);
@@ -300,6 +307,16 @@ test("keeps saved looks and styling recommendations connected to the product", a
   assert.match(css, /padding:52px 16px calc\(150px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /\.pricing-page \.pricing-plan-list \{ grid-template-columns:1fr; gap:16px; \}/);
   assert.match(css, /\.pricing-page \.pricing-plan-list article > button \{ min-height:48px; margin-top:18px; \}/);
+  assert.match(pilotCss, /\.forme-app \.saved-look-card,[\s\S]*?border: 0 !important;[\s\S]*?box-shadow: none !important;/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.wordmark[\s\S]*?font: 800 29px\/1 var\(--fs-font\);/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.zone-nav[\s\S]*?background: transparent !important;[\s\S]*?gap: 24px;/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.zone-nav button,[\s\S]*?font: 600 12px\/1 var\(--fs-font\);/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.studio-layout[\s\S]*?grid-template-columns: var\(--studio-rail-left\) minmax\(0, 1fr\) var\(--studio-rail-right\);/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.look-artboard \{[\s\S]*?inset: 0;[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?transform: none;/);
+  assert.match(pilotCss, /\.forme-app\.view-studio \.canvas-action-bar \{[\s\S]*?left: var\(--studio-rail-left\);[\s\S]*?right: var\(--studio-rail-right\);[\s\S]*?transform: none;/);
+  assert.match(pilotCss, /\.forme-app \.profile-page-editor,[\s\S]*?border: 0 !important;[\s\S]*?background: transparent !important;/);
+  assert.match(pilotCss, /\.pricing-page\.forme-app\.public-app \.pricing-plan-list > article,[\s\S]*?border: 0 !important;[\s\S]*?border-radius: 0;[\s\S]*?background: transparent !important;/);
+  assert.match(pilotCss, /@media \(max-width: 900px\)[\s\S]*?\.forme-app \.saved-look-actions \{[\s\S]*?display: flex;[\s\S]*?opacity: 1;/);
 });
 
 test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
