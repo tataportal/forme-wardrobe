@@ -1115,6 +1115,7 @@ function buildStylingRecommendations(
   excludedSignatures: Set<string> = new Set(),
   styleProfile?: StyleProfile | null,
   priorityGarmentIds: Set<string> = new Set(),
+  avoidedGarmentIds: Set<string> = new Set(),
 ): StylingRecommendation[] {
   const eligibleGarments = garments.filter((item) => garmentMatchesAudience(item, styleProfile?.audience));
   const bottoms = eligibleGarments.filter((item) => item.category === "Bottoms");
@@ -1148,12 +1149,19 @@ function buildStylingRecommendations(
         + strategyScore(top, bottom, outer, strategy),
     }))));
     const effectiveScore = (candidate: typeof candidates[number]) => candidate.score
-      - (garmentUse.get(candidate.bottom.id) ?? 0) * 11
-      - (garmentUse.get(candidate.top.id) ?? 0) * 11
-      - (garmentUse.get(candidate.outer.id) ?? 0) * 14
+      - (garmentUse.get(candidate.bottom.id) ?? 0) * 18
+      - (garmentUse.get(candidate.top.id) ?? 0) * 18
+      - (garmentUse.get(candidate.outer.id) ?? 0) * 22
       + stableTextScore(`${strategy}:${candidate.signature}`) % 100 / 1000;
     candidates.sort((a, b) => effectiveScore(b) - effectiveScore(a) || a.signature.localeCompare(b.signature));
-    const choice = candidates.find((candidate) => !excludedSignatures.has(candidate.signature) && !selectedSignatures.has(candidate.signature))
+    const usesAvoidedGarment = (candidate: typeof candidates[number]) => (
+      avoidedGarmentIds.has(candidate.bottom.id)
+      || avoidedGarmentIds.has(candidate.top.id)
+      || avoidedGarmentIds.has(candidate.outer.id)
+    );
+    const choice = candidates.find((candidate) => !usesAvoidedGarment(candidate) && !excludedSignatures.has(candidate.signature) && !selectedSignatures.has(candidate.signature))
+      ?? candidates.find((candidate) => !usesAvoidedGarment(candidate) && !selectedSignatures.has(candidate.signature))
+      ?? candidates.find((candidate) => !excludedSignatures.has(candidate.signature) && !selectedSignatures.has(candidate.signature))
       ?? candidates.find((candidate) => !selectedSignatures.has(candidate.signature))
       ?? candidates[0];
     if (!choice) return [];
@@ -1161,11 +1169,16 @@ function buildStylingRecommendations(
     for (const garment of [choice.bottom, choice.top, choice.outer]) garmentUse.set(garment.id, (garmentUse.get(garment.id) ?? 0) + 1);
 
     const selectedBase = [choice.top, choice.bottom, choice.outer];
-    const rankComplement = (pool: Garment[]) => [...pool].sort((a, b) => {
-      const aScore = complementScore(a, selectedBase, code, moment, occasion) + stylePreferenceScore(a, styleProfile) + (priorityGarmentIds.has(a.id) ? 14 : 0) - (usedComplements.has(a.id) ? 10 : 0);
-      const bScore = complementScore(b, selectedBase, code, moment, occasion) + stylePreferenceScore(b, styleProfile) + (priorityGarmentIds.has(b.id) ? 14 : 0) - (usedComplements.has(b.id) ? 10 : 0);
-      return bScore - aScore || a.id.localeCompare(b.id);
-    })[0];
+    const rankComplement = (pool: Garment[]) => {
+      const unusedFresh = pool.filter((item) => !usedComplements.has(item.id) && !avoidedGarmentIds.has(item.id));
+      const unused = pool.filter((item) => !usedComplements.has(item.id));
+      const rankedPool = unusedFresh.length ? unusedFresh : unused.length ? unused : pool;
+      return [...rankedPool].sort((a, b) => {
+        const aScore = complementScore(a, selectedBase, code, moment, occasion) + stylePreferenceScore(a, styleProfile) + (priorityGarmentIds.has(a.id) ? 14 : 0) - (usedComplements.has(a.id) ? 10 : 0);
+        const bScore = complementScore(b, selectedBase, code, moment, occasion) + stylePreferenceScore(b, styleProfile) + (priorityGarmentIds.has(b.id) ? 14 : 0) - (usedComplements.has(b.id) ? 10 : 0);
+        return bScore - aScore || a.id.localeCompare(b.id);
+      })[0];
+    };
     const shoe = rankComplement(footwear);
     if (shoe) usedComplements.add(shoe.id);
     const accessory = rankComplement(accessories.filter((item) => item.id !== shoe?.id));
@@ -2061,7 +2074,7 @@ export function WardrobeApp({
     () => autocompleteOptions(garments.map((item) => item.material), starterMaterialSuggestions),
     [garments],
   );
-  const personalGarments = garments.filter((item) => item.collection !== "forme" && (item.status === "ready" || item.status === "ghosted"));
+  const personalGarments = garments.filter((item) => item.collection !== "forme" && item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
   const sharedBasics = garments.filter((item) => item.collection === "forme");
   const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
   const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
@@ -3111,7 +3124,7 @@ export function WardrobeApp({
     setSaved(false);
   }
 
-  function answerAssistantFollowup(preset: AssistantPreset, followup: AssistantFollowup) {
+  function answerAssistantFollowup(preset: AssistantPreset, followup: AssistantFollowup, avoidCurrentRecommendations = false) {
     setAssistantPresetId(preset.id);
     setAssistantFollowupId(followup.id);
     setStyleCode(followup.code);
@@ -3138,6 +3151,11 @@ export function WardrobeApp({
       .map((look) => savedLookCoreSignature(look, garmentById))
       .filter(Boolean);
     const excludedSignatures = new Set([...recommendationHistory, ...savedSignatures]);
+    const avoidedGarmentIds = new Set(
+      avoidCurrentRecommendations
+        ? stylingRecommendations.flatMap((recommendation) => recommendation.items.map((item) => item.garmentId))
+        : [],
+    );
     const usedGarmentIds = new Set(savedLooks.flatMap((look) => look.items.map((item) => item.garmentId)));
     const priorityGarmentIds = new Set<string>();
     if (followup.intent === "underused") {
@@ -3154,7 +3172,7 @@ export function WardrobeApp({
     }
     const next = demoMode
       ? buildDemoRecommendations(followup.code, followup.moment, followup.occasion)
-      : buildStylingRecommendations(assistantGarments, followup.code, followup.moment, followup.occasion, excludedSignatures, styleProfile, priorityGarmentIds);
+      : buildStylingRecommendations(assistantGarments, followup.code, followup.moment, followup.occasion, excludedSignatures, styleProfile, priorityGarmentIds, avoidedGarmentIds);
     if (!next.length) {
       setWardrobeError("Faltan prendas compatibles para crear esta recomendación.");
       return;
@@ -3167,7 +3185,7 @@ export function WardrobeApp({
   function repeatAssistantAnswer() {
     if (!selectedAssistantPreset) return;
     const followup = selectedAssistantPreset.options.find((option) => option.id === assistantFollowupId);
-    if (followup) answerAssistantFollowup(selectedAssistantPreset, followup);
+    if (followup) answerAssistantFollowup(selectedAssistantPreset, followup, true);
   }
 
   function generateLooksQuickly() {
@@ -4009,7 +4027,7 @@ export function WardrobeApp({
                   </p>}
                   {uploadAllPassed && !uploadingBatch
                     ? <button className="primary-action ready" onClick={() => { resetUpload(); setClosetMode("browse"); }}>VER EN MI CLOSET <span>→</span></button>
-                    : <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadRetryableCount > 0 && uploadItems.some((item) => item.status === "failed" || item.status === "review") ? `REINTENTAR ${uploadRetryableCount}` : uploadRetryableCount > 0 ? `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}` : "PROCESANDO EL LOTE"}<span>→</span></button>}
+                    : uploadItems.length > 0 && <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadRetryableCount > 0 && uploadItems.some((item) => item.status === "failed" || item.status === "review") ? `REINTENTAR ${uploadRetryableCount}` : uploadRetryableCount > 0 ? `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}` : "LOTE EN PROCESO"}<span>→</span></button>}
                 </div>
               </div>
             </section>

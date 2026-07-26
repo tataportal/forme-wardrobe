@@ -14,6 +14,7 @@ export function FormeLanding() {
           <p>Closet visual y asistente de estilo</p>
           <h1 id="landing-title">
             <span className="landing-title-line landing-title-line-one">Tu ropa ya</span>
+            {" "}
             <span className="landing-title-line landing-title-line-two"><em>sabe</em> quién eres.</span>
           </h1>
           <span>Digitaliza lo que tienes, crea looks y entiende mejor tu forma de vestir.</span>

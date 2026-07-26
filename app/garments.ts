@@ -172,7 +172,16 @@ export function classifyGarment(item: Pick<Garment, "name" | "category" | "color
 }
 
 const archive: ArchiveEntry[] = [
-  { file: "001_DSC01768.webp", openFile: "001_DSC01768-open.webp", name: "Daisy Coach Jacket", category: "Outerwear", color: "Black", favorite: true },
+  {
+    file: "001_DSC01768.webp",
+    openFile: "001_DSC01768-open.webp",
+    name: "Daisy Coach Jacket",
+    category: "Outerwear",
+    color: "Black",
+    favorite: true,
+    qaStatus: "review",
+    qaNotes: "La foto completa tiene etiqueta interior, borde blanco y artefactos de calado. No publicar hasta reemplazarla.",
+  },
   { file: "002_DSC01771.webp", openFile: "002_DSC01771-open.webp", name: "WFP Bomber", category: "Outerwear", color: "Black" },
   { file: "003_DSC01773.webp", openFile: "003_DSC01773-open.webp", name: "Navy Peacoat", category: "Tailoring", color: "Navy" },
   { file: "004_DSC01775.webp", openFile: "004_DSC01775-open.webp", name: "Leather Hooded Shirt", category: "Outerwear", color: "Black" },

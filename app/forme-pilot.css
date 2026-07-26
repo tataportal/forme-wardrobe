@@ -2912,7 +2912,99 @@
   color: var(--fs-signal);
 }
 
+/* Final product pass: exact title rhythm, denser garment-first catalog. */
+.forme-app .closet-looks-nav > button,
+.forme-app .closet-looks-nav > span {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.forme-app .looks-commandbar .closet-looks-nav {
+  gap: 0;
+}
+
+.forme-app.view-wardrobe.route-closet .garment-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.forme-app .looks-empty {
+  min-height: 128px;
+  display: flex;
+  align-items: center;
+}
+
+.forme-app .looks-view > .week-view {
+  margin-top: 48px;
+}
+
+@media (min-width: 1680px) {
+  .forme-app.view-wardrobe.route-closet .garment-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .forme-app.view-wardrobe.route-closet .garment-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
+  .forme-app.view-wardrobe.route-closet .garment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forme-app .looks-empty {
+    min-height: 84px;
+  }
+
+  .forme-app .looks-view > .week-view {
+    margin-top: 40px;
+  }
+
+  .forme-app.view-studio .topbar {
+    height: 64px;
+    border: 0 !important;
+    background: color-mix(in srgb, var(--fs-canvas) 90%, transparent);
+    box-shadow: none !important;
+    backdrop-filter: blur(18px);
+  }
+
+  .forme-app.view-studio .topbar::after {
+    display: none !important;
+  }
+
+  .forme-app.view-studio .topbar-inner {
+    width: 100%;
+    padding: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0;
+  }
+
+  .forme-app.view-studio .topbar-actions {
+    justify-self: end;
+  }
+
+  .forme-app.view-studio .mobile-nav {
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: 0;
+    background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
+    box-shadow: none;
+    backdrop-filter: blur(18px);
+  }
+
+  .forme-app.view-studio .mobile-nav button {
+    color: var(--fs-muted);
+    font: 600 11px/1 var(--fs-font);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .forme-app.view-studio .mobile-nav button.active {
+    color: var(--fs-ink);
+  }
+
   .forme-landing .public-header,
   .public-app .public-header {
     grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
