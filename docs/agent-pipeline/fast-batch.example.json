@@ -1,0 +1,27 @@
+{
+  "batchId": "FORME-FOOTWEAR-YYYY-MM-DD",
+  "category": "Footwear",
+  "concurrency": 6,
+  "baseUrl": "https://forme.gallery",
+  "outputRoot": "tmp/garment-pipeline/FORME-FOOTWEAR-YYYY-MM-DD/fast",
+  "items": [
+    {
+      "id": "000000",
+      "source": "/absolute/path/to/source-photo.png",
+      "input": "/absolute/path/to/approved-retail.png",
+      "cutout": "/absolute/path/to/api-transparent-cutout.png",
+      "cutoutProvider": "configured-background-removal-api",
+      "destination": "public/wardrobe/imports/YYYY-MM-DD/000000.webp",
+      "generation": {
+        "channel": "api",
+        "provider": "openai",
+        "model": "gpt-image-2",
+        "endpoint": "images.edits",
+        "requestId": "req_example",
+        "sourceSha256": "replace-with-source-sha256",
+        "outputSha256": "replace-with-approved-output-sha256"
+      },
+      "generationApproved": true
+    }
+  ]
+}

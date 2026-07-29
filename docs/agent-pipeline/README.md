@@ -1,191 +1,247 @@
-# Cadena de agentes para prendas Formé
+# Pipeline operativo de prendas Formé
 
-La cadena separa inventario, interpretación, generación, calado, tres tipos de QA, reconciliación, integración y release. Cada agente produce una sola cosa y ningún productor aprueba su propia salida.
+Este procedimiento prioriza dos cosas: no gastar generación ni postproceso en
+imágenes que el usuario no aprobó, y no convertir verificaciones simples en una
+cadena de agentes seriales.
 
-## Máquina de estados
+Los roles de `.agents/garment-pipeline/` son responsabilidades especializadas.
+No equivalen a diez tasks obligatorias.
+
+## Flujo principal
 
 ```text
-RECEIVED
-→ INVENTORIED
-→ SPECCED
-→ GENERATED
-→ NORMALIZED
-→ FIDELITY_PASSED
-→ TECH_PASSED
-→ PRESENTATION_PASSED
-→ RECONCILED
-→ INTEGRATED
-→ LIVE_PASSED
+AUDITADO
+→ RETAIL_GENERADO_POR_API
+→ APROBADO_POR_USUARIO
+→ CALADO_EN_PARALELO
+→ QA_CONJUNTO
+→ INTEGRADO_Y_TESTEADO
+→ LIVE_VERIFICADO
 ```
 
-Un rechazo vuelve únicamente al productor responsable:
-
-- Fidelidad → `garment-generator`.
-- Alfa, canvas, crop o escala → `asset-normalizer`.
-- Estilo dentro del app → renderer compartido / `catalog-integrator`.
-- Conteo o duplicados → `intake-auditor` / orquestador.
-
-Máximo dos reintentos automáticos. Después la pieza queda `BLOCKED`; nunca se convierte en “good enough”.
-
-## 0. Orquestador
-
-**Única función:** mover el lote entre estados y conservar los recibos.
-
-**Recibe:** carpeta fuente y objetivo del lote.
-
-**Entrega:** `batch_id`, rutas, estado por pieza y siguiente handoff.
-
-**Bloquea:** artefactos sin hash, estado previo incompleto, conteos que no cierran o aprobaciones faltantes.
-
-**Prohibido:** editar imágenes, cambiar metadata, aprobar calidad, saltar etapas o publicar.
-
-## 1. `intake-auditor`
-
-**Única función:** registrar exactamente qué fuentes y prendas únicas existen.
-
-**Recibe:** RAW/JPG/HEIF/PNG y tomas alternativas.
-
-**Entrega:** manifest 1:1 con `source_id`, ruta, SHA-256, vista principal, vistas de apoyo, dimensiones, orientación y cantidad esperada.
-
-**Rechaza:** duplicados, archivos ilegibles, dos prendas principales mezcladas o fuente insuficiente.
-
-**Prohibido:** generar, recortar, omitir por criterio estético o decidir detalles de styling.
-
-## 2. `visual-specifier`
-
-**Única función:** describir la prenda antes de generar.
-
-**Recibe:** fuente inventariada.
-
-**Entrega:** ficha inmutable con categoría, tipo, color, silueta, material, variante abierta/cerrada, gráficos, texto exterior, logos, herrajes, bolsillos, cierres y detalles protegidos.
-
-**Rechaza:** fuente demasiado ambigua para identificar detalles críticos.
-
-**Prohibido:** generar, embellecer, corregir la fuente o aprobar resultados.
-
-## 3. `garment-generator`
-
-**Única función:** producir una representación de catálogo fiel.
-
-**Recibe:** fuente, ficha visual, variante y versión fija del prompt.
-
-**Entrega:** render 1024 × 1280 y recibo con modelo/calidad, prompt version, job ID y hash.
-
-**Rechaza:** fallo del proveedor, moderación, detalle crítico imposible de conservar o generación inconsistente.
-
-**Prohibido:** calar, añadir borde/sombra, cambiar metadata, sustituir una prenda o aprobar su imagen.
-
-La fuente manda. Outerwear se entrega abierta cuando corresponde; sin etiqueta interior visible, hanger, barras, cuerpo, maniquí ni fondo. Logos, estampados, textos, parches y herrajes exteriores se conservan.
-
-## 4. `asset-normalizer`
-
-**Única función:** producir el master transparente uniforme.
-
-**Recibe:** render generado.
-
-**Entrega:** WebP transparente 1024 × 1280, bbox, cobertura alpha, anchor y scale class por categoría.
-
-**Rechaza:** fondo residual, halo, prenda cortada, agujeros falsos, bordes dañados o bbox fuera de template.
-
-**Prohibido:** regenerar detalles, cambiar color, reparar logos, aprobar fidelidad o hornear borde/sombra.
-
-## 5. `fidelity-qa`
-
-**Única función:** comparar fuente, ficha visual y master.
-
-**Entrega:** `PASS` o `REJECT` con score y códigos concretos.
-
-**Rechaza:** cambio u omisión en silueta, proporción, color, material, gráfico, texto, logo, bolsillo, cierre, hardware, desgaste o detalle exterior; también etiqueta interior, hanger, cuello/maniquí, objeto residual o estado abierto incorrecto.
-
-**Prohibido:** editar, regenerar, recortar o aceptar por parecido general.
-
-## 6. `technical-qa`
-
-**Única función:** validar el archivo normalizado.
-
-**Entrega:** reporte de WebP, 1024 × 1280, alpha, safe area, bbox, márgenes, peso, integridad y escala de categoría.
-
-**Rechaza:** cualquier incumplimiento técnico.
-
-**Prohibido:** juzgar fidelidad, moda o estética; no modifica el asset.
-
-Todos los assets comparten canvas 1024 × 1280. La ocupación no usa un solo porcentaje global: tops, outerwear, pantalones, shorts, calzado, bolsos, lentes y headwear tienen template, anchor y tolerancia propios.
-
-## 7. `presentation-qa`
-
-**Única función:** comprobar el master dentro del producto real.
-
-**Recibe:** renders automáticos en Closet, Canvas, miniatura de Look, perfil y share.
-
-**Entrega:** `PASS/REJECT` por superficie.
-
-**Rechaza:** contorno `#f4f4f4` desigual, sombra diferente, escala aparente inconsistente, miniatura descentrada o diferencia entre Canvas y Look guardado.
-
-**Prohibido:** tocar el master, compensar una pieza con CSS especial o crear otra estética.
-
-## 8. `batch-reconciler`
-
-**Única función:** demostrar que no falta ni sobra ninguna prenda.
-
-**Recibe:** manifest fuente y recibos aprobados.
-
-**Entrega:** matriz 1:1 `source_id → final_asset_id`.
-
-**Rechaza:** `expected_count !== passed_count`, fuente ausente, duplicado, sustitución, variante obligatoria faltante o cualquier estado pendiente/fallido.
-
-**Prohibido:** generar assets, perdonar faltantes o inventar excepciones.
-
-## 9. `catalog-integrator`
-
-**Única función:** registrar assets reconciliados en app/DB.
-
-**Recibe:** tres pases por pieza —fidelidad, técnico y presentación— más reconciliación del lote.
-
-**Entrega:** rutas, records, metadata, filtros y revision IDs.
-
-**Rechaza:** aprobaciones incompletas, hashes distintos, IDs duplicados o cualquier asset que exija CSS especial.
-
-**Prohibido:** editar imágenes, declarar calidad o publicar.
-
-## 10. `release-verifier`
-
-**Única función:** validar y comprobar producción después de integrar.
-
-**Ejecuta:** `npm run validate:garments`, `npm test`, revisión del diff, publicación y verificación visual en `forme.gallery` mobile/desktop.
-
-**Entrega:** commit, deploy, conteos y capturas de Closet, Canvas y Looks.
-
-**Bloquea:** assets ausentes, rutas rotas, renders inconsistentes, conteo incorrecto, regresión visual o live desactualizado.
-
-**Prohibido:** corregir producción directamente o aprobar basándose solo en el push.
-
-## Handoff obligatorio
+Hay un solo bloqueo humano obligatorio:
 
 ```text
-BATCH_ID:
-SOURCE_ID:
-FROM_STAGE:
-TO_STAGE:
-SOURCE_SHA256:
-ARTIFACT_SHA256:
-VARIANT:
-PROMPT_VERSION:
-STYLE_VERSION:
-CATEGORY_TEMPLATE_VERSION:
-INPUT_COUNT:
-OUTPUT_COUNT:
-APPROVED_IDS:
-REJECTED_IDS:
-EVIDENCE:
-OPEN_ISSUES:
-STATUS:
+RETAIL_GENERADO_POR_API → APROBADO_POR_USUARIO
 ```
 
-Los artefactos son inmutables. Una corrección crea una revisión nueva. Si `INPUT_COUNT` no coincide con `OUTPUT_COUNT + REJECTED_IDS`, el lote no avanza.
+Nada se cala antes de esa aprobación. Después, el lote corre seguido y solo se
+detiene por un error real de QA.
+
+## 1. Auditoría
+
+Antes de generar:
+
+1. unir las carpetas fuente autorizadas;
+2. agrupar tomas alternativas, reversos y duplicados;
+3. reconciliar fuente y resultado actual 1:1;
+4. clasificar cada pieza:
+   - `OK`
+   - `LIMPIAR_ALPHA`
+   - `REGENERAR`
+   - `FALTANTE`
+
+La tabla mínima usa:
+
+```text
+ID | FUENTE | OUTPUT | CATEGORÍA | ESTADO | RAZÓN | ACCIÓN
+```
+
+`LIMPIAR_ALPHA` nunca debe enviarse a generación. `REGENERAR` exige un defecto
+estructural: silueta, proporción, parte faltante, gráfico perdido, textura
+inventada, etiqueta interior visible o calado roto.
+
+## 2. Generación
+
+Solo se generan `REGENERAR` y `FALTANTE`.
+
+1. Identificar la prenda y su subtipo.
+2. Elegir el prompt retail corto por tipo.
+3. Enviar una sola edición por pieza a la Image API desde el backend.
+4. Generar retail limpio sobre fondo simple con `n: 1`.
+5. Guardar request ID, modelo, prompt y hashes de entrada/salida.
+6. Mostrar el resultado al usuario antes de cualquier calado.
+
+La generación de producción no usa la interfaz ni la suscripción de ChatGPT.
+La clave API nunca llega al navegador. Los errores transitorios `429` y `5xx`
+pueden reintentarse con backoff; un error de usuario o moderación no se reintenta
+sin cambiar la entrada.
+
+Para una edición aislada de una fuente, la Image API es la ruta directa. El
+modelo de generación vigente se declara en el manifest y no se cambia
+silenciosamente. Si se usa `gpt-image-2`, el retail de aprobación es opaco:
+ese modelo no acepta `background: "transparent"`. El calado posterior sigue
+siendo una operación separada y no una segunda reinterpretación de la prenda.
+
+El manifest registra por pieza:
+
+```json
+{
+  "id": "000000",
+  "source": "/ruta/a/la/fuente.png",
+  "input": "/ruta/al/retail-aprobado.png",
+  "destination": "public/wardrobe/imports/fecha/000000.webp",
+  "category": "Footwear",
+  "generation": {
+    "channel": "api",
+    "provider": "openai",
+    "model": "gpt-image-2",
+    "endpoint": "images.edits",
+    "requestId": "req_...",
+    "sourceSha256": "...",
+    "outputSha256": "..."
+  },
+  "generationApproved": true
+}
+```
+
+`generationApproved: true` significa que el usuario aprobó esa imagen concreta.
+No se hereda desde un README, un intento anterior o una aprobación de otra
+vista. Una pieza sin ese flag queda fuera del calado.
+
+## 3. Fast path de calado
+
+Preparar un manifest a partir de
+`docs/agent-pipeline/fast-batch.example.json` y ejecutar:
+
+```bash
+npm run garments:prepare -- --manifest ruta/al/manifest.json
+```
+
+Antes del comando, el worker de backend envía únicamente los retail aprobados
+al proveedor de background removal configurado. Ese proveedor debe ser de
+segmentación, no de generación: el calado no puede reinterpretar la prenda.
+Su PNG transparente se registra como `cutout` en el manifest.
+
+El comando:
+
+- valida IDs, inputs, categorías y aprobación post-generación;
+- valida la procedencia API y los hashes de lotes nuevos;
+- consume el calado API sin volver a generar la prenda;
+- procesa hasta seis piezas en paralelo;
+- elimina fondo, sombra de estudio y contaminación blanca;
+- normaliza a WebP lossless transparente `1024 × 1280`;
+- aplica fit y anchor por categoría;
+- comprueba alpha, safe area, dimensiones y borde de canvas;
+- genera `review-gray.png` y `review-black.png`;
+- escribe un resumen de lote y un recibo pequeño por pieza.
+
+El extractor local queda únicamente como compatibilidad para lotes legacy de
+tres dígitos. Un lote nuevo de seis dígitos no puede depender de Vision/ANE.
+
+No toca `public/`, catálogo ni producción.
+
+## 4. QA conjunto
+
+Se revisan una vez las dos contact sheets.
+
+Cada tile muestra:
+
+```text
+RETAIL APROBADO | CALADO
+```
+
+Revisar:
+
+- prenda o par completo;
+- silueta y detalle fiel;
+- ausencia de fondo, halo y contorno blanco;
+- transparencias reales conservadas;
+- escala consistente con su categoría;
+- nada tocando el canvas.
+
+Esto es una sola revisión del lote, no 25 handoffs. Si una pieza falla:
+
+1. marcar únicamente ese ID;
+2. corregir solo normalización si la generación sigue siendo fiel;
+3. volver a generación únicamente si el defecto es estructural;
+4. reconstruir las contact sheets;
+5. continuar cuando el conteo vuelva a cerrar.
+
+## 5. Integración y release
+
+Cuando `prepare` entrega `READY_FOR_RELEASE`:
+
+```bash
+npm run garments:release -- --manifest ruta/al/manifest.json --deploy
+```
+
+El comando:
+
+- hace backup recuperable de cada destino;
+- copia masters y verifica hashes;
+- ejecuta `npm test`;
+- restaura backups automáticamente si los tests fallan;
+- publica una sola vez;
+- descarga los assets live en paralelo;
+- compara SHA-256 live contra cada master;
+- escribe `release-summary.json`.
+
+El resultado final debe ser:
+
+```text
+expected = integrated = liveMatches
+status = LIVE_PASSED
+```
+
+## Política de agentes
+
+El operador principal ejecuta el fast path. No se crean agentes separados para
+normalizer, technical QA, reconciler, integrator y release verifier cuando esas
+funciones ya están automatizadas.
+
+Usar un rol especializado únicamente cuando exista trabajo independiente:
+
+- `intake-auditor`: reconciliación ambigua o fuentes mezcladas;
+- `visual-specifier`: prenda difícil de identificar;
+- `garment-generator`: generación autorizada;
+- `fidelity-qa`: discrepancia visual real;
+- `asset-normalizer`: excepción de máscara o transparencia;
+- `presentation-qa`: regresión del renderer compartido;
+- `release-verifier`: fallo live o cache inconsistente.
+
+Un agente de excepción entrega la corrección o el diagnóstico del ID afectado.
+No vuelve a ejecutar todo el lote.
+
+## Presupuesto operativo
+
+Para 25 imágenes retail ya aprobadas, el objetivo es:
+
+| Etapa | Presupuesto |
+|---|---:|
+| Preflight y compilación | ≤ 1 min |
+| Calado paralelo | ≤ 4 min |
+| Contact sheets y QA conjunto | ≤ 2 min |
+| Integración, tests y deploy | ≤ 5 min |
+| Total activo | ≤ 12 min |
+
+La espera del usuario durante la aprobación post-generación no cuenta como
+tiempo de procesamiento. Si una etapa supera su presupuesto:
+
+1. no encadenar waits silenciosos;
+2. reportar el ID lento o fallido;
+3. dejar avanzar las piezas correctas dentro del batch temporal;
+4. resolver solo la excepción antes del release;
+5. no publicar parcialmente.
+
+## Contratos que siguen siendo obligatorios
+
+- Fuente y resultado 1:1.
+- IDs simples: seis dígitos para lotes nuevos; tres dígitos legacy permitidos.
+- Toda generación nueva corre por API desde el backend; nunca desde una sesión
+  o suscripción interactiva.
+- La API solo se llama para `REGENERAR` y `FALTANTE`.
+- Cero calado antes de aprobación post-generación.
+- Cero borde, halo o sombra horneada.
+- Cero CSS por lote o prenda.
+- Cero regeneración para un problema superficial de alpha.
+- Un solo deploy por batch.
+- Verificación live por hash, no por confianza en el comando de deploy.
 
 ## Rechazos canónicos
 
-- `TECH_FORMAT`, `TECH_SIZE`, `TECH_ALPHA`, `TECH_CROP`, `TECH_SCALE`, `TECH_BAKED_STYLE`
-- `FID_SHAPE`, `FID_COLOR`, `FID_DETAIL`, `FID_GRAPHIC`, `FID_TEXT`, `FID_LABEL`, `FID_OUTERWEAR`, `FID_ARTIFACT`, `FID_HALLUCINATION`
-- `RENDER_STYLE`, `RENDER_SCALE`, `BATCH_MISSING`, `BATCH_DUPLICATE`, `RELEASE_REGRESSION`
-
+- `TECH_FORMAT`, `TECH_SIZE`, `TECH_ALPHA`, `TECH_CROP`, `TECH_SCALE`
+- `TECH_BAKED_STYLE`, `TECH_TRANSLUCENCY`
+- `FID_SHAPE`, `FID_COLOR`, `FID_DETAIL`, `FID_GRAPHIC`, `FID_TEXT`
+- `FID_LABEL`, `FID_ARTIFACT`, `FID_HALLUCINATION`
+- `BATCH_MISSING`, `BATCH_DUPLICATE`, `RELEASE_REGRESSION`

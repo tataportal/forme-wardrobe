@@ -20,6 +20,7 @@ function parseWebP(buffer, label) {
   let height;
   let alphaFlag = false;
   let alphaChunk = false;
+  let losslessChunk = false;
 
   while (offset + 8 <= buffer.length) {
     const type = buffer.toString("ascii", offset, offset + 4);
@@ -31,6 +32,13 @@ function parseWebP(buffer, label) {
       width = 1 + buffer[data + 4] + (buffer[data + 5] << 8) + (buffer[data + 6] << 16);
       height = 1 + buffer[data + 7] + (buffer[data + 8] << 8) + (buffer[data + 9] << 16);
     }
+    if (type === "VP8L" && size >= 5 && data + 5 <= buffer.length && buffer[data] === 0x2f) {
+      const bits = buffer.readUInt32LE(data + 1);
+      width = 1 + (bits & 0x3fff);
+      height = 1 + ((bits >>> 14) & 0x3fff);
+      alphaFlag = Boolean((bits >>> 28) & 0x01);
+      losslessChunk = true;
+    }
     if (type === "ALPH") alphaChunk = true;
 
     offset = data + size + (size % 2);
@@ -39,7 +47,7 @@ function parseWebP(buffer, label) {
   if (width !== standard.asset.width || height !== standard.asset.height) {
     errors.push(`${label}: ${width ?? "?"}×${height ?? "?"}; debe ser ${standard.asset.width}×${standard.asset.height}`);
   }
-  if (!alphaFlag || !alphaChunk) {
+  if (!alphaFlag || (!alphaChunk && !losslessChunk)) {
     errors.push(`${label}: no tiene transparencia WebP verificable`);
   }
 }
@@ -95,11 +103,17 @@ const batches = (await readdir(importRoot, { withFileTypes: true }))
 for (const batch of batches) await validateBatch(batch);
 
 const css = await readFile(cssPath, "utf8");
-if (!css.includes(`${standard.presentation.rendererToken}:`)) {
+const rendererToken = standard.presentation.rendererToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const rendererValues = [...css.matchAll(new RegExp(`${rendererToken}\\s*:\\s*([^;]+);`, "g"))]
+  .map((match) => match[1]);
+if (rendererValues.length === 0) {
   errors.push(`globals.css: falta ${standard.presentation.rendererToken}`);
 }
-if (!css.includes(standard.presentation.outline)) {
-  errors.push(`globals.css: el sticker Formé debe usar ${standard.presentation.outline}`);
+if (
+  standard.presentation.outlineAllowed === false
+  && rendererValues.some((value) => /drop-shadow\(\s*[-\d.]+(?:px)?\s+[-\d.]+(?:px)?\s+0(?:px)?\s+/i.test(value))
+) {
+  errors.push("globals.css: el tratamiento Formé no debe dibujar contorno");
 }
 if (/--garment-(?:import|batch|lot)[\w-]*-sticker-filter/i.test(css)) {
   errors.push("globals.css: existe un filtro sticker específico por lote");

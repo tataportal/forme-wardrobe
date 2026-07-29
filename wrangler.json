@@ -9,6 +9,10 @@
     {
       "pattern": "forme.gallery",
       "custom_domain": true
+    },
+    {
+      "pattern": "admin.forme.gallery",
+      "custom_domain": true
     }
   ],
   "assets": {
@@ -32,6 +36,23 @@
   ],
   "images": {
     "binding": "IMAGES"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "GARMENT_JOBS",
+        "queue": "forme-garment-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "forme-garment-jobs",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "forme-garment-jobs-dlq"
+      }
+    ]
   },
   "vars": {
     "OPENAI_IMAGE_MODEL": "gpt-image-2",

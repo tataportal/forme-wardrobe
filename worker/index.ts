@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { handleWardrobeApi, WardrobeEnv } from "./wardrobe-api";
+import { handleGarmentQueue, handleWardrobeApi, WardrobeEnv, WardrobeQueueBatch } from "./wardrobe-api";
 import { handleGoogleAuth } from "./google-auth";
 
 interface Env extends WardrobeEnv {
@@ -22,6 +22,10 @@ interface ExecutionContext {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (url.hostname === "admin.forme.gallery" && url.pathname === "/") {
+      url.pathname = "/admin";
+      request = new Request(url, request);
+    }
 
     const authResponse = await handleGoogleAuth(request, env);
     if (authResponse) return authResponse;
@@ -42,6 +46,9 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+  },
+  async queue(batch: WardrobeQueueBatch, env: Env): Promise<void> {
+    await handleGarmentQueue(batch, env);
   },
 };
 

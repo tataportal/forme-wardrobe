@@ -4,6 +4,9 @@ import { garmentTypesByCategory, inferGarmentType, starterGarments } from "../ap
 export interface WardrobeEnv {
   DB?: D1Database;
   WARDROBE_MEDIA?: R2Bucket;
+  GARMENT_JOBS?: {
+    send(message: GarmentQueueMessage, options?: { delaySeconds?: number }): Promise<unknown>;
+  };
   IMAGES?: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -24,6 +27,27 @@ export interface WardrobeEnv {
 
 export interface WardrobeExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
+}
+
+export type GarmentQueueMessage = {
+  ownerId: string;
+  garmentId: string;
+  jobId: string;
+  quality: ImageQuality;
+  presentation: GarmentPresentation;
+  outputVariant: GarmentOutputVariant;
+  stage?: "generate" | "postprocess";
+  generatedKey?: string;
+  maskAttempt?: number;
+};
+
+export interface WardrobeQueueBatch {
+  messages: ReadonlyArray<{
+    body: unknown;
+    attempts: number;
+    ack(): void;
+    retry(options?: { delaySeconds?: number }): void;
+  }>;
 }
 
 type Identity = {
@@ -109,6 +133,43 @@ type GarmentPayload = {
   tags: string[];
 };
 
+function processingEnabled(env: WardrobeEnv): boolean {
+  return Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA && env.GARMENT_JOBS);
+}
+
+const IMAGE_GENERATION_TIMEOUT_MS = 3 * 60 * 1000;
+const VISUAL_QA_TIMEOUT_MS = 45 * 1000;
+
+class RetryableProcessingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableProcessingError";
+  }
+}
+
+function isGarmentQueueMessage(value: unknown): value is GarmentQueueMessage {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Partial<GarmentQueueMessage>;
+  return typeof message.ownerId === "string"
+    && typeof message.garmentId === "string"
+    && typeof message.jobId === "string"
+    && ["low", "medium", "high"].includes(message.quality || "")
+    && ["auto", "closed", "open"].includes(message.presentation || "")
+    && ["closed", "open"].includes(message.outputVariant || "")
+    && (!message.stage || ["generate", "postprocess"].includes(message.stage))
+    && (message.stage !== "postprocess" || typeof message.generatedKey === "string")
+    && (message.maskAttempt === undefined || (Number.isInteger(message.maskAttempt) && message.maskAttempt >= 0 && message.maskAttempt <= 2));
+}
+
+async function enqueueGarmentJob(
+  env: WardrobeEnv,
+  message: GarmentQueueMessage,
+  options?: { delaySeconds?: number },
+): Promise<void> {
+  if (!env.GARMENT_JOBS) throw new Error("La cola de procesamiento no está conectada.");
+  await env.GARMENT_JOBS.send(message, options);
+}
+
 type UserProfileRow = {
   id: string;
   email: string;
@@ -135,7 +196,6 @@ type StyleFamilyRatingPayload = {
 };
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-const MAX_BATCH_GARMENTS = 15;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
 const garmentTypes = new Set(Object.values(garmentTypesByCategory).flat());
@@ -268,7 +328,7 @@ async function createIntakeBatch(request: Request, db: D1Database, identity: Ide
     items?: Array<{ clientItemId?: unknown; filename?: unknown; fingerprint?: unknown }>;
   } | null;
   const clientId = safeClientId(textValue(value?.clientId));
-  const rawItems = Array.isArray(value?.items) ? value.items.slice(0, 15) : [];
+  const rawItems = Array.isArray(value?.items) ? value.items : [];
   if (!clientId || !rawItems.length) return apiError("El lote de fotos no es válido.", 400);
   const items = rawItems.map((item) => ({
     clientItemId: safeClientId(textValue(item.clientItemId)),
@@ -778,12 +838,22 @@ async function uploadGarment(
     throw error;
   }
 
-  const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
+  const enabled = processingEnabled(env);
   const quality = imageQuality(env.OPENAI_IMAGE_QUALITY);
   const mode = form.get("processingMode") === "batch" ? "batch" : "immediate";
-  const job = await createProcessingJob(db, identity.id, garmentId, enabled, quality, "closed", "closed", mode);
+  const presentation: GarmentPresentation = payload.category === "Outerwear" || payload.category === "Tops" ? "open" : "closed";
+  const job = await createProcessingJob(db, identity.id, garmentId, enabled, quality, presentation, "closed", mode);
   await syncIntakeItem(db, garmentId, enabled ? "processing" : "uploaded");
-  if (enabled && mode === "immediate") ctx.waitUntil(processGarment(env, db, identity.id, garmentId, job.id, quality, "closed", "closed"));
+  if (enabled && mode === "immediate") {
+    await enqueueGarmentJob(env, {
+      ownerId: identity.id,
+      garmentId,
+      jobId: job.id,
+      quality,
+      presentation,
+      outputVariant: "closed",
+    });
+  }
   const row = await findGarment(db, identity.id, clientId);
   if (!row) throw new Error("No se pudo crear la prenda.");
   return json({ garment: garmentJson(row, payload.tags), job }, 202);
@@ -868,12 +938,22 @@ async function reviewGeneratedGarment(
   sourceBytes: ArrayBuffer,
   sourceContentType: string,
   generated: Uint8Array,
-): Promise<{ passed: boolean; score: number; notes: string }> {
-  if (!env.OPENAI_API_KEY) return { passed: false, score: 0, notes: "El control visual no está disponible." };
+  maskAttempt = 0,
+): Promise<{ passed: boolean; retryable: boolean; score: number; notes: string; layeringPolygon: Array<{ x: number; y: number }> }> {
+  if (!env.OPENAI_API_KEY) {
+    return { passed: false, retryable: true, score: 0, notes: "El control visual no está disponible.", layeringPolygon: [] };
+  }
   try {
+    const retryInstruction = maskAttempt > 0
+      ? "A previous mask was rejected for cutting garment fabric. Make this retry more conservative and keep every boundary farther inside the lining."
+      : "";
+    const layeringInstruction = garment.category === "Outerwear"
+      ? `This is outerwear and must support layering. In layering_mask, provide 8 to 24 clockwise points that tightly trace only the true central lining/opening between the two open front panels. Use the real curved inner edges of the garment, not a rectangle, triangle, trapezoid, or other geometric approximation. Start below the complete back collar/neck band, trace inside both lapel/front-panel edges, and reach the natural opening at the bottom without removing hem fabric. Every point must remain safely inside the lining: never include collar, lapels, outer panels, graphics, buttons, sleeves, or hem fabric. Coordinates are normalized integers from 0 to 1000 across the OUTPUT image. Set applicable=true only when this exact opening is clearly visible. ${retryInstruction}`
+      : "This category does not need an interior layering mask. Set layering_mask applicable=false, confidence=100 and points=[].";
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
       body: JSON.stringify({
         model: env.OPENAI_QA_MODEL || "gpt-5-mini",
         store: false,
@@ -882,7 +962,7 @@ async function reviewGeneratedGarment(
           content: [
             {
               type: "input_text",
-              text: `You are the final visual quality gate for a fashion digitization service. Compare SOURCE (first image) against OUTPUT (second image). The output must depict the exact same ${garment.garment_type || garment.category} as a ghost-mannequin catalog image. Reject if any silhouette, proportion, color, material, finish, seam, pocket, closure, hardware, graphic, print, embroidery, patch, logo, visible exterior text, distressing, or construction detail is missing, changed, moved, invented or obscured. Reject any hanger, person, mannequin body, visible interior brand/care/size label, solid black neck oval or geometric void, background contamination, cropped garment, malformed edge, or invented styling item. A natural empty neck opening is allowed only when it follows the construction and shows plausible matching lining. Be strict: uncertainty means review. Return only the requested JSON.`,
+              text: `You are the final visual quality gate for a fashion digitization service. Compare SOURCE (first image) against OUTPUT (second image). The output must depict the exact same ${garment.garment_type || garment.category} as a ghost-mannequin catalog image. Reject if any silhouette, proportion, color, material, finish, seam, pocket, closure, hardware, graphic, print, embroidery, patch, logo, visible exterior text, distressing, or construction detail is missing, changed, moved, invented or obscured. Reject any hanger, person, mannequin body, visible interior brand/care/size label, solid black neck oval or geometric void, background contamination, cropped garment, malformed edge, or invented styling item. A natural empty neck opening is allowed only when it follows the construction and shows plausible matching lining. Be strict: uncertainty means review. ${layeringInstruction} Return only the requested JSON.`,
             },
             { type: "input_image", image_url: `data:${sourceContentType};base64,${encodeBase64(sourceBytes)}`, detail: "high" },
             { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
@@ -892,6 +972,129 @@ async function reviewGeneratedGarment(
           format: {
             type: "json_schema",
             name: "garment_quality_gate",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                passed: { type: "boolean" },
+                score: { type: "integer", minimum: 0, maximum: 100 },
+                summary: { type: "string" },
+                issues: { type: "array", items: { type: "string" }, maxItems: 8 },
+                layering_mask: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    applicable: { type: "boolean" },
+                    confidence: { type: "integer", minimum: 0, maximum: 100 },
+                    points: {
+                      type: "array",
+                      minItems: 0,
+                      maxItems: 24,
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          x: { type: "integer", minimum: 0, maximum: 1000 },
+                          y: { type: "integer", minimum: 0, maximum: 1000 },
+                        },
+                        required: ["x", "y"],
+                      },
+                    },
+                  },
+                  required: ["applicable", "confidence", "points"],
+                },
+              },
+              required: ["passed", "score", "summary", "issues", "layering_mask"],
+            },
+          },
+        },
+      }),
+    });
+    const result = await response.json() as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+      error?: { message?: string };
+    };
+    if (!response.ok) throw new Error(result.error?.message || `Control visual ${response.status}`);
+    const raw = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "";
+    const parsed = JSON.parse(raw) as {
+      passed?: boolean;
+      score?: number;
+      summary?: string;
+      issues?: string[];
+      layering_mask?: {
+        applicable?: boolean;
+        confidence?: number;
+        points?: Array<{ x?: number; y?: number }>;
+      };
+    };
+    const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
+    const points = Array.isArray(parsed.layering_mask?.points)
+      ? parsed.layering_mask.points
+        .map((point) => ({ x: Number(point.x), y: Number(point.y) }))
+        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      : [];
+    const layeringReady = garment.category !== "Outerwear"
+      || (
+        parsed.layering_mask?.applicable === true
+        && Number(parsed.layering_mask.confidence) >= 85
+        && points.length >= 8
+      );
+    const issues = [
+      ...(Array.isArray(parsed.issues) ? parsed.issues : []),
+      ...(!layeringReady ? ["No se pudo delimitar con confianza la abertura central para layering."] : []),
+    ];
+    const notes = [parsed.summary, ...issues].filter(Boolean).join(" · ").slice(0, 500);
+    return {
+      passed: parsed.passed === true && score >= 85,
+      retryable: false,
+      score,
+      notes: notes || "El resultado necesita revisión visual.",
+      layeringPolygon: garment.category === "Outerwear" && layeringReady ? points : [],
+    };
+  } catch (error) {
+    return {
+      passed: false,
+      retryable: true,
+      score: 0,
+      notes: `No se pudo completar el control visual: ${error instanceof Error ? error.message : "error desconocido"}`.slice(0, 500),
+      layeringPolygon: [],
+    };
+  }
+}
+
+async function reviewLayeringCutout(
+  env: WardrobeEnv,
+  generated: Uint8Array,
+  canvasQaPng: ArrayBuffer,
+): Promise<{ passed: boolean; retryable: boolean; score: number; notes: string }> {
+  if (!env.OPENAI_API_KEY) {
+    return { passed: false, retryable: true, score: 0, notes: "El control visual del calado no está disponible." };
+  }
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: env.OPENAI_QA_MODEL || "gpt-5-mini",
+        store: false,
+        input: [{
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "You are the final cutout gate for an open outerwear garment. IMAGE 1 is the approved master. IMAGE 2 shows every transparent pixel as bright magenta. Pass only when magenta appears outside the garment and inside the true central opening between its front panels. The complete top/back collar band must remain for depth. Reject if the opening cuts any collar, lapel, front panel, graphic, button, sleeve, or hem; if it follows straight geometric diagonals instead of the real inner edges; or if any garment fabric visible in IMAGE 1 is missing in IMAGE 2. Be strict: uncertainty means reject. Return only the requested JSON.",
+            },
+            { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
+            { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(canvasQaPng)}`, detail: "high" },
+          ],
+        }],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "layering_cutout_quality_gate",
             strict: true,
             schema: {
               type: "object",
@@ -913,15 +1116,281 @@ async function reviewGeneratedGarment(
       output?: Array<{ content?: Array<{ text?: string }> }>;
       error?: { message?: string };
     };
-    if (!response.ok) throw new Error(result.error?.message || `Control visual ${response.status}`);
+    if (!response.ok) throw new Error(result.error?.message || `Control visual del calado ${response.status}`);
     const raw = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "";
     const parsed = JSON.parse(raw) as { passed?: boolean; score?: number; summary?: string; issues?: string[] };
     const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
     const notes = [parsed.summary, ...(Array.isArray(parsed.issues) ? parsed.issues : [])].filter(Boolean).join(" · ").slice(0, 500);
-    return { passed: parsed.passed === true && score >= 85, score, notes: notes || "El resultado necesita revisión visual." };
+    return {
+      passed: parsed.passed === true && score >= 90,
+      retryable: false,
+      score,
+      notes: notes || "El calado para layering necesita una máscara más conservadora.",
+    };
   } catch (error) {
-    return { passed: false, score: 0, notes: `No se pudo completar el control visual: ${error instanceof Error ? error.message : "error desconocido"}`.slice(0, 500) };
+    return {
+      passed: false,
+      retryable: true,
+      score: 0,
+      notes: `No se pudo completar el control visual del calado: ${error instanceof Error ? error.message : "error desconocido"}`.slice(0, 500),
+    };
   }
+}
+
+type StoredCutouts = {
+  closetKey: string;
+  canvasKey: string | null;
+};
+
+async function storeGeneratedCutouts(
+  env: WardrobeEnv,
+  garment: GarmentRow,
+  generated: Uint8Array,
+  quality: ImageQuality,
+  layeringPolygon: Array<{ x: number; y: number }>,
+): Promise<StoredCutouts> {
+  if (!env.WARDROBE_MEDIA) throw new Error("El almacenamiento de imágenes no está conectado.");
+  const baseKey = `users/${garment.owner_id}/garments/${garment.client_id}`;
+  const timestamp = Date.now();
+  const { contourCutoutPng } = await import("./contour-cutout");
+  const contour = await contourCutoutPng(generated, layeringPolygon);
+  if (!contour.passed) throw new Error(contour.notes);
+
+  const closetKey = `${baseKey}/cutout-closet-${quality}-${timestamp}.png`;
+  if (garment.category !== "Outerwear") {
+    await env.WARDROBE_MEDIA.put(closetKey, contour.png, {
+      httpMetadata: { contentType: "image/png" },
+      customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-closet" },
+    });
+    return { closetKey, canvasKey: null };
+  }
+  if (!contour.canvasPassed || !contour.canvasPng || !contour.canvasQaPng) {
+    throw new Error(contour.canvasNotes);
+  }
+
+  const cutoutQa = await reviewLayeringCutout(env, generated, contour.canvasQaPng);
+  if (!cutoutQa.passed) {
+    if (cutoutQa.retryable) throw new RetryableProcessingError(cutoutQa.notes);
+    throw new Error(cutoutQa.notes);
+  }
+  const canvasKey = `${baseKey}/cutout-canvas-${quality}-${timestamp}.png`;
+  await Promise.all([
+    env.WARDROBE_MEDIA.put(closetKey, contour.png, {
+      httpMetadata: { contentType: "image/png" },
+      customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-closet" },
+    }),
+    env.WARDROBE_MEDIA.put(canvasKey, contour.canvasPng, {
+      httpMetadata: { contentType: "image/png" },
+      customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-canvas" },
+    }),
+  ]);
+  return { closetKey, canvasKey };
+}
+
+async function retryOrRejectGenerated(
+  env: WardrobeEnv,
+  db: D1Database,
+  garment: GarmentRow,
+  jobId: string,
+  generatedKey: string,
+  quality: ImageQuality,
+  presentation: GarmentPresentation,
+  outputVariant: GarmentOutputVariant,
+  notes: string,
+): Promise<void> {
+  if (!env.WARDROBE_MEDIA) return;
+  await env.WARDROBE_MEDIA.delete(generatedKey);
+  const attempt = await db.prepare("SELECT attempt FROM processing_jobs WHERE id = ? AND owner_id = ? LIMIT 1")
+    .bind(jobId, garment.owner_id).first<{ attempt: number }>();
+  if (Number(attempt?.attempt || 0) < 2) {
+    await db.batch([
+      db.prepare(`
+        UPDATE garments
+        SET status = 'processing', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(`Reintentando automáticamente: ${notes}`.slice(0, 500), garment.id, garment.owner_id),
+      db.prepare(`
+        UPDATE processing_jobs
+        SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(notes.slice(0, 500), jobId, garment.owner_id),
+    ]);
+    await syncIntakeItem(db, garment.id, "processing", "Reintentando el control automático.");
+    await enqueueGarmentJob(env, {
+      ownerId: garment.owner_id,
+      garmentId: garment.id,
+      jobId,
+      quality,
+      presentation,
+      outputVariant,
+      stage: "generate",
+    });
+    return;
+  }
+
+  await db.batch([
+    db.prepare(`
+      UPDATE garments
+      SET status = 'failed', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(notes.slice(0, 500), garment.id, garment.owner_id),
+    db.prepare(`
+      UPDATE processing_jobs
+      SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(notes.slice(0, 500), jobId, garment.owner_id),
+  ]);
+  await syncIntakeItem(db, garment.id, "failed", notes);
+}
+
+async function retryOrRejectCutouts(
+  env: WardrobeEnv,
+  db: D1Database,
+  garment: GarmentRow,
+  jobId: string,
+  generatedKey: string,
+  quality: ImageQuality,
+  presentation: GarmentPresentation,
+  outputVariant: GarmentOutputVariant,
+  maskAttempt: number,
+  notes: string,
+): Promise<void> {
+  if (maskAttempt < 1) {
+    await db.batch([
+      db.prepare(`
+        UPDATE garments
+        SET status = 'processing', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(`Recalculando la máscara automáticamente: ${notes}`.slice(0, 500), garment.id, garment.owner_id),
+      db.prepare(`
+        UPDATE processing_jobs
+        SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(notes.slice(0, 500), jobId, garment.owner_id),
+    ]);
+    await enqueueGarmentJob(env, {
+      ownerId: garment.owner_id,
+      garmentId: garment.id,
+      jobId,
+      quality,
+      presentation,
+      outputVariant,
+      stage: "postprocess",
+      generatedKey,
+      maskAttempt: maskAttempt + 1,
+    }, { delaySeconds: 1 });
+    return;
+  }
+
+  await db.batch([
+    db.prepare(`
+      UPDATE garments
+      SET status = 'failed', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(notes.slice(0, 500), garment.id, garment.owner_id),
+    db.prepare(`
+      UPDATE processing_jobs
+      SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(notes.slice(0, 500), jobId, garment.owner_id),
+  ]);
+  await syncIntakeItem(db, garment.id, "failed", notes);
+}
+
+async function finalizeGeneratedGarment(
+  env: WardrobeEnv,
+  db: D1Database,
+  garment: GarmentRow,
+  jobId: string,
+  quality: ImageQuality,
+  presentation: GarmentPresentation,
+  outputVariant: GarmentOutputVariant,
+  generatedKey: string,
+  generated: Uint8Array,
+  sourceBytes: ArrayBuffer,
+  sourceContentType: string,
+  maskAttempt = 0,
+): Promise<void> {
+  const visualQa = await reviewGeneratedGarment(env, garment, sourceBytes, sourceContentType, generated, maskAttempt);
+  if (!visualQa.passed) {
+    if (visualQa.retryable) throw new RetryableProcessingError(visualQa.notes);
+    await retryOrRejectGenerated(
+      env,
+      db,
+      garment,
+      jobId,
+      generatedKey,
+      quality,
+      presentation,
+      outputVariant,
+      visualQa.notes,
+    );
+    return;
+  }
+
+  let cutouts: StoredCutouts;
+  try {
+    cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon);
+  } catch (error) {
+    if (error instanceof RetryableProcessingError) throw error;
+    await retryOrRejectCutouts(
+      env,
+      db,
+      garment,
+      jobId,
+      generatedKey,
+      quality,
+      presentation,
+      outputVariant,
+      maskAttempt,
+      error instanceof Error ? error.message : "El control automático del calado falló.",
+    );
+    return;
+  }
+
+  const isOuterwearSource = garment.category === "Outerwear" && outputVariant === "closed";
+  const garmentUpdate = isOuterwearSource
+    ? db.prepare(`
+      UPDATE garments
+      SET status = 'ready', generated_image_key = ?, generated_open_image_key = ?,
+        image_key = ?, open_image_key = ?, quality = ?, qa_status = 'passed',
+        qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(
+      generatedKey,
+      generatedKey,
+      cutouts.closetKey,
+      cutouts.canvasKey,
+      quality,
+      garment.id,
+      garment.owner_id,
+    )
+    : outputVariant === "open"
+      ? db.prepare(`
+        UPDATE garments
+        SET status = 'ready', generated_open_image_key = ?, open_image_key = ?,
+          quality = ?, qa_status = 'passed', qa_notes = NULL,
+          revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(generatedKey, cutouts.closetKey, quality, garment.id, garment.owner_id)
+      : db.prepare(`
+        UPDATE garments
+        SET status = 'ready', generated_image_key = ?, image_key = ?,
+          quality = ?, qa_status = 'passed', qa_notes = NULL,
+          revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND owner_id = ?
+      `).bind(generatedKey, cutouts.closetKey, quality, garment.id, garment.owner_id);
+
+  await db.batch([
+    garmentUpdate,
+    db.prepare(`
+      UPDATE processing_jobs
+      SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP, error = NULL
+      WHERE id = ? AND owner_id = ?
+    `).bind(jobId, garment.owner_id),
+  ]);
+  await syncIntakeItem(db, garment.id, "passed");
 }
 
 async function processGarment(
@@ -963,17 +1432,29 @@ async function processGarment(
     form.append("quality", quality);
     form.append("output_format", "png");
 
-    const response = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
-      body: form,
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
+        body: form,
+        signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
+      });
+    } catch (error) {
+      throw new RetryableProcessingError(
+        error instanceof Error && error.name === "TimeoutError"
+          ? "OpenAI superó el límite de 3 minutos."
+          : `No se pudo completar la llamada de generación: ${error instanceof Error ? error.message : "error de red"}`,
+      );
+    }
     const result = await response.json() as {
       data?: Array<{ b64_json?: string }>;
       error?: { message?: string };
     };
     if (!response.ok || !result.data?.[0]?.b64_json) {
-      throw new Error(result.error?.message || `El generador respondió con ${response.status}.`);
+      const message = result.error?.message || `El generador respondió con ${response.status}.`;
+      if (response.status === 429 || response.status >= 500) throw new RetryableProcessingError(message);
+      throw new Error(message);
     }
 
     const generated = decodeBase64(result.data[0].b64_json);
@@ -983,98 +1464,55 @@ async function processGarment(
       httpMetadata: { contentType: "image/png" },
       customMetadata: { owner: ownerId, garment: garment.client_id, kind: "generated" },
     });
-
-    const visualQa = await reviewGeneratedGarment(env, garment, sourceBytes, contentType, generated);
-    if (!visualQa.passed) {
-      const attempt = await db.prepare("SELECT attempt FROM processing_jobs WHERE id = ? AND owner_id = ? LIMIT 1")
-        .bind(jobId, ownerId).first<{ attempt: number }>();
-      if (Number(attempt?.attempt || 0) < 2) {
-        await env.WARDROBE_MEDIA.delete(generatedKey);
-        await db.batch([
-          db.prepare("UPDATE garments SET status = 'processing', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-            .bind(`Reintentando automáticamente: ${visualQa.notes}`.slice(0, 500), garmentId, ownerId),
-          db.prepare("UPDATE processing_jobs SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-            .bind(visualQa.notes, jobId, ownerId),
-        ]);
-        await syncIntakeItem(db, garmentId, "processing", "Reintentando el control visual.");
-        await processGarment(env, db, ownerId, garmentId, jobId, quality, presentation, outputVariant);
-        return;
-      }
-      const reviewUpdate = outputVariant === "open"
-        ? db.prepare(`
-          UPDATE garments SET generated_open_image_key = ?, status = 'review', quality = ?, qa_status = 'review',
-            qa_notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?
-        `).bind(generatedKey, quality, visualQa.notes, garmentId, ownerId)
-        : db.prepare(`
-          UPDATE garments SET generated_image_key = ?, status = 'review', quality = ?, qa_status = 'review',
-            qa_notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?
-        `).bind(generatedKey, quality, visualQa.notes, garmentId, ownerId);
-      await db.batch([
-        reviewUpdate,
-        db.prepare("UPDATE processing_jobs SET status = 'review', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-          .bind(visualQa.notes, jobId, ownerId),
-      ]);
-      await syncIntakeItem(db, garmentId, "review", visualQa.notes);
-      return;
-    }
-
-    let cutoutKey: string | null = null;
-    if (env.IMAGES) {
-      const segmented = await env.IMAGES
-        .input(new Blob([generated], { type: "image/png" }).stream())
-        .transform({ segment: "foreground" })
-        .output({ format: "image/webp", quality: 92 });
-      const segmentedResponse = await segmented.response();
-      if (!segmentedResponse.ok) throw new Error(`El recorte respondió con ${segmentedResponse.status}.`);
-      const cutout = await segmentedResponse.arrayBuffer();
-      cutoutKey = `${baseKey}/cutout-${outputVariant}-${quality}-${Date.now()}.webp`;
-      await env.WARDROBE_MEDIA.put(cutoutKey, cutout, {
-        httpMetadata: { contentType: "image/webp" },
-        customMetadata: { owner: ownerId, garment: garment.client_id, kind: `cutout-${outputVariant}` },
-      });
-    }
-
-    const nextStatus = cutoutKey ? "ready" : "cutout_pending";
-    const nextJobStatus = cutoutKey ? "succeeded" : "awaiting_cutout";
-    const garmentUpdate = outputVariant === "open"
+    const generatedUpdate = outputVariant === "open"
       ? db.prepare(`
         UPDATE garments
-        SET status = ?, generated_open_image_key = ?, open_image_key = COALESCE(?, open_image_key),
-          quality = ?, qa_status = 'passed', qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        SET status = 'processing', generated_open_image_key = ?, qa_status = 'pending',
+          qa_notes = 'Ejecutando control automático.', updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(nextStatus, generatedKey, cutoutKey, quality, garmentId, ownerId)
+      `).bind(generatedKey, garmentId, ownerId)
       : db.prepare(`
         UPDATE garments
-        SET status = ?, generated_image_key = ?, image_key = COALESCE(?, image_key),
-          quality = ?, qa_status = 'passed', qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+        SET status = 'processing', generated_image_key = ?, qa_status = 'pending',
+          qa_notes = 'Ejecutando control automático.', updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(nextStatus, generatedKey, cutoutKey, quality, garmentId, ownerId);
+      `).bind(generatedKey, garmentId, ownerId);
     await db.batch([
-      garmentUpdate,
+      generatedUpdate,
       db.prepare(`
         UPDATE processing_jobs
-        SET status = ?, finished_at = CASE WHEN ? = 'succeeded' THEN CURRENT_TIMESTAMP ELSE finished_at END,
-          updated_at = CURRENT_TIMESTAMP, error = NULL
+        SET status = 'queued', updated_at = CURRENT_TIMESTAMP, error = NULL
         WHERE id = ? AND owner_id = ?
-      `).bind(nextJobStatus, nextJobStatus, jobId, ownerId),
+      `).bind(jobId, ownerId),
     ]);
-    let openRequired = false;
-    if (nextStatus === "ready" && outputVariant === "closed" && garment.category === "Outerwear") {
-      const existingOpen = await db.prepare(`
-        SELECT id, status FROM processing_jobs
-        WHERE garment_id = ? AND owner_id = ? AND output_variant = 'open'
-          AND status IN ('queued', 'processing', 'batch_staged', 'batch_processing', 'awaiting_cutout', 'succeeded')
-        LIMIT 1
-      `).bind(garmentId, ownerId).first<{ id: string; status: string }>();
-      openRequired = !existingOpen || existingOpen.status !== "succeeded";
-      if (!existingOpen) {
-        const openJob = await createProcessingJob(db, ownerId, garmentId, true, quality, "open", "open");
-        await processGarment(env, db, ownerId, garmentId, openJob.id, quality, "open", "open");
-      }
-    }
-    if (nextStatus === "ready" && !openRequired) await syncIntakeItem(db, garmentId, "passed");
+    await enqueueGarmentJob(env, {
+      ownerId,
+      garmentId,
+      jobId,
+      quality,
+      presentation,
+      outputVariant,
+      stage: "postprocess",
+      generatedKey,
+    });
   } catch (error) {
     const message = (error instanceof Error ? error.message : "El procesamiento falló.").slice(0, 500);
+    if (error instanceof RetryableProcessingError) {
+      await db.batch([
+        db.prepare(`
+          UPDATE garments
+          SET status = 'processing', qa_status = 'pending', qa_notes = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ?
+        `).bind(`Reintentando automáticamente: ${message}`.slice(0, 500), garmentId, ownerId),
+        db.prepare(`
+          UPDATE processing_jobs
+          SET status = 'queued', attempt = MAX(attempt - 1, 0), error = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ?
+        `).bind(message, jobId, ownerId),
+      ]);
+      await syncIntakeItem(db, garmentId, "processing", "Reintentando una interrupción temporal.");
+      throw error;
+    }
     const existing = await db.prepare("SELECT image_key FROM garments WHERE id = ? AND owner_id = ? LIMIT 1")
       .bind(garmentId, ownerId)
       .first<{ image_key: string | null }>();
@@ -1088,6 +1526,147 @@ async function processGarment(
   }
 }
 
+async function failQueuedGarment(
+  db: D1Database,
+  ownerId: string,
+  garmentId: string,
+  jobId: string,
+  error: unknown,
+): Promise<void> {
+  const message = (error instanceof Error ? error.message : "El procesamiento no pudo reanudarse.").slice(0, 500);
+  await db.batch([
+    db.prepare(`
+      UPDATE processing_jobs
+      SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ? AND status NOT IN ('succeeded', 'review', 'failed')
+    `).bind(message, jobId, ownerId),
+    db.prepare(`
+      UPDATE garments
+      SET status = CASE WHEN image_key IS NULL THEN 'failed' ELSE 'ready' END,
+        qa_status = CASE WHEN image_key IS NULL THEN 'review' ELSE qa_status END,
+        qa_notes = CASE WHEN image_key IS NULL THEN ? ELSE qa_notes END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(message, garmentId, ownerId),
+  ]);
+  await syncIntakeItem(db, garmentId, "failed", message);
+}
+
+export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: WardrobeEnv): Promise<void> {
+  const db = env.DB;
+  await Promise.all(batch.messages.map(async (message) => {
+    if (!isGarmentQueueMessage(message.body)) {
+      message.ack();
+      return;
+    }
+    const payload = message.body;
+    if (!db || !env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) {
+      message.retry({ delaySeconds: 60 });
+      return;
+    }
+    try {
+      const job = await db.prepare(`
+        SELECT id, garment_id, owner_id, status, quality, presentation, output_variant,
+          CASE
+            WHEN status = 'processing' AND updated_at > datetime('now', '-14 minutes') THEN 1
+            ELSE 0
+          END AS active
+        FROM processing_jobs
+        WHERE id = ? AND garment_id = ? AND owner_id = ?
+        LIMIT 1
+      `).bind(payload.jobId, payload.garmentId, payload.ownerId).first<{
+        id: string;
+        garment_id: string;
+        owner_id: string;
+        status: string;
+        quality: string;
+        presentation: string;
+        output_variant: string;
+        active: number;
+      }>();
+      if (!job || ["succeeded", "review", "failed", "awaiting_cutout", "batch_processing", "batch_staged", "retrying"].includes(job.status)) {
+        message.ack();
+        return;
+      }
+      if (job.status === "processing" && Number(job.active) === 1) {
+        if (message.attempts <= 1) {
+          message.retry({ delaySeconds: 15 });
+          return;
+        }
+        await db.prepare(`
+          UPDATE processing_jobs
+          SET status = 'queued', error = 'Reintentando una llamada externa interrumpida.', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ?
+        `).bind(job.id, job.owner_id).run();
+      }
+      if (job.status === "processing" || job.status === "waiting_for_key") {
+        await db.prepare(`
+          UPDATE processing_jobs
+          SET status = 'queued', error = 'Reanudando procesamiento interrumpido.', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ?
+        `).bind(job.id, job.owner_id).run();
+      }
+      const claim = await db.prepare(`
+        UPDATE processing_jobs
+        SET status = 'processing', started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+          updated_at = CURRENT_TIMESTAMP, error = NULL
+        WHERE id = ? AND owner_id = ? AND status = 'queued'
+      `).bind(job.id, job.owner_id).run();
+      if (Number(claim.meta.changes || 0) !== 1) {
+        message.retry({ delaySeconds: 120 });
+        return;
+      }
+      if (payload.stage === "postprocess" && payload.generatedKey) {
+        const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ? LIMIT 1`)
+          .bind(job.garment_id, job.owner_id)
+          .first<GarmentRow>();
+        if (!garment) throw new Error("La prenda del lote ya no existe.");
+        const processingKey = garment.processing_image_key || garment.source_image_key;
+        const [generatedObject, source] = await Promise.all([
+          env.WARDROBE_MEDIA.get(payload.generatedKey),
+          processingKey ? env.WARDROBE_MEDIA.get(processingKey) : null,
+        ]);
+        if (!generatedObject || !source) throw new Error("Falta la imagen generada o la referencia original.");
+        await finalizeGeneratedGarment(
+          env,
+          db,
+          garment,
+          job.id,
+          imageQuality(job.quality),
+          garmentPresentation(job.presentation),
+          job.output_variant === "open" ? "open" : "closed",
+          payload.generatedKey,
+          new Uint8Array(await generatedObject.arrayBuffer()),
+          await source.arrayBuffer(),
+          source.httpMetadata?.contentType || "image/jpeg",
+          payload.maskAttempt || 0,
+        );
+        message.ack();
+        return;
+      }
+      await processGarment(
+        env,
+        db,
+        job.owner_id,
+        job.garment_id,
+        job.id,
+        imageQuality(job.quality),
+        garmentPresentation(job.presentation),
+        job.output_variant === "open" ? "open" : "closed",
+      );
+      message.ack();
+    } catch (error) {
+      const retryLimit = error instanceof RetryableProcessingError ? 3 : 6;
+      if (message.attempts >= retryLimit) {
+        await failQueuedGarment(db, payload.ownerId, payload.garmentId, payload.jobId, error);
+        message.ack();
+      } else {
+        message.retry({ delaySeconds: error instanceof RetryableProcessingError ? 10 : 60 });
+      }
+    }
+  }));
+}
+
 async function retryGarment(
   request: Request,
   env: WardrobeEnv,
@@ -1099,14 +1678,26 @@ async function retryGarment(
   const garment = await findGarment(db, identity.id, clientId);
   if (!garment) return apiError("Prenda no encontrada.", 404);
   if (!garment.source_image_key) return apiError("Esta prenda no tiene una foto original para reprocesar.", 400);
-  const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
+  const enabled = processingEnabled(env);
   const body = await request.json().catch(() => null) as { quality?: unknown; presentation?: unknown; outputVariant?: unknown } | null;
   const quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
-  const outputVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
-  const presentation = outputVariant === "open" ? "open" : garmentPresentation(body?.presentation ?? "closed");
+  const requestedVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
+  const outputVariant: GarmentOutputVariant = garment.category === "Outerwear" ? "closed" : requestedVariant;
+  const presentation: GarmentPresentation = garment.category === "Outerwear" || garment.category === "Tops"
+    ? "open"
+    : outputVariant === "open" ? "open" : garmentPresentation(body?.presentation ?? "closed");
   const job = await createProcessingJob(db, identity.id, garment.id, enabled, quality, presentation, outputVariant);
   await syncIntakeItem(db, garment.id, enabled ? "processing" : "uploaded");
-  if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garment.id, job.id, quality, presentation, outputVariant));
+  if (enabled) {
+    await enqueueGarmentJob(env, {
+      ownerId: identity.id,
+      garmentId: garment.id,
+      jobId: job.id,
+      quality,
+      presentation,
+      outputVariant,
+    });
+  }
   return json({ job }, 202);
 }
 
@@ -1153,22 +1744,6 @@ async function attachCutout(
     `).bind(garment.id, identity.id, outputVariant),
   ]);
 
-  let openedJob: { id: string; status: string } | null = null;
-  if (outputVariant === "closed" && garment.category === "Outerwear" && !garment.open_image_key) {
-    const existingOpen = await db.prepare(`
-      SELECT id FROM processing_jobs
-      WHERE garment_id = ? AND owner_id = ? AND output_variant = 'open'
-        AND status IN ('queued', 'processing', 'batch_staged', 'batch_processing', 'awaiting_cutout')
-      LIMIT 1
-    `).bind(garment.id, identity.id).first<{ id: string }>();
-    if (!existingOpen) {
-      const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
-      const quality = imageQuality(garment.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
-      openedJob = await createProcessingJob(db, identity.id, garment.id, enabled, quality, "open", "open");
-      if (enabled) ctx.waitUntil(processGarment(env, db, identity.id, garment.id, openedJob.id, quality, "open", "open"));
-    }
-  }
-
   const pending = await db.prepare(`
     SELECT COUNT(*) AS count FROM processing_jobs
     WHERE garment_id = ? AND owner_id = ?
@@ -1182,20 +1757,43 @@ async function attachCutout(
   await syncIntakeItem(db, garment.id, nextStatus === "ready" ? "passed" : nextStatus === "review" ? "review" : "processing", qaNotes || null);
   const updated = await findGarment(db, identity.id, clientId);
   const tags = await garmentTagsFor(db, garment.id);
-  return json({ garment: updated ? garmentJson(updated, tags) : null, openJob: openedJob }, 201);
+  return json({ garment: updated ? garmentJson(updated, tags) : null, openJob: null }, 201);
 }
 
-async function garmentStatus(db: D1Database, ownerId: string, clientId: string): Promise<Response> {
+async function garmentStatus(env: WardrobeEnv, db: D1Database, ownerId: string, clientId: string): Promise<Response> {
   const garment = await findGarment(db, ownerId, clientId);
   if (!garment) return apiError("Prenda no encontrada.", 404);
   const job = await db.prepare(`
     SELECT id, garment_id, status, provider, attempt, quality, presentation, output_variant,
-      mode, batch_id, openai_file_id, error, created_at, updated_at
+      mode, batch_id, openai_file_id, error, created_at, updated_at,
+      CASE
+        WHEN status = 'processing' AND updated_at <= datetime('now', '-14 minutes') THEN 1
+        ELSE 0
+      END AS stale
     FROM processing_jobs
     WHERE garment_id = ? AND owner_id = ?
     ORDER BY created_at DESC
     LIMIT 1
-  `).bind(garment.id, ownerId).first<ProcessingJobRow>();
+  `).bind(garment.id, ownerId).first<ProcessingJobRow & { stale: number }>();
+  if (job && Number(job.stale) === 1 && processingEnabled(env)) {
+    const reset = await db.prepare(`
+      UPDATE processing_jobs
+      SET status = 'queued', error = 'Reanudando procesamiento interrumpido.', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ? AND status = 'processing'
+    `).bind(job.id, ownerId).run();
+    if (Number(reset.meta.changes || 0) === 1) {
+      await enqueueGarmentJob(env, {
+        ownerId,
+        garmentId: job.garment_id,
+        jobId: job.id,
+        quality: imageQuality(job.quality),
+        presentation: garmentPresentation(job.presentation),
+        outputVariant: job.output_variant === "open" ? "open" : "closed",
+      });
+      job.status = "queued";
+      job.error = "Reanudando procesamiento interrumpido.";
+    }
+  }
   const tags = await garmentTagsFor(db, garment.id);
   return json({ garment: garmentJson(garment, tags), job });
 }
@@ -1281,7 +1879,7 @@ async function internalGarmentOperation(
     const variant = searchParams.get("variant");
     return variant && ["original", "generated", "generated-open", "cutout", "open"].includes(variant)
       ? mediaResponse(env, env.DB, identity.id, clientId, variant)
-      : garmentStatus(env.DB, identity.id, clientId);
+      : garmentStatus(env, env.DB, identity.id, clientId);
   }
   if (request.method !== "POST") return apiError("Ruta no encontrada.", 404);
 
@@ -1361,10 +1959,17 @@ async function internalGarmentOperation(
     sourceKey,
   ).run();
 
-  const enabled = Boolean(env.OPENAI_API_KEY && env.WARDROBE_MEDIA);
+  const enabled = processingEnabled(env);
   const job = await createProcessingJob(env.DB, identity.id, garmentId, enabled, quality);
   if (enabled) {
-    ctx.waitUntil(processGarment(env, env.DB, identity.id, garmentId, job.id, quality, presentation, outputVariant));
+    await enqueueGarmentJob(env, {
+      ownerId: identity.id,
+      garmentId,
+      jobId: job.id,
+      quality,
+      presentation,
+      outputVariant,
+    });
   }
   return json({ clientId, quality, presentation, outputVariant, job }, 202);
 }
@@ -1404,7 +2009,7 @@ async function createGarmentBatch(
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El procesamiento todavía no está conectado.", 503);
   const body = await request.json().catch(() => null) as { garmentIds?: unknown } | null;
   const garmentIds = Array.isArray(body?.garmentIds)
-    ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))].slice(0, MAX_BATCH_GARMENTS)
+    ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))]
     : [];
   if (garmentIds.length < 2) return apiError("El lote necesita al menos dos prendas.", 400);
 
@@ -1429,13 +2034,9 @@ async function createGarmentBatch(
         WHERE garment_id = ? AND owner_id = ? AND output_variant = 'closed' AND status = 'batch_staged'
         ORDER BY created_at DESC LIMIT 1
       `).bind(garment.id, identity.id).first<{ id: string }>();
-      if (!closedJob) closedJob = await createProcessingJob(db, identity.id, garment.id, true, "low", "closed", "closed", "batch");
-      batchItems.push({ garment, job: { id: closedJob.id, quality: "low", presentation: "closed", outputVariant: "closed" }, fileId });
-
-      if (garment.category === "Outerwear") {
-        const openJob = await createProcessingJob(db, identity.id, garment.id, true, "low", "open", "open", "batch");
-        batchItems.push({ garment, job: { id: openJob.id, quality: "low", presentation: "open", outputVariant: "open" }, fileId });
-      }
+      const presentation: GarmentPresentation = garment.category === "Outerwear" || garment.category === "Tops" ? "open" : "closed";
+      if (!closedJob) closedJob = await createProcessingJob(db, identity.id, garment.id, true, "low", presentation, "closed", "batch");
+      batchItems.push({ garment, job: { id: closedJob.id, quality: "low", presentation, outputVariant: "closed" }, fileId });
     }
     if (batchItems.length < 2) throw new Error("No encontramos suficientes prendas válidas para el lote.");
 
@@ -1482,7 +2083,14 @@ async function createGarmentBatch(
     for (const { garment, job } of batchItems) {
       await db.prepare("UPDATE processing_jobs SET status = 'queued', mode = 'immediate', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
         .bind(job.id, identity.id).run();
-      ctx.waitUntil(processGarment(env, db, identity.id, garment.id, job.id, job.quality, job.presentation, job.outputVariant));
+      await enqueueGarmentJob(env, {
+        ownerId: identity.id,
+        garmentId: garment.id,
+        jobId: job.id,
+        quality: job.quality,
+        presentation: job.presentation,
+        outputVariant: job.outputVariant,
+      });
     }
     return json({ fallback: "immediate", message: error instanceof Error ? error.message : "El lote pasó al flujo inmediato." }, 202);
   }
@@ -1518,9 +2126,15 @@ async function reconcileGarmentBatches(
         try { item = JSON.parse(line) as typeof item; } catch { continue; }
         if (!item.custom_id) continue;
         const job = await db.prepare(`
-          SELECT id, garment_id, quality, output_variant FROM processing_jobs
+          SELECT id, garment_id, quality, presentation, output_variant FROM processing_jobs
           WHERE id = ? AND owner_id = ? AND batch_id = ? AND status = 'batch_processing' LIMIT 1
-        `).bind(item.custom_id, identity.id, batchId).first<{ id: string; garment_id: string; quality: string; output_variant: string }>();
+        `).bind(item.custom_id, identity.id, batchId).first<{
+          id: string;
+          garment_id: string;
+          quality: string;
+          presentation: string;
+          output_variant: string;
+        }>();
         if (!job) continue;
         const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ? LIMIT 1`)
           .bind(job.garment_id, identity.id).first<GarmentRow>();
@@ -1540,35 +2154,31 @@ async function reconcileGarmentBatches(
           httpMetadata: { contentType: "image/png" },
           customMetadata: { owner: identity.id, garment: garment.client_id, kind: `generated-${outputVariant}` },
         });
-        const processingKey = garment.processing_image_key || garment.source_image_key;
-        const source = processingKey ? await env.WARDROBE_MEDIA.get(processingKey) : null;
-        const visualQa = source
-          ? await reviewGeneratedGarment(env, garment, await source.arrayBuffer(), source.httpMetadata?.contentType || "image/jpeg", generated)
-          : { passed: false, score: 0, notes: "La imagen original no está disponible para el control visual." };
-        if (!visualQa.passed) {
-          await env.WARDROBE_MEDIA.delete(generatedKey);
-          const retryJob = await createProcessingJob(db, identity.id, garment.id, true, quality, outputVariant === "open" ? "open" : "closed", outputVariant);
-          await db.batch([
-            db.prepare("UPDATE processing_jobs SET status = 'retrying', error = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-              .bind(visualQa.notes, job.id, identity.id),
-            db.prepare("UPDATE processing_jobs SET attempt = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-              .bind(retryJob.id, identity.id),
-          ]);
-          await syncIntakeItem(db, garment.id, "processing", "Reintentando el control visual.");
-          ctx.waitUntil(processGarment(env, db, identity.id, garment.id, retryJob.id, quality, outputVariant === "open" ? "open" : "closed", outputVariant));
-          continue;
-        }
-        const updateGarment = outputVariant === "open"
-          ? db.prepare("UPDATE garments SET generated_open_image_key = ?, status = 'cutout_pending', quality = ?, qa_status = 'passed', revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-            .bind(generatedKey, quality, garment.id, identity.id)
-          : db.prepare("UPDATE garments SET generated_image_key = ?, status = 'cutout_pending', quality = ?, qa_status = 'passed', revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
-            .bind(generatedKey, quality, garment.id, identity.id);
         await db.batch([
-          updateGarment,
-          db.prepare("UPDATE processing_jobs SET status = 'awaiting_cutout', updated_at = CURRENT_TIMESTAMP, error = NULL WHERE id = ? AND owner_id = ?")
+          db.prepare(`
+            UPDATE garments
+            SET status = 'processing', qa_status = 'pending', qa_notes = 'Ejecutando control automático.',
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND owner_id = ?
+          `).bind(garment.id, identity.id),
+          db.prepare(`
+            UPDATE processing_jobs
+            SET status = 'queued', attempt = MAX(attempt, 1), updated_at = CURRENT_TIMESTAMP, error = NULL
+            WHERE id = ? AND owner_id = ?
+          `)
             .bind(job.id, identity.id),
         ]);
         await syncIntakeItem(db, garment.id, "processing");
+        await enqueueGarmentJob(env, {
+          ownerId: identity.id,
+          garmentId: garment.id,
+          jobId: job.id,
+          quality,
+          presentation: garmentPresentation(job.presentation),
+          outputVariant,
+          stage: "postprocess",
+          generatedKey,
+        });
       }
       await db.prepare(`
         UPDATE processing_jobs SET status = 'failed', error = 'No se recibió una imagen para esta solicitud.', finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -2159,7 +2769,7 @@ export async function handleWardrobeApi(
     const statusMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/status$/);
     if (statusMatch && request.method === "GET") {
       const clientId = safeClientId(decodeURIComponent(statusMatch[1]));
-      return clientId ? garmentStatus(db, identity.id, clientId) : apiError("Ruta inválida.", 400);
+      return clientId ? garmentStatus(env, db, identity.id, clientId) : apiError("Ruta inválida.", 400);
     }
 
     const retryMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/retry$/);

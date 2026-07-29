@@ -10,6 +10,10 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "deploy": "vinext deploy",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "garments:prepare": "node scripts/garment-fast-batch.mjs prepare",
+    "garments:release": "node scripts/garment-fast-batch.mjs release",
+    "admin:build-data": "node scripts/build-admin-generation-data.mjs",
+    "admin:sync-live": "node scripts/sync-admin-live-jobs.mjs && node scripts/build-admin-generation-data.mjs",
     "validate:garments": "node scripts/validate-garments.mjs",
     "test": "npm run validate:garments && npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
@@ -17,6 +21,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply forme-gallery --remote"
   },
   "dependencies": {
+    "@jsquash/png": "^3.1.1",
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",
