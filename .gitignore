@@ -36,8 +36,29 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+tsconfig.tsbuildinfo
 /dist/
 /.wrangler/
 /outputs/
 /work/
 /tmp/
+/archive/
+/design/
+/app/admin/generation-data.ts
+/public/admin-assets/
+/public/wardrobe/normalized/
+/public/wardrobe/*.mp4
+/scripts/build-admin-generation-data.mjs
+/scripts/sync-admin-live-jobs.mjs
+/public/_nuxt/about.forme-f*.js
+!/public/_nuxt/about.forme-f18.js
+/public/_nuxt/stickerPhysics.forme*.js
+/public/models/*
+!/public/models/forme_F_web.glb
+/public/forme-social-*.gif
+!/public/forme-social-instagram-v1.gif
+/public/onboarding/revisar-estilos.html
+/public/onboarding/style-history/
+/public/onboarding/style-people/
+/public/onboarding/style-test/
+/public/style-calibration/

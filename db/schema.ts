@@ -78,6 +78,8 @@ export const processingJobs = sqliteTable("processing_jobs", {
   mode: text("mode").notNull().default("immediate"),
   batchId: text("batch_id"),
   openaiFileId: text("openai_file_id"),
+  prompt: text("prompt"),
+  providerRequestId: text("provider_request_id"),
   error: text("error"),
   startedAt: text("started_at"),
   finishedAt: text("finished_at"),

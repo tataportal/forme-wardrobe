@@ -1,5 +1,8 @@
 {
   "version": "forme-garment-v1",
+  "catalog": {
+    "expectedPrincipalCount": 220
+  },
   "asset": {
     "format": "webp",
     "width": 1024,

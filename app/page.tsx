@@ -1,10 +1,5 @@
-import { FormeLanding } from "./forme-landing";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return (
-    <>
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <FormeLanding />
-    </>
-  );
+  redirect("/about");
 }

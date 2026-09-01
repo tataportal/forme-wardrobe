@@ -1,0 +1,4 @@
+wrangler.json
+.dev.vars
+wardrobe/*.mp4
+.DS_Store

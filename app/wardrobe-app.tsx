@@ -269,7 +269,6 @@ const demoWeekStorageKey = "forme-demo-week-v1";
 const sessionProfileStorageKey = "forme-session-profile-v1";
 const sessionProfileMaxAge = 12 * 60 * 60 * 1000;
 const currentOutfitId = "current-look";
-const maxBatchFiles = 15;
 const discountedBatchThreshold = 5;
 const maxUploadBytes = 20 * 1024 * 1024;
 const uploadStatusLabels: Record<UploadStatus, string> = {
@@ -679,9 +678,7 @@ function AttributeFilters({ value, options, compact = false, onChange, onReset }
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const asset = (path: string) => `${basePath}${path}`;
 const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
-const cleanCanvasImage = (path: string) => path.startsWith("/wardrobe/cutouts/")
-  ? path.replace("/wardrobe/cutouts/", "/wardrobe/clean/")
-  : path;
+const cleanCanvasImage = (path: string) => path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
 
@@ -827,6 +824,8 @@ const layerBase = (category: Garment["category"]) => {
   if (category === "Footwear") return 4000;
   return 5000;
 };
+const upperBodyAnchor = { x: 50, y: 34 } as const;
+const lowerBodyAnchor = { x: 50, y: 61.5 } as const;
 const defaultPlacement = (garment: Garment) => {
   if (garment.category === "Footwear") return { x: 50, y: 86, scale: 0.34 };
   if (garment.category === "Accessories") {
@@ -836,7 +835,7 @@ const defaultPlacement = (garment: Garment) => {
   }
   if (garment.category === "Bottoms") {
     const scale = garment.silhouette === "Oversized" ? 0.55 : garment.silhouette === "Relaxed" ? 0.57 : 0.59;
-    return { x: 50, y: 61.5, scale };
+    return { ...lowerBodyAnchor, scale };
   }
   if (garment.category === "Tops") {
     const scale = garment.silhouette === "Oversized"
@@ -846,17 +845,17 @@ const defaultPlacement = (garment: Garment) => {
         : garment.silhouette === "Relaxed"
           ? 0.46
           : 0.48;
-    return { x: 50, y: garment.silhouette === "Longline" ? 35.5 : 34, scale };
+    return { ...upperBodyAnchor, scale };
   }
-  const outerPreset: Record<string, { y: number; scale: number }> = {
-    Cropped: { y: 32.75, scale: 0.56 },
-    Longline: { y: 39, scale: 0.46 },
-    Oversized: { y: 36.25, scale: 0.49 },
-    Draped: { y: 36.75, scale: 0.49 },
-    Relaxed: { y: 34.75, scale: 0.51 },
-    Regular: { y: 34.25, scale: 0.52 },
+  const outerScale: Record<string, number> = {
+    Cropped: 0.56,
+    Longline: 0.46,
+    Oversized: 0.49,
+    Draped: 0.49,
+    Relaxed: 0.51,
+    Regular: 0.52,
   };
-  return { x: 50, ...(outerPreset[garment.silhouette] ?? outerPreset.Regular) };
+  return { ...upperBodyAnchor, scale: outerScale[garment.silhouette] ?? outerScale.Regular };
 };
 
 const roundedScale = (scale: number) => Math.round(scale * 1000) / 1000;
@@ -866,10 +865,10 @@ function recommendationOuterPlacement(garment: Garment) {
   const searchable = searchableGarment(garment);
 
   if (/funnel-neck cape|cape coat|poncho/.test(searchable)) {
-    return { ...placement, y: placement.y - 1, scale: roundedScale(placement.scale * 1.18) };
+    return { ...placement, scale: roundedScale(placement.scale * 1.18) };
   }
   if (/puffer/.test(searchable)) {
-    return { ...placement, y: placement.y - 1, scale: roundedScale(placement.scale * 1.12) };
+    return { ...placement, scale: roundedScale(placement.scale * 1.12) };
   }
   return placement;
 }
@@ -879,10 +878,10 @@ function recommendationTopPlacement(top: Garment, outer: Garment) {
   const outerText = searchableGarment(outer);
 
   if (/funnel-neck cape|cape coat|poncho/.test(outerText)) {
-    return { ...placement, y: placement.y + 0.75, scale: roundedScale(placement.scale * 0.88) };
+    return { ...placement, scale: roundedScale(placement.scale * 0.88) };
   }
   if (/puffer/.test(outerText)) {
-    return { ...placement, y: placement.y + 0.5, scale: roundedScale(placement.scale * 0.92) };
+    return { ...placement, scale: roundedScale(placement.scale * 0.92) };
   }
   return placement;
 }
@@ -894,25 +893,35 @@ function normalizedCanvasPiece(piece: CanvasPiece, garment?: Garment): CanvasPie
     next = { ...next, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
   }
   if (Math.abs(piece.rotation) > 0.01) return next;
-  if (garment.category === "Bottoms" && Math.abs(piece.y - 66.5) < 0.05) return { ...next, y: 61.5 };
-  if (garment.category === "Tops" && Math.abs(piece.y - 31.5) < 0.05) return { ...next, y: 34 };
+  if (garment.category === "Bottoms" && Math.abs(piece.x - lowerBodyAnchor.x) < 0.05 && Math.abs(piece.y - 66.5) < 0.05) {
+    return { ...next, ...lowerBodyAnchor };
+  }
+  if (garment.category === "Tops") {
+    const previousY = garment.silhouette === "Longline" ? 35.5 : 34;
+    if (Math.abs(piece.x - upperBodyAnchor.x) < 0.05 && (Math.abs(piece.y - 31.5) < 0.05 || Math.abs(piece.y - previousY) < 0.05)) {
+      return { ...next, ...upperBodyAnchor };
+    }
+  }
   if (garment.category === "Footwear" && Math.abs(piece.y - 87) < 0.05) return { ...next, y: 86 };
   if (garment.category === "Outerwear" || garment.category === "Tailoring") {
     const legacyY: Record<string, number> = { Cropped: 30.5, Longline: 38, Oversized: 34, Draped: 34.5, Relaxed: 32.5, Regular: 32 };
-    const oldY = legacyY[garment.silhouette] ?? legacyY.Regular;
-    if (Math.abs(piece.y - oldY) < 0.05) return { ...next, y: defaultPlacement(garment).y };
+    const previousY: Record<string, number> = { Cropped: 32.75, Longline: 39, Oversized: 36.25, Draped: 36.75, Relaxed: 34.75, Regular: 34.25 };
+    const knownDefaultY = [legacyY[garment.silhouette] ?? legacyY.Regular, previousY[garment.silhouette] ?? previousY.Regular];
+    if (Math.abs(piece.x - upperBodyAnchor.x) < 0.05 && knownDefaultY.some((y) => Math.abs(piece.y - y) < 0.05)) {
+      return { ...next, ...upperBodyAnchor };
+    }
   }
   return next;
 }
 
 const initialCanvas: CanvasPiece[] = [
-  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 61.5, scale: 0.59, rotation: 0, z: 1001 },
+  { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", ...lowerBodyAnchor, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
-  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 34.75, scale: 0.51, rotation: 0, z: 3001 },
+  { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 34, scale: 0.51, rotation: 0, z: 3001 },
 ];
 
 const initialDemoCanvas: CanvasPiece[] = [
-  { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", x: 50, y: 61.5, scale: 0.59, rotation: 0, z: 1001 },
+  { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", ...lowerBodyAnchor, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "demo-top", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
   { instanceId: "demo-shoes", garmentId: "footwear-white-sneakers", variant: "closed", x: 50, y: 86, scale: 0.34, rotation: 0, z: 4001 },
   { instanceId: "demo-glasses", garmentId: "accessory-black-sunglasses", variant: "closed", x: 50, y: 17.5, scale: 0.14, rotation: 0, z: 5001 },
@@ -2621,8 +2630,7 @@ export function WardrobeApp({
     if (!incoming.length) return;
     const existing = new Set(uploadItems.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const images = incoming.filter((item) => item.type.startsWith("image/") && item.size <= maxUploadBytes && !existing.has(`${item.name}:${item.size}:${item.lastModified}`));
-    const remaining = Math.max(0, maxBatchFiles - uploadItems.length);
-    const accepted = images.slice(0, remaining).map<UploadItem>((next) => ({
+    const accepted = images.map<UploadItem>((next) => ({
       id: crypto.randomUUID(),
       file: next,
       preview: URL.createObjectURL(next),
@@ -2638,11 +2646,9 @@ export function WardrobeApp({
 
     const oversized = incoming.filter((item) => item.type.startsWith("image/") && item.size > maxUploadBytes).length;
     const invalid = incoming.filter((item) => !item.type.startsWith("image/")).length;
-    const overflow = Math.max(0, images.length - remaining);
     const notices = [
       oversized ? `${oversized} ${oversized === 1 ? "foto supera" : "fotos superan"} 20 MB` : "",
       invalid ? `${invalid} ${invalid === 1 ? "archivo no es una imagen" : "archivos no son imágenes"}` : "",
-      overflow ? `puedes subir hasta ${maxBatchFiles} prendas a la vez` : "",
     ].filter(Boolean);
     setUploadError(notices.join(" · "));
   }
@@ -2839,16 +2845,29 @@ export function WardrobeApp({
   }
 
   function addToCanvas(garmentId: string) {
-    const existing = canvasPieces.find((item) => item.garmentId === garmentId);
-    if (existing) {
-      setSelectedId(existing.instanceId);
+    const garment = garmentById.get(garmentId);
+    if (!garment) return;
+    const selectedPiece = selectedId ? canvasPieces.find((item) => item.instanceId === selectedId) : undefined;
+    const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
+
+    if (selectedPiece && selectedGarment && layerBase(selectedGarment.category) === layerBase(garment.category)) {
+      const previousPlacement = defaultPlacement(selectedGarment);
+      const nextPlacement = defaultPlacement(garment);
+      const relativeScale = selectedPiece.scale / previousPlacement.scale;
+      setCanvasPieces((items) => items.map((item) => item.instanceId === selectedPiece.instanceId
+        ? {
+            ...item,
+            garmentId,
+            variant: garment.openImage ? "open" : "closed",
+            scale: clamp(roundedScale(nextPlacement.scale * relativeScale), 0.08, 1.35),
+          }
+        : item));
+      setSelectedId(selectedPiece.instanceId);
       setSelectedGroupIds([]);
-      bringToFront(existing.instanceId);
       setSaved(false);
       return;
     }
-    const garment = garmentById.get(garmentId);
-    if (!garment) return;
+
     const instanceId = crypto.randomUUID();
     const placement = defaultPlacement(garment);
     setCanvasPieces((items) => {
@@ -3994,8 +4013,8 @@ export function WardrobeApp({
                   <input ref={fileInput} type="file" accept="image/*" multiple disabled={Boolean(uploadIntakeBatchId)} onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFiles(event.target.files ?? undefined)} hidden />
                   {uploadItems.length > 0
                     ? <div className="upload-preview-grid">{uploadItems.map((item) => <img src={item.preview} alt="" key={item.id} />)}</div>
-                    : <div className="dropzone-empty"><span className="upload-icon" aria-hidden="true">↑</span><h3>Arrastra tus fotos aquí</h3><p>o toca para seleccionar</p><small>HASTA {maxBatchFiles} PRENDAS · 20 MB C/U</small></div>}
-                  {uploadItems.length > 0 && !uploadingBatch && !uploadIntakeBatchId && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length}/{maxBatchFiles}</span>}
+                    : <div className="dropzone-empty"><span className="upload-icon" aria-hidden="true">↑</span><h3>Arrastra tus fotos aquí</h3><p>o toca para seleccionar</p><small>20 MB POR PRENDA · LOS LOTES SE PROCESAN EN PARALELO</small></div>}
+                  {uploadItems.length > 0 && !uploadingBatch && !uploadIntakeBatchId && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length} EN EL LOTE</span>}
                 </label>
                 <div className="intake-panel bulk-intake">
                   <div className="batch-heading"><span>TUS FOTOS</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>

@@ -17,6 +17,13 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "dist/**",
+    "public/**",
+    "archive/**",
+    "design/**",
+    "tmp/**",
+    "app/admin/generation-data.ts",
+    "tsconfig.tsbuildinfo",
     "next-env.d.ts",
   ]),
 ]);

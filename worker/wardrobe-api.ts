@@ -1416,6 +1416,13 @@ async function processGarment(
     const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ? LIMIT 1`)
       .bind(garmentId, ownerId)
       .first<GarmentRow>();
+    if (!garment) throw new Error("La prenda no está disponible.");
+    const prompt = ghostPrompt(garment, presentation);
+    await db.prepare(`
+      UPDATE processing_jobs
+      SET prompt = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND owner_id = ?
+    `).bind(prompt, jobId, ownerId).run();
     const processingKey = garment?.processing_image_key || garment?.source_image_key;
     if (!processingKey) throw new Error("La imagen original no está disponible.");
     const source = await env.WARDROBE_MEDIA.get(processingKey);
@@ -1427,7 +1434,7 @@ async function processGarment(
     const form = new FormData();
     form.append("model", env.OPENAI_IMAGE_MODEL || "gpt-image-2");
     form.append("image[]", new File([sourceBytes], filename, { type: contentType }));
-    form.append("prompt", ghostPrompt(garment, presentation));
+    form.append("prompt", prompt);
     form.append("size", "1024x1280");
     form.append("quality", quality);
     form.append("output_format", "png");
@@ -1440,6 +1447,14 @@ async function processGarment(
         body: form,
         signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
       });
+      const providerRequestId = response.headers.get("x-request-id");
+      if (providerRequestId) {
+        await db.prepare(`
+          UPDATE processing_jobs
+          SET provider_request_id = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ?
+        `).bind(providerRequestId, jobId, ownerId).run();
+      }
     } catch (error) {
       throw new RetryableProcessingError(
         error instanceof Error && error.name === "TimeoutError"
@@ -2070,9 +2085,10 @@ async function createGarmentBatch(
     if (!response.ok || !result.id) throw new Error(result.error?.message || `El lote respondió con ${response.status}.`);
     await db.batch(batchItems.flatMap(({ garment, job, fileId }) => [
       db.prepare(`
-        UPDATE processing_jobs SET status = 'batch_processing', batch_id = ?, openai_file_id = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE processing_jobs SET status = 'batch_processing', batch_id = ?, openai_file_id = ?,
+          prompt = ?, provider_request_id = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(result.id, fileId, job.id, identity.id),
+      `).bind(result.id, fileId, ghostPrompt(garment, job.presentation), result.id, job.id, identity.id),
       db.prepare("UPDATE garments SET status = 'batch_processing', quality = 'low', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
         .bind(garment.id, identity.id),
     ]));

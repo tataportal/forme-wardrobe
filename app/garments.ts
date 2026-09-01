@@ -69,7 +69,7 @@ type ArchiveEntry = Omit<Garment, "id" | "image" | "openImage" | "status" | keyo
   openFile?: string;
 };
 
-type BasicEntry = Omit<Garment, keyof GarmentAttributes>;
+type BasicEntry = Omit<Garment, "image" | keyof GarmentAttributes>;
 
 const washedBlack = /Essentials|Open-Knit|Draped Black Shirt|Oversized Black Tee|Washed Black Jeans/i;
 const pitchBlack = /Peacoat|Trench|Cape|Poncho|Blazer|Wide-Leg/i;
@@ -84,9 +84,13 @@ function colorAttributes(color: string, name: string): Pick<GarmentAttributes, "
   if (/cream/i.test(color)) return { colorFamily: "White", tone: "Cream" };
   if (/white/i.test(color)) return { colorFamily: "White", tone: "Optic white" };
   if (/brown/i.test(color)) return { colorFamily: "Brown", tone: /shearling/i.test(name) ? "Dark brown" : "Brown" };
-  if (/camel|tan/i.test(color)) return { colorFamily: "Brown", tone: "Tan / camel" };
+  if (/camel|tan|taupe|chocolate/i.test(color)) return { colorFamily: "Brown", tone: "Tan / camel" };
+  if (/burgundy/i.test(color)) return { colorFamily: "Red / orange", tone: "Burgundy" };
+  if (/blush/i.test(color)) return { colorFamily: "Pink", tone: "Blush" };
+  if (/butter|yellow/i.test(color)) return { colorFamily: "Yellow", tone: "Butter yellow" };
+  if (/charcoal|silver|grey|gray/i.test(color)) return { colorFamily: "Grey", tone: color };
   if (/navy/i.test(color)) return { colorFamily: "Blue", tone: "Navy" };
-  if (/light blue/i.test(color)) return { colorFamily: "Blue", tone: "Light blue" };
+  if (/light blue|pale blue/i.test(color)) return { colorFamily: "Blue", tone: "Light blue" };
   if (/denim|indigo/i.test(color)) return { colorFamily: "Blue", tone: "Denim blue" };
   if (/blue/i.test(color)) return { colorFamily: "Blue", tone: /embroidered/i.test(name) ? "Navy" : "Denim blue" };
   if (/sage/i.test(color)) return { colorFamily: "Green", tone: "Sage" };
@@ -233,45 +237,116 @@ const archive: ArchiveEntry[] = [
 ];
 
 const basics: BasicEntry[] = [
-  { id: "bottom-blue-jeans", name: "Classic Straight Jeans", category: "Bottoms", color: "Indigo", image: "/wardrobe/clean/blue-straight-jeans.webp", status: "ghosted", favorite: true },
-  { id: "bottom-black-jeans", name: "Washed Black Jeans", category: "Bottoms", color: "Washed Black", image: "/wardrobe/clean/washed-black-jeans.webp", status: "ghosted" },
-  { id: "bottom-black-trouser", name: "Wide-Leg Trousers", category: "Bottoms", color: "Black", image: "/wardrobe/clean/black-wide-trousers.webp", status: "ghosted" },
-  { id: "bottom-stone-chino", name: "Pleated Chinos", category: "Bottoms", color: "Stone", image: "/wardrobe/clean/stone-pleated-chinos.webp", status: "ghosted" },
-  { id: "top-basic-white-tee", name: "Basic White Tee", category: "Tops", color: "White", image: "/wardrobe/clean/basic-white-tee.webp", status: "ghosted" },
-  { id: "top-oversized-black-tee", name: "Oversized Black Tee", category: "Tops", color: "Black", image: "/wardrobe/clean/oversized-black-tee.webp", status: "ghosted" },
-  { id: "top-blue-long-sleeve-shirt", name: "Blue Long-Sleeve Shirt", category: "Tops", color: "Light Blue", image: "/wardrobe/clean/blue-long-sleeve-shirt.webp", status: "ghosted" },
-  { id: "top-black-short-sleeve-shirt", name: "Black Short-Sleeve Shirt", category: "Tops", color: "Black", image: "/wardrobe/clean/black-short-sleeve-shirt.webp", status: "ghosted" },
-  { id: "footwear-white-sneakers", name: "White Leather Sneakers", category: "Footwear", color: "White", image: "/wardrobe/basics/white-sneakers.webp", status: "ghosted" },
-  { id: "footwear-black-leather-shoes", name: "Black Leather Shoes", category: "Footwear", color: "Black", image: "/wardrobe/basics/black-leather-shoes.webp", status: "ghosted" },
-  { id: "footwear-brown-leather-shoes", name: "Brown Leather Shoes", category: "Footwear", color: "Brown", image: "/wardrobe/basics/brown-leather-shoes.webp", status: "ghosted" },
-  { id: "footwear-black-pumps", name: "Black Pumps", category: "Footwear", color: "Black", image: "/wardrobe/basics/black-pumps.webp", status: "ghosted" },
-  { id: "accessory-black-cap", name: "Black Cap", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-cap.webp", status: "ghosted" },
-  { id: "accessory-black-beanie", name: "Black Beanie", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-beanie.webp", status: "ghosted" },
-  { id: "accessory-black-sunglasses", name: "Black Rectangular Sunglasses", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-sunglasses.webp", status: "ghosted" },
-  { id: "accessory-black-tote", name: "Black Tote", category: "Accessories", color: "Black", image: "/wardrobe/basics/black-tote.webp", status: "ghosted" },
+  { id: "bottom-blue-jeans", name: "Classic Straight Jeans", category: "Bottoms", color: "Indigo", status: "ghosted", favorite: true },
+  { id: "bottom-black-jeans", name: "Washed Black Jeans", category: "Bottoms", color: "Washed Black", status: "ghosted" },
+  { id: "bottom-black-trouser", name: "Wide-Leg Trousers", category: "Bottoms", color: "Black", status: "ghosted" },
+  { id: "bottom-stone-chino", name: "Pleated Chinos", category: "Bottoms", color: "Stone", status: "ghosted" },
+  { id: "top-basic-white-tee", name: "Basic White Tee", category: "Tops", color: "White", status: "ghosted" },
+  { id: "top-oversized-black-tee", name: "Oversized Black Tee", category: "Tops", color: "Black", status: "ghosted" },
+  { id: "top-blue-long-sleeve-shirt", name: "Blue Long-Sleeve Shirt", category: "Tops", color: "Light Blue", status: "ghosted" },
+  { id: "top-black-short-sleeve-shirt", name: "Black Short-Sleeve Shirt", category: "Tops", color: "Black", status: "ghosted" },
+  { id: "footwear-white-sneakers", name: "White Leather Sneakers", category: "Footwear", color: "White", status: "ghosted" },
+  { id: "footwear-black-leather-shoes", name: "Black Leather Shoes", category: "Footwear", color: "Black", status: "ghosted" },
+  { id: "footwear-brown-leather-shoes", name: "Brown Leather Shoes", category: "Footwear", color: "Brown", status: "ghosted" },
+  { id: "footwear-black-pumps", name: "Black Pumps", category: "Footwear", color: "Black", status: "ghosted" },
+  { id: "accessory-black-cap", name: "Black Cap", category: "Accessories", color: "Black", status: "ghosted" },
+  { id: "accessory-black-beanie", name: "Black Beanie", category: "Accessories", color: "Black", status: "ghosted" },
+  { id: "accessory-black-sunglasses", name: "Black Rectangular Sunglasses", category: "Accessories", color: "Black", status: "ghosted" },
+  { id: "accessory-black-tote", name: "Black Tote", category: "Accessories", color: "Black", status: "ghosted" },
 ];
 
-export const formeBasics: Garment[] = basics.map((item) => ({
+const demoWomenBasics: BasicEntry[] = [
+  { id: "demo-w-001", name: "Chocolate Suede Bomber", category: "Outerwear", color: "Chocolate", status: "ready" },
+  { id: "demo-w-002", name: "Navy Technical Trench", category: "Outerwear", color: "Navy", status: "ready" },
+  { id: "demo-w-003", name: "Cream Boucle Jacket", category: "Outerwear", color: "Cream", status: "ready" },
+  { id: "demo-w-004", name: "Burgundy Moto Jacket", category: "Outerwear", color: "Burgundy", status: "ready" },
+  { id: "demo-w-005", name: "Pale Blue Denim Jacket", category: "Outerwear", color: "Pale Blue", status: "ready" },
+  { id: "demo-w-006", name: "Black Tailored Coat", category: "Outerwear", color: "Black", status: "ready" },
+  { id: "demo-w-007", name: "Sage Utility Jacket", category: "Outerwear", color: "Sage", status: "ready" },
+  { id: "demo-w-008", name: "Charcoal Cropped Puffer", category: "Outerwear", color: "Charcoal", status: "ready" },
+  { id: "demo-w-009", name: "Camel Belted Trench", category: "Outerwear", color: "Camel", status: "ready" },
+  { id: "demo-w-010", name: "Silver Grey Windbreaker", category: "Outerwear", color: "Silver Grey", status: "ready" },
+  { id: "demo-w-011", name: "White Baby Tee", category: "Tops", color: "White", status: "ready" },
+  { id: "demo-w-012", name: "Burgundy Ribbed Baby Tee", category: "Tops", color: "Burgundy", status: "ready" },
+  { id: "demo-w-013", name: "Pale Blue Poplin Shirt", category: "Tops", color: "Pale Blue", status: "ready" },
+  { id: "demo-w-014", name: "Ivory Draped Blouse", category: "Tops", color: "Ivory", status: "ready" },
+  { id: "demo-w-015", name: "Black Asymmetrical Top", category: "Tops", color: "Black", status: "ready" },
+  { id: "demo-w-016", name: "Chocolate Knit Polo", category: "Tops", color: "Chocolate", status: "ready" },
+  { id: "demo-w-017", name: "Blush Satin Camisole", category: "Tops", color: "Blush", status: "ready" },
+  { id: "demo-w-018", name: "Navy Striped Fitted Tee", category: "Tops", color: "Navy / Cream", status: "ready" },
+  { id: "demo-w-019", name: "Soft Grey Long Sleeve Top", category: "Tops", color: "Soft Grey", status: "ready" },
+  { id: "demo-w-020", name: "Butter Yellow Cropped Cardigan", category: "Tops", color: "Butter Yellow", status: "ready" },
+  { id: "demo-w-021", name: "Dark Indigo Straight Jeans", category: "Bottoms", color: "Indigo", status: "ready" },
+  { id: "demo-w-022", name: "Washed Blue Wide Leg Jeans", category: "Bottoms", color: "Denim", status: "ready" },
+  { id: "demo-w-023", name: "Charcoal Tailored Trousers", category: "Bottoms", color: "Charcoal", status: "ready" },
+  { id: "demo-w-024", name: "Cream Pleated Trousers", category: "Bottoms", color: "Cream", status: "ready" },
+  { id: "demo-w-025", name: "Black Satin Midi Skirt", category: "Bottoms", color: "Black", status: "ready" },
+  { id: "demo-w-026", name: "Burgundy Mini Skirt", category: "Bottoms", color: "Burgundy", status: "ready" },
+  { id: "demo-w-027", name: "Chocolate Leather Skirt", category: "Bottoms", color: "Chocolate", status: "ready" },
+  { id: "demo-w-028", name: "Navy Culottes", category: "Bottoms", color: "Navy", status: "ready" },
+  { id: "demo-w-029", name: "Pale Blue Denim Mini Skirt", category: "Bottoms", color: "Pale Blue", status: "ready" },
+  { id: "demo-w-030", name: "Stone Cargo Maxi Skirt", category: "Bottoms", color: "Stone", status: "ready" },
+  { id: "demo-w-031", name: "White Low Top Sneakers", category: "Footwear", color: "White", status: "ready" },
+  { id: "demo-w-032", name: "Silver Retro Runners", category: "Footwear", color: "Silver Grey", status: "ready" },
+  { id: "demo-w-033", name: "Burgundy Mary Jane Flats", category: "Footwear", color: "Burgundy", status: "ready" },
+  { id: "demo-w-034", name: "Black Kitten Heels", category: "Footwear", color: "Black", status: "ready" },
+  { id: "demo-w-035", name: "Chocolate Ankle Boots", category: "Footwear", color: "Chocolate", status: "ready" },
+  { id: "demo-w-036", name: "Cream Platform Sandals", category: "Footwear", color: "Cream", status: "ready" },
+  { id: "demo-w-037", name: "Navy Slingback Heels", category: "Footwear", color: "Navy", status: "ready" },
+  { id: "demo-w-038", name: "Taupe Ballet Flats", category: "Footwear", color: "Taupe", status: "ready" },
+  { id: "demo-w-039", name: "Black Chunky Loafers", category: "Footwear", color: "Black", status: "ready" },
+  { id: "demo-w-040", name: "Pale Blue Sport Sandals", category: "Footwear", color: "Pale Blue", status: "ready" },
+  { id: "demo-w-041", name: "Black Rectangular Sunglasses", category: "Accessories", color: "Black", status: "ready" },
+  { id: "demo-w-042", name: "Tortoiseshell Oval Sunglasses", category: "Accessories", color: "Brown", status: "ready" },
+  { id: "demo-w-043", name: "Chocolate Shoulder Bag", category: "Accessories", color: "Chocolate", status: "ready" },
+  { id: "demo-w-044", name: "Burgundy Mini Handbag", category: "Accessories", color: "Burgundy", status: "ready" },
+  { id: "demo-w-045", name: "Cream Structured Tote", category: "Accessories", color: "Cream", status: "ready" },
+  { id: "demo-w-046", name: "Silver Mini Bag", category: "Accessories", color: "Silver", status: "ready" },
+  { id: "demo-w-047", name: "Navy Baseball Cap", category: "Accessories", color: "Navy", status: "ready" },
+  { id: "demo-w-048", name: "Camel Bucket Hat", category: "Accessories", color: "Camel", status: "ready" },
+  { id: "demo-w-049", name: "Black Slim Belt", category: "Accessories", color: "Black", status: "ready" },
+  { id: "demo-w-050", name: "Geometric Silk Neck Scarf", category: "Accessories", color: "Ivory / Pale Blue / Burgundy", status: "ready" },
+];
+
+const finalGarmentImage = (index: number, open = false) =>
+  `/wardrobe/final/${String(index + 1).padStart(7, "0")}${open ? "-c" : ""}.png`;
+
+const legacyFormeBasics: Garment[] = basics.map((item, index) => ({
   ...item,
   ...classifyGarment(item),
+  image: finalGarmentImage(154 + index),
   collection: "forme" as const,
 }));
+
+export const demoWomenGarments: Garment[] = demoWomenBasics.map((item, index) => ({
+  ...item,
+  ...classifyGarment(item),
+  image: finalGarmentImage(170 + index),
+  collection: "forme" as const,
+  qaStatus: "passed" as const,
+  tags: ["demo", "women", "20-25", "chroma-pipeline"],
+}));
+
+export const formeBasics: Garment[] = [
+  ...legacyFormeBasics,
+  ...demoWomenGarments,
+];
 
 export const starterGarments: Garment[] = [
   ...archive.map(({ file, openFile, ...item }, index) => ({
     ...item,
     ...classifyGarment(item),
     id: `archive-${String(index + 1).padStart(3, "0")}`,
-    image: `/wardrobe/clean/${file}`,
-    openImage: openFile ? `/wardrobe/clean/${openFile}` : undefined,
+    image: finalGarmentImage(index),
+    openImage: openFile ? finalGarmentImage(index, true) : undefined,
     status: "ghosted" as const,
     collection: "personal" as const,
   })),
-  ...importedGarments20260718.map((item) => ({
+  ...importedGarments20260718.map((item, index) => ({
     ...item,
     ...classifyGarment(item),
     id: `import-20260718-${item.file.slice(0, 3)}`,
-    image: `/wardrobe/imports/2026-07-18/${item.file}`,
+    image: finalGarmentImage(50 + index),
     status: item.status ?? "ghosted",
     collection: "personal" as const,
   })),

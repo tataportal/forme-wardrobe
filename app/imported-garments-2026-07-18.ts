@@ -77,7 +77,7 @@ export const importedGarments20260718: ImportedGarmentEntry[] = [
   { file: "062_DSC02009.webp", name: "Sandalias técnicas blancas", category: "Footwear", color: "White / Black" },
   { file: "063_DSC02011.webp", name: "Sneakers blancas y champagne", category: "Footwear", color: "White / Champagne", brand: "Nike" },
   { file: "064_DSC02013.webp", name: "Sneakers knit negras", category: "Footwear", color: "Black" },
-  { file: "065_DSC02015.webp", name: "Mules negras puntiagudas", category: "Footwear", color: "Black" },
+  { file: "065_DSC02015.webp", name: "Mules negras de espuma", category: "Footwear", color: "Black" },
   { file: "066_DSC02017.webp", name: "High-tops bronce y naranja", category: "Footwear", color: "Bronze / Orange", brand: "Nike" },
   { file: "067_DSC02019.webp", name: "Sneakers negras clásicas", category: "Footwear", color: "Black", brand: "Nike" },
   { file: "068_DSC02022.webp", name: "High-tops amarillas", category: "Footwear", color: "Yellow / Black" },

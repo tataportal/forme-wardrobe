@@ -18,7 +18,14 @@
   "assets": {
     "directory": "./dist/client",
     "not_found_handling": "none",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/forme-social-instagram-v1.gif",
+      "/admin",
+      "/admin/*",
+      "/admin-assets/*",
+      "/api/admin/*"
+    ]
   },
   "d1_databases": [
     {

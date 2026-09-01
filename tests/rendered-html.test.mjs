@@ -24,10 +24,9 @@ test("keeps the main product areas on stable routes", async () => {
 
   const about = await responses[0].text();
   const pricing = await responses[4].text();
-  assert.match(about, /Tu ropa ya/);
-  assert.match(about, /Digitaliza/);
-  assert.match(about, /Combina/);
-  assert.match(about, /Entiende/);
+  assert.match(about, /Formé® convierte tu closet/);
+  assert.match(about, /about\.forme-f18\.js/);
+  assert.match(about, /forme-social-instagram-v1\.gif/);
   assert.match(pricing, /Elige cuánto quieres guardar/);
 
   const [pricingSource, publicProfileSource, closetSource, looksSource, canvasSource, profileSource] = await Promise.all([
@@ -52,19 +51,19 @@ test("keeps the main product areas on stable routes", async () => {
   assert.doesNotMatch(`${closetSource}${looksSource}${canvasSource}${profileSource}`, /closetVariant/);
 });
 
-test("server-renders the FORMÉ brand entry and wardrobe", async () => {
+test("redirects the brand entry to About and server-renders the wardrobe", async () => {
   const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(homeSource, /["']use client["']|WardrobeApp/);
 
   const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "http://localhost/about");
 
-  const html = await response.text();
-  assert.match(html, /<title>FORMÉ \| Tu ropa, leída de nuevo<\/title>/i);
-  assert.match(html, /class="forme-landing"/);
-  assert.match(html, /Tu ropa ya/);
-  assert.match(html, /Abrir mi closet/);
+  const aboutResponse = await render("/about");
+  assert.equal(aboutResponse.status, 200);
+  const html = await aboutResponse.text();
+  assert.match(html, /<title>Formé®\. Closet digital y asistente de estilo\.<\/title>/i);
+  assert.match(html, /Formé® convierte tu closet/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 
   const closetResponse = await render("/closet");
@@ -348,17 +347,17 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(schema, /garmentType/);
 });
 
-test("ships the complete July closet import as usable garments", async () => {
+test("ships one sequential final wardrobe directory", async () => {
   const [catalog, manifest, files] = await Promise.all([
     readFile(new URL("../app/imported-garments-2026-07-18.ts", import.meta.url), "utf8"),
-    readFile(new URL("../public/wardrobe/imports/2026-07-18/audit/manifest-104.csv", import.meta.url), "utf8"),
-    readdir(new URL("../public/wardrobe/imports/2026-07-18", import.meta.url)),
+    readFile(new URL("../public/wardrobe/final/manifest.csv", import.meta.url), "utf8"),
+    readdir(new URL("../public/wardrobe/final", import.meta.url)),
   ]);
 
   assert.equal((catalog.match(/\{ file: "\d{3}_DSC\d+\.webp"/g) ?? []).length, 104);
-  assert.equal(files.filter((file) => /^\d{3}_DSC\d+\.webp$/.test(file)).length, 104);
-  assert.equal(manifest.trim().split("\n").length - 1, 104);
-  assert.doesNotMatch(manifest, /,faltante$|,rechazada$/m);
+  assert.equal(files.filter((file) => /^\d{7}\.png$/.test(file)).length, 220);
+  assert.equal(files.filter((file) => /^\d{7}-c\.png$/.test(file)).length, 42);
+  assert.equal(manifest.trim().split("\n").length - 1, 262);
   assert.match(catalog, /category: "Bottoms"/);
   assert.match(catalog, /category: "Tops"/);
   assert.match(catalog, /category: "Footwear"/);

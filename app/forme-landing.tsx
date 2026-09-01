@@ -28,7 +28,7 @@ export function FormeLanding() {
         >
           <img
             className="landing-garment landing-garment-main"
-            src={asset("/wardrobe/clean/015_DSC01797.webp")}
+            src={asset("/wardrobe/final/0000015.png")}
             alt="Blazer gráfico negro digitalizado en Formé"
             width="1024"
             height="1280"

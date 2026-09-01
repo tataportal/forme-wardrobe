@@ -8,6 +8,10 @@ const ABOUT_BUNDLE = new URL(
   "../public/_nuxt/about.a3e1edf1.js",
   import.meta.url,
 );
+const FORME_ABOUT_BUNDLE = new URL(
+  "../public/_nuxt/about.forme-f18.js",
+  import.meta.url,
+);
 const DEFAULT_BUNDLE = new URL(
   "../public/_nuxt/default.4cd10699.js",
   import.meta.url,
@@ -17,15 +21,31 @@ const SCENE_BUNDLE = new URL(
   import.meta.url,
 );
 const FORME_SCENE_BUNDLE = new URL(
-  "../public/_nuxt/stickerPhysics.forme-f13.js",
+  "../public/_nuxt/stickerPhysics.forme-f18.js",
   import.meta.url,
 );
+const COMPAT_SCENE_BUNDLES = [
+  new URL("../public/_nuxt/stickerPhysics.forme-f13.js", import.meta.url),
+  new URL("../public/_nuxt/stickerPhysics.forme-f15.js", import.meta.url),
+  FORME_SCENE_BUNDLE,
+];
 const ABOUT_HTML = new URL(
   "../public/savoir-exact/about/original-about.html",
   import.meta.url,
 );
 const FORME_MODEL_SOURCE = new URL("../../forme_F_3.glb", import.meta.url);
 const FORME_MODEL_PUBLIC = new URL("../public/models/forme_F_3.glb", import.meta.url);
+const FORME_MODEL_WEB = "/models/forme_F_web.glb?v=forme-f16";
+const FORME_SCENE_MODEL = "/models/star2-forme.glb?v=forme-f18";
+const SOCIAL_IMAGE_URL =
+  "https://forme.gallery/forme-social-instagram-v1.gif";
+const SOCIAL_IMAGE_URL_ESCAPED = SOCIAL_IMAGE_URL.replaceAll("/", "\\u002F");
+const LEGACY_SOCIAL_IMAGE_URL =
+  "https://images.prismic.io/savoir-faire/a9fc8a41-050a-4407-9b5a-a4b8b53489e7_SavoirFaire.gif?auto=compress,format";
+const LEGACY_SOCIAL_IMAGE_URL_ESCAPED = LEGACY_SOCIAL_IMAGE_URL.replaceAll(
+  "/",
+  "\\u002F",
+);
 
 const FORME_RED = "#ff0000";
 const FORME_RED_MUTED = "#a60000";
@@ -423,7 +443,7 @@ function writeUpdated(url, update) {
 const desktopCaptions = buildCaptions(48);
 const mobileCaptions = buildCaptions(25);
 const modelLoaderSetup =
-  'this.loader=new L0,this.loader.load("/models/star2.gltf",async n=>{this.gltf=n,this.logoGroup.add(this.gltf.scene),this.TO_SCALE=ja(window.innerWidth,this.screenMin,this.screenMax,.048,.1,!0),this.gltf.scene.scale.setScalar(this.TO_SCALE),this.gltf.scene.position.set(0,0,1),this.material=e(),this.gltf.scene.traverse(a=>{a.layers.set(qa.REFRACTION_DISABLE),a.isMesh&&(a.material=this.material,a.material.envMap=this.texture,a.material.envMapIntensity=2,a.renderOrder=10,a.material.needsUpdate=!0)}),this.gltf.scene.position.z+=15,new L0().load("/models/forme_F_3.glb",n=>{let a=null;n.scene.updateMatrixWorld(!0),n.scene.traverse(n=>{n.isMesh&&n.name==="F"&&(a=n)});const i=this.gltf.scene.getObjectByName("Star");a&&i&&(i.geometry=a.geometry.clone(),i.geometry.applyMatrix4(a.matrixWorld),i.geometry.scale(156,156,156))}),this.mixer=new C0(this.gltf.scene),this.action=this.mixer.clipAction(this.gltf.animations[0]),this.action.play(),this.mixer.addEventListener("loop",a=>{this.action.paused=!0,setTimeout(()=>{this.action.paused=!1,this.action.play()},1500)}),this.animateLogoIn()})';
+  `this.loader=new L0,this.loader.load("${FORME_SCENE_MODEL}",async n=>{this.gltf=n,this.logoGroup.add(this.gltf.scene),this.TO_SCALE=ja(window.innerWidth,this.screenMin,this.screenMax,.048,.1,!0),this.gltf.scene.scale.setScalar(this.TO_SCALE),this.gltf.scene.position.set(0,0,1),this.material=e(),this.gltf.scene.traverse(a=>{a.layers.set(qa.REFRACTION_DISABLE),a.isMesh&&(a.material=this.material,a.material.envMap=this.texture,a.material.envMapIntensity=2,a.renderOrder=10,a.material.needsUpdate=!0)}),this.gltf.scene.position.z+=15;const i=this.gltf.scene.getObjectByName("Star"),t=()=>{this.mixer=new C0(this.gltf.scene),this.action=this.mixer.clipAction(this.gltf.animations[0]),this.action.play(),this.mixer.addEventListener("loop",a=>{this.action.paused=!0,setTimeout(()=>{this.action.paused=!1,this.action.play()},1500)}),this.animateLogoIn()};this.formeMark=i,new L0().load("${FORME_MODEL_WEB}",n=>{let e=null;n.scene.updateMatrixWorld(!0),n.scene.traverse(n=>{n.isMesh&&n.name==="F"&&(e=n)}),e&&i&&(i.geometry=e.geometry.clone(),i.geometry.applyMatrix4(e.matrixWorld),i.geometry.scale(156,156,156)),t()},void 0,t)})`;
 
 writeUpdated(SCENE_BUNDLE, (source) => {
   let next = replaceCaptionArray(source, "const Tf=", desktopCaptions);
@@ -437,13 +457,24 @@ writeUpdated(SCENE_BUNDLE, (source) => {
     next.slice(0, modelSetupStart) +
     modelLoaderSetup +
     next.slice(modelSetupEnd);
+  next = next
+    .replace(
+      "this.mixer&&this.mixer.update(n),this.formeMark&&this.action&&(this.formeMark.rotation.y=this.action.time/this.action.getClip().duration*Math.PI*2),this.render()",
+      "this.mixer&&this.mixer.update(n),this.render()",
+    )
+    .replace(
+      "this.mixer&&this.mixer.update(n),this.render()",
+      "this.mixer&&this.mixer.update(n),this.render()",
+    );
   return next
     .replaceAll(/#cdfd50/gi, FORME_RED)
     .replaceAll(/#a9d92e/gi, FORME_RED_MUTED);
 });
 
 copyFileSync(FORME_MODEL_SOURCE, FORME_MODEL_PUBLIC);
-copyFileSync(SCENE_BUNDLE, FORME_SCENE_BUNDLE);
+for (const bundle of COMPAT_SCENE_BUNDLES) {
+  copyFileSync(SCENE_BUNDLE, bundle);
+}
 
 const textReplacements = [
   ["SavoirFaire©. Holistic creative studio based in NYC.", "Formé. Closet digital y asistente de estilo."],
@@ -520,19 +551,10 @@ writeUpdated(DEFAULT_BUNDLE, (source) =>
 
 writeUpdated(ABOUT_BUNDLE, (source) =>
   applyTextAndColorReplacements(source)
-    .replace("./stickerPhysics.ce31be14.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f2.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f3.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f4.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f5.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f6.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f7.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f8.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f9.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f10.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f11.js", "./stickerPhysics.forme-f13.js")
-    .replace("./stickerPhysics.forme-f12.js", "./stickerPhysics.forme-f13.js")
+    .replace(
+      /(?:\.\/)?stickerPhysics\.(?:ce31be14|forme(?:-f\d+)?)\.js/,
+      "./stickerPhysics.forme-f18.js",
+    )
     .replace(/zt=\{href:"mailto:[^"]+"/, 'zt={href:"/closet"')
     .replace("window.stickerEngine||it(),Be()", "Be()")
     .replace(
@@ -547,22 +569,16 @@ writeUpdated(ABOUT_BUNDLE, (source) =>
     .replaceAll('"zero"', '"cero"'),
 );
 
+copyFileSync(ABOUT_BUNDLE, FORME_ABOUT_BUNDLE);
+
 writeUpdated(ABOUT_HTML, (source) => {
   let next = applyTextAndColorReplacements(source)
     .replace('<html  lang="en">', '<html lang="es">')
     .replace(/href="mailto:[^"]+"/g, 'href="/closet"')
     .replaceAll("five...", "cinco...")
     .replace(
-      '/_nuxt/about.a3e1edf1.js" crossorigin',
-      '/_nuxt/about.a3e1edf1.js?v=forme-f13" crossorigin',
-    )
-    .replace(
-      '/_nuxt/about.a3e1edf1.js?v=forme-f" crossorigin',
-      '/_nuxt/about.a3e1edf1.js?v=forme-f13" crossorigin',
-    )
-    .replace(
-      '/_nuxt/about.a3e1edf1.js?v=forme-f2" crossorigin',
-      '/_nuxt/about.a3e1edf1.js?v=forme-f13" crossorigin',
+      /\/_nuxt\/(?:about\.a3e1edf1|about\.forme-f\d+)\.js(?:\?v=forme-f\d+)?/g,
+      "/_nuxt/about.forme-f18.js",
     )
     .replace(
       '/_nuxt/about.a3e1edf1.js?v=forme-f3" crossorigin',
@@ -604,6 +620,48 @@ writeUpdated(ABOUT_HTML, (source) => {
       '/_nuxt/about.a3e1edf1.js?v=forme-f12" crossorigin',
       '/_nuxt/about.a3e1edf1.js?v=forme-f13" crossorigin',
     );
+  next = next
+    .replaceAll(LEGACY_SOCIAL_IMAGE_URL, SOCIAL_IMAGE_URL)
+    .replaceAll(LEGACY_SOCIAL_IMAGE_URL_ESCAPED, SOCIAL_IMAGE_URL_ESCAPED)
+    .replace(
+      /og_image:\{dimensions:\{width:\d+,height:\d+\}/,
+      "og_image:{dimensions:{width:1600,height:900}",
+    )
+    .replace(
+      /(og_image:\{.*?url:")[^"]+(")/,
+      `$1${SOCIAL_IMAGE_URL_ESCAPED}$2`,
+    )
+    .replace(
+      /<meta property="og:image" content="[^"]*">/i,
+      `<meta property="og:image" content="${SOCIAL_IMAGE_URL}">`,
+    )
+    .replace(
+      /<meta (?:property|name)="twitter:image" content="[^"]*">/i,
+      `<meta property="twitter:image" content="${SOCIAL_IMAGE_URL}">`,
+    )
+    .replace(
+      /<meta property="og:image:secure_url" content="[^"]*">/i,
+      `<meta property="og:image:secure_url" content="${SOCIAL_IMAGE_URL}">`,
+    );
+  next = next
+    .replace(/\n?<meta property="og:image:secure_url" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:image:type" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:image:width" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:image:height" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:image:alt" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:site_name" content="[^"]*">/i, "")
+    .replace(/\n?<meta property="og:url" content="[^"]*">/i, "")
+    .replace(/\n?<link rel="canonical" href="[^"]*">/i, "");
+  next = next.replace(
+    /(<link id="forme-model-preload"[^>]*href=")[^"]+("[^>]*>)/,
+    `$1${FORME_MODEL_WEB}$2`,
+  );
+  if (!next.includes('id="forme-model-preload"')) {
+    next = next.replace(
+      "</head>",
+      `<link id="forme-model-preload" rel="preload" as="fetch" type="model/gltf-binary" href="${FORME_MODEL_WEB}" crossorigin></head>`,
+    );
+  }
   next = upsertHtmlTag(
     next,
     "forme-app-cta-styles",
