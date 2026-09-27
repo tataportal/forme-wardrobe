@@ -1305,7 +1305,7 @@ function buildClosetReading(garments: Garment[], looks: SavedLook[]): ClosetRead
   const summary = dominantShare >= 45
     ? `${translateValue(mainCategory)} concentra ${dominantShare}% de tu closet.`
     : secondCategory
-      ? `Tu closet se apoya en ${translateValue(mainCategory).toLocaleLowerCase()} y ${translateValue(secondCategory).toLocaleLowerCase()}.`
+      ? `Tu closet se apoya principalmente en ${translateValue(mainCategory).toLocaleLowerCase()}, seguido de ${translateValue(secondCategory).toLocaleLowerCase()}.`
       : `${translateValue(mainCategory)} define la base de tu closet.`;
   const detail = `${translateValue(colors[0]?.[0] ?? "varios colores")} es el color más presente. ${translateValue(materials[0]?.[0] ?? "Varios materiales")} es el material que más se repite.`;
   return { summary, detail, categories, colors, materials, usedCount, unusedCount: Math.max(0, garments.length - usedCount), mostUsed, visualGarments };
