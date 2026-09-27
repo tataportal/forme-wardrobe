@@ -165,6 +165,16 @@ type SavedLook = {
   updatedAt?: string;
 };
 
+type ShareLabelMode = "name" | "name-brand" | "none";
+type ShareTarget =
+  | { kind: "look"; look: SavedLook }
+  | { kind: "garment"; garment: Garment }
+  | { kind: "closet"; garments: Garment[] };
+type ShareTemplateOptions = {
+  labelMode: ShareLabelMode;
+  includeHandle: boolean;
+};
+
 type WeeklyOccasion = "daily" | "work" | "dinner" | "event" | "weekend";
 type WeeklyPlanEntry = {
   date: string;
@@ -1388,7 +1398,17 @@ function storyFileName(name: string) {
   return `forme-${slug || "look"}-story.png`;
 }
 
-async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string, Garment>): Promise<Blob> {
+function shareHandle(value: string) {
+  const normalized = value.trim().replace(/^@/, "");
+  return normalized ? `@${normalized}` : "@FORME";
+}
+
+async function createInstagramStoryBlob(
+  look: SavedLook,
+  garmentById: Map<string, Garment>,
+  options: ShareTemplateOptions,
+  handle: string,
+): Promise<Blob> {
   const width = 1080;
   const height = 1920;
   const canvas = document.createElement("canvas");
@@ -1412,9 +1432,11 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
   context.fillText("FORMÉ®", 72, 92);
-  context.font = "500 64px Helvetica, Arial, sans-serif";
-  context.letterSpacing = "-2px";
-  context.fillText(look.name, 72, 185, width - 144);
+  if (options.labelMode !== "none") {
+    context.font = "500 64px Helvetica, Arial, sans-serif";
+    context.letterSpacing = "-2px";
+    context.fillText(look.name, 72, 185, width - 144);
+  }
 
   const artboard = { x: 92, y: 266, width: 896, height: 1344 };
   context.fillStyle = "#f3f3ef";
@@ -1456,12 +1478,133 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   context.fillText("Vístete con lo que ya tienes.", 72, 1738);
   context.font = "600 19px Arial, sans-serif";
   context.letterSpacing = "4px";
-  context.fillText(`${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}  ·  FORME.GALLERY`, 72, 1793);
+  const footer = [
+    `${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}`,
+    options.includeHandle ? shareHandle(handle) : "FORME.GALLERY",
+  ].join("  /  ");
+  context.fillText(footer, 72, 1793);
   context.fillStyle = "#e83b25";
   context.fillRect(72, 1840, 128, 8);
 
   const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!result) throw new Error("No se pudo exportar la historia.");
+  return result;
+}
+
+async function createGarmentStoryBlob(
+  garment: Garment,
+  options: ShareTemplateOptions,
+  handle: string,
+): Promise<Blob> {
+  const width = 1080;
+  const height = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
+  context.fillStyle = "#f3f3ef";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "rgba(17,17,15,.12)";
+  for (let x = 48; x < width; x += 28) for (let y = 48; y < height; y += 28) {
+    context.beginPath(); context.arc(x, y, 1.2, 0, Math.PI * 2); context.fill();
+  }
+  context.fillStyle = "#11110f";
+  context.font = "600 24px Arial, sans-serif";
+  context.letterSpacing = "5px";
+  context.fillText("FORMÉ®", 72, 92);
+  const image = await loadShareImage(imageSrc(garmentPhotoFor(garment, "complete").image));
+  try {
+    const frame = { x: 90, y: 210, width: 900, height: 1300 };
+    const contain = Math.min(frame.width / image.width, frame.height / image.height);
+    const drawWidth = image.width * contain;
+    const drawHeight = image.height * contain;
+    context.shadowColor = "rgba(17,17,15,.12)";
+    context.shadowBlur = 28;
+    context.shadowOffsetY = 16;
+    context.drawImage(image.source, frame.x + (frame.width - drawWidth) / 2, frame.y + (frame.height - drawHeight) / 2, drawWidth, drawHeight);
+    context.shadowColor = "transparent";
+  } finally { image.close(); }
+  if (options.labelMode !== "none") {
+    context.fillStyle = "#11110f";
+    context.font = "500 58px Helvetica, Arial, sans-serif";
+    context.letterSpacing = "-2px";
+    context.fillText(translateGarmentName(garment.name), 72, 1662, width - 144);
+    if (options.labelMode === "name-brand" && garment.brand?.trim()) {
+      context.font = "500 22px Arial, sans-serif";
+      context.letterSpacing = "4px";
+      context.fillText(garment.brand.toLocaleUpperCase(), 72, 1712, width - 144);
+    }
+  }
+  context.font = "600 19px Arial, sans-serif";
+  context.letterSpacing = "4px";
+  context.fillText(options.includeHandle ? shareHandle(handle) : "FORME.GALLERY", 72, 1810);
+  context.fillStyle = "#e83b25";
+  context.fillRect(72, 1850, 128, 8);
+  const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!result) throw new Error("No se pudo exportar la prenda.");
+  return result;
+}
+
+async function createClosetStoryBlob(
+  garments: Garment[],
+  options: ShareTemplateOptions,
+  handle: string,
+): Promise<Blob> {
+  const width = 1080;
+  const height = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
+  context.fillStyle = "#f3f3ef";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#11110f";
+  context.font = "600 24px Arial, sans-serif";
+  context.letterSpacing = "5px";
+  context.fillText("MI CLOSET EN FORMÉ", 64, 84);
+  const visible = garments.slice(0, 12);
+  const columns = 3;
+  const gap = 18;
+  const cellWidth = (width - 128 - gap * (columns - 1)) / columns;
+  const cellHeight = 390;
+  const loaded = await Promise.all(visible.map(async (garment) => ({ garment, image: await loadShareImage(imageSrc(garmentPhotoFor(garment, "complete").image)) })));
+  try {
+    loaded.forEach(({ garment, image }, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = 64 + column * (cellWidth + gap);
+      const y = 136 + row * (cellHeight + gap);
+      context.fillStyle = "#e9e9e4";
+      context.fillRect(x, y, cellWidth, cellHeight);
+      const labelSpace = options.labelMode === "none" ? 24 : 70;
+      const contain = Math.min((cellWidth - 24) / image.width, (cellHeight - labelSpace) / image.height);
+      const drawWidth = image.width * contain;
+      const drawHeight = image.height * contain;
+      context.drawImage(image.source, x + (cellWidth - drawWidth) / 2, y + 12 + (cellHeight - labelSpace - drawHeight) / 2, drawWidth, drawHeight);
+      if (options.labelMode !== "none") {
+        context.fillStyle = "#11110f";
+        context.font = "500 17px Arial, sans-serif";
+        context.letterSpacing = "0";
+        const name = translateGarmentName(garment.name);
+        context.fillText(name.length > 25 ? `${name.slice(0, 23)}…` : name, x + 12, y + cellHeight - 35, cellWidth - 24);
+        if (options.labelMode === "name-brand" && garment.brand?.trim()) {
+          context.fillStyle = "#676760";
+          context.font = "500 12px Arial, sans-serif";
+          context.fillText(garment.brand.toLocaleUpperCase().slice(0, 28), x + 12, y + cellHeight - 15, cellWidth - 24);
+        }
+      }
+    });
+  } finally { loaded.forEach(({ image }) => image.close()); }
+  context.fillStyle = "#11110f";
+  context.font = "600 19px Arial, sans-serif";
+  context.letterSpacing = "4px";
+  context.fillText(options.includeHandle ? shareHandle(handle) : "FORME.GALLERY", 64, 1830);
+  context.fillStyle = "#e83b25";
+  context.fillRect(64, 1870, 128, 8);
+  const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!result) throw new Error("No se pudo exportar el closet.");
   return result;
 }
 
@@ -1560,25 +1703,72 @@ function WeeklyPlanView({
   );
 }
 
-function ClosetGarmentGrid({ garments, emptyLabel, onOpen, onResetFilters }: {
+function ClosetGarmentGrid({ garments, emptyLabel, onOpen, onResetFilters, selecting = false, selectedIds, onToggle }: {
   garments: Garment[];
   emptyLabel: string;
   onOpen: (garment: Garment) => void;
   onResetFilters: () => void;
+  selecting?: boolean;
+  selectedIds?: Set<string>;
+  onToggle?: (garment: Garment) => void;
 }) {
-  return <div className="garment-grid">
-    {garments.map((item) => <article className="garment-card" key={item.id}>
-      <button type="button" className="garment-open" onClick={() => onOpen(item)} aria-label={`Ver prenda: ${translateGarmentName(item.name)}`}>
+  return <div className="garment-grid" data-selecting={selecting || undefined}>
+    {garments.map((item) => {
+      const selected = selectedIds?.has(item.id) ?? false;
+      return <article className="garment-card" data-selected={selected || undefined} key={item.id}>
+      <button type="button" className="garment-open" onClick={() => selecting && onToggle ? onToggle(item) : onOpen(item)} aria-pressed={selecting ? selected : undefined} aria-label={selecting ? `${selected ? "Quitar" : "Seleccionar"} ${translateGarmentName(item.name)}` : `Ver prenda: ${translateGarmentName(item.name)}`}>
         <span className="image-wrap">
           <img src={imageSrc(garmentPhotoFor(item, "complete").image)} alt="" loading="lazy" data-photo-role="complete" />
+          {selecting && <span className="bulk-check" aria-hidden="true">{selected ? "✓" : ""}</span>}
           {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">Preparando</span>}
           {item.status === "failed" && <span className="processing-badge failed">Necesita revisión</span>}
         </span>
         <span className="garment-caption" title={translateGarmentName(item.name)}>{translateGarmentName(item.name)}</span>
       </button>
-    </article>)}
+    </article>;})}
     {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>Limpiar filtros</button></div>}
   </div>;
+}
+
+function ShareTemplateDialog({ target, options, garmentById, handle, busy, onOptions, onClose, onExport }: {
+  target: ShareTarget;
+  options: ShareTemplateOptions;
+  garmentById: Map<string, Garment>;
+  handle: string;
+  busy: boolean;
+  onOptions: (options: ShareTemplateOptions) => void;
+  onClose: () => void;
+  onExport: () => void;
+}) {
+  const title = target.kind === "look" ? target.look.name : target.kind === "garment" ? translateGarmentName(target.garment.name) : "Mi closet";
+  return <FormeDialog labelledBy="share-template-title" className="share-template-dialog" onClose={() => { if (!busy) onClose(); }}>
+      <header><div><span>COMPARTIR</span><h2 id="share-template-title">Elige cómo se verá</h2></div><button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar">×</button></header>
+      <div className="share-template-layout">
+        <div className="share-template-preview" data-kind={target.kind}>
+          <div className="share-preview-brand">FORMÉ®</div>
+          <div className="share-preview-media">
+            {target.kind === "look" && <LookPreview look={target.look} garmentById={garmentById} />}
+            {target.kind === "garment" && <img src={imageSrc(garmentPhotoFor(target.garment, "complete").image)} alt="" />}
+            {target.kind === "closet" && <div className="share-preview-closet">{target.garments.slice(0, 6).map((garment) => <span key={garment.id}>
+              <img src={imageSrc(garmentPhotoFor(garment, "complete").image)} alt="" />
+              {options.labelMode !== "none" && <small>{translateGarmentName(garment.name)}</small>}
+              {options.labelMode === "name-brand" && garment.brand?.trim() && <strong>{garment.brand}</strong>}
+            </span>)}</div>}
+          </div>
+          {target.kind !== "closet" && options.labelMode !== "none" && <div className="share-preview-copy"><strong>{title}</strong>{options.labelMode === "name-brand" && target.kind === "garment" && target.garment.brand && <span>{target.garment.brand}</span>}</div>}
+          {options.includeHandle && <span className="share-preview-handle">{shareHandle(handle)}</span>}
+        </div>
+        <div className="share-template-controls">
+          <fieldset><legend>Información</legend>
+            <label><input type="radio" name="share-label" checked={options.labelMode === "name"} onChange={() => onOptions({ ...options, labelMode: "name" })} /><span>Solo nombre</span></label>
+            {target.kind !== "look" && <label><input type="radio" name="share-label" checked={options.labelMode === "name-brand"} onChange={() => onOptions({ ...options, labelMode: "name-brand" })} /><span>Nombre + marca</span></label>}
+            <label><input type="radio" name="share-label" checked={options.labelMode === "none"} onChange={() => onOptions({ ...options, labelMode: "none" })} /><span>Sin información</span></label>
+          </fieldset>
+          <label className="share-template-tag"><span><strong>Mostrar @usuario</strong><small>Desactívalo para exportar sin tag.</small></span><input type="checkbox" checked={options.includeHandle} onChange={(event) => onOptions({ ...options, includeHandle: event.target.checked })} /></label>
+          <button type="button" className="primary-action" disabled={busy} onClick={onExport}>{busy ? "Preparando…" : "Compartir imagen"}</button>
+        </div>
+      </div>
+  </FormeDialog>;
 }
 
 function ClosetActionIcon({ filter = false }: { filter?: boolean }) {
@@ -1838,7 +2028,14 @@ export function WardrobeApp({
   const [garmentSaveError, setGarmentSaveError] = useState("");
   const [savingOutfit, setSavingOutfit] = useState(false);
   const [deletingLookId, setDeletingLookId] = useState<string | null>(null);
-  const [sharingLookId, setSharingLookId] = useState<string | null>(null);
+  const [closetSelecting, setClosetSelecting] = useState(false);
+  const [lookSelecting, setLookSelecting] = useState(false);
+  const [selectedGarmentIds, setSelectedGarmentIds] = useState<Set<string>>(new Set());
+  const [selectedLookIds, setSelectedLookIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+  const [shareOptions, setShareOptions] = useState<ShareTemplateOptions>({ labelMode: "name-brand", includeHandle: true });
+  const [shareBusy, setShareBusy] = useState(false);
   const [shareNotice, setShareNotice] = useState("");
   const [profileShareNotice, setProfileShareNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -3477,24 +3674,35 @@ export function WardrobeApp({
     }
   }
 
-  async function shareLook(look: SavedLook) {
-    if (!look.items.length || sharingLookId) return;
-    setSharingLookId(look.id);
+  function openShareTemplate(target: ShareTarget) {
+    setShareOptions({ labelMode: target.kind === "look" ? "name" : "name-brand", includeHandle: true });
+    setShareTarget(target);
+  }
+
+  async function exportShareTemplate() {
+    if (!shareTarget || shareBusy) return;
+    setShareBusy(true);
     setShareNotice("");
     setWardrobeError("");
     try {
-      const blob = await createInstagramStoryBlob(look, garmentById);
-      const file = new File([blob], storyFileName(look.name), { type: "image/png" });
+      const blob = shareTarget.kind === "look"
+        ? await createInstagramStoryBlob(shareTarget.look, garmentById, shareOptions, profile.handle)
+        : shareTarget.kind === "garment"
+          ? await createGarmentStoryBlob(shareTarget.garment, shareOptions, profile.handle)
+          : await createClosetStoryBlob(shareTarget.garments, shareOptions, profile.handle);
+      const baseName = shareTarget.kind === "look" ? shareTarget.look.name : shareTarget.kind === "garment" ? shareTarget.garment.name : "mi-closet";
+      const file = new File([blob], storyFileName(baseName), { type: "image/png" });
       const canUseNativeShare = typeof navigator.share === "function"
         && (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] }));
       if (canUseNativeShare) {
         try {
           await navigator.share({
             files: [file],
-            title: `${look.name} · Formé`,
-            text: "Mi look en Formé",
+            title: `${baseName} - Formé`,
+            text: shareOptions.includeHandle ? `${shareHandle(profile.handle)} en Formé` : "Creado en Formé",
           });
           setShareNotice("Imagen compartida");
+          setShareTarget(null);
           return;
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") return;
@@ -3507,11 +3715,102 @@ export function WardrobeApp({
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       setShareNotice("Imagen descargada");
+      setShareTarget(null);
     } catch (error) {
-      setWardrobeError(error instanceof Error ? error.message : "No se pudo compartir el look.");
-    } finally {
-      setSharingLookId(null);
-    }
+      setWardrobeError(error instanceof Error ? error.message : "No se pudo compartir la imagen.");
+    } finally { setShareBusy(false); }
+  }
+
+  function shareLook(look: SavedLook) {
+    if (!look.items.length || shareBusy) return;
+    openShareTemplate({ kind: "look", look });
+  }
+
+  function toggleGarmentSelection(item: Garment) {
+    if (item.collection === "forme") return;
+    setSelectedGarmentIds((current) => {
+      const next = new Set(current);
+      if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+      return next;
+    });
+  }
+
+  function toggleLookSelection(look: SavedLook) {
+    setSelectedLookIds((current) => {
+      const next = new Set(current);
+      if (next.has(look.id)) next.delete(look.id); else next.add(look.id);
+      return next;
+    });
+  }
+
+  async function bulkSetGarmentVisibility(isPublic: boolean) {
+    const selected = personalGarments.filter((item) => selectedGarmentIds.has(item.id));
+    if (!selected.length || bulkBusy) return;
+    setBulkBusy(true); setWardrobeError("");
+    try {
+      const results = await Promise.all(selected.map(async (item) => {
+        const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...apiPayload(item), isPublic }) });
+        const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
+        if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo actualizar una prenda.");
+        return result.garment;
+      }));
+      setGarments((items) => mergeApiGarments(items, results));
+      setShareNotice(isPublic ? `${selected.length} prendas elegidas para tu perfil` : `${selected.length} prendas quedaron privadas`);
+      setSelectedGarmentIds(new Set()); setClosetSelecting(false);
+    } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron actualizar las prendas."); }
+    finally { setBulkBusy(false); }
+  }
+
+  async function bulkDeleteGarments() {
+    const selected = personalGarments.filter((item) => selectedGarmentIds.has(item.id));
+    if (!selected.length || bulkBusy || !window.confirm(`¿Eliminar ${selected.length} prendas de tu closet?`)) return;
+    setBulkBusy(true); setWardrobeError("");
+    try {
+      await Promise.all(selected.map(async (item) => {
+        const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(apiPayload(item)) });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar una prenda.");
+      }));
+      const ids = new Set(selected.map((item) => item.id));
+      setGarments((items) => items.filter((item) => !ids.has(item.id)));
+      setCanvasPieces((items) => items.filter((piece) => !ids.has(piece.garmentId)));
+      setSelectedGarmentIds(new Set()); setClosetSelecting(false);
+      setShareNotice(`${selected.length} prendas eliminadas`);
+    } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron eliminar las prendas."); }
+    finally { setBulkBusy(false); }
+  }
+
+  async function bulkSetLookVisibility(isPublic: boolean) {
+    const selected = savedLooks.filter((look) => selectedLookIds.has(look.id));
+    if (!selected.length || bulkBusy) return;
+    setBulkBusy(true); setWardrobeError("");
+    try {
+      await Promise.all(selected.map(async (look) => {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(look.id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: look.name, items: look.items, isPublic }) });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo actualizar un look.");
+      }));
+      setSavedLooks((looks) => looks.map((look) => selectedLookIds.has(look.id) ? { ...look, isPublic } : look));
+      setShareNotice(isPublic ? `${selected.length} looks elegidos para tu perfil` : `${selected.length} looks quedaron privados`);
+      setSelectedLookIds(new Set()); setLookSelecting(false);
+    } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron actualizar los looks."); }
+    finally { setBulkBusy(false); }
+  }
+
+  async function bulkDeleteLooks() {
+    const selected = savedLooks.filter((look) => selectedLookIds.has(look.id));
+    if (!selected.length || bulkBusy || !window.confirm(`¿Eliminar ${selected.length} looks?`)) return;
+    setBulkBusy(true); setWardrobeError("");
+    try {
+      await Promise.all(selected.map(async (look) => {
+        const response = await fetch(`/api/outfits/${encodeURIComponent(look.id)}`, { method: "DELETE" });
+        if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo eliminar un look.");
+      }));
+      const ids = new Set(selected.map((look) => look.id));
+      setSavedLooks((looks) => looks.filter((look) => !ids.has(look.id)));
+      setWeeklyPlan((entries) => entries.filter((entry) => !ids.has(entry.outfitId)));
+      setSelectedLookIds(new Set()); setLookSelecting(false);
+      setShareNotice(`${selected.length} looks eliminados`);
+    } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron eliminar los looks."); }
+    finally { setBulkBusy(false); }
   }
 
   function currentSnapshotItems() {
@@ -3629,7 +3928,7 @@ export function WardrobeApp({
   }
 
   const saveLookLabel = savingOutfit ? "Guardando…" : saved ? "Guardado" : "Guardar look";
-  const shareLookLabel = sharingLookId ? "Preparando…" : "Compartir imagen";
+  const shareLookLabel = shareBusy ? "Preparando…" : "Compartir imagen";
 
   return (
     <main className={`site-shell view-${view} route-${activeRoute} forme-app`}>
@@ -3832,9 +4131,18 @@ export function WardrobeApp({
                 <div className="catalog-tools">
                   <GarmentViewControls size={closetGridSize} onSizeChange={setClosetGridSize} favorites={favoritesOnly} onFavoritesChange={setFavoritesOnly} />
                   <button type="button" className={`catalog-filter${archiveFilterCount || catalogSort !== "recent" ? " active" : ""}`} onClick={() => setFiltersOpen(true)} aria-label={`Filtrar y ordenar prendas${archiveFilterCount ? `, ${archiveFilterCount} filtros activos` : ""}`}><ClosetActionIcon filter /><span>Filtros{archiveFilterCount ? ` · ${archiveFilterCount}` : ""}</span></button>
+                  {!showingBasics && catalogItems.length > 0 && <button type="button" className={closetSelecting ? "active" : ""} onClick={() => { setClosetSelecting((value) => !value); setSelectedGarmentIds(new Set()); }}>{closetSelecting ? "Cancelar" : "Seleccionar"}</button>}
+                  {!showingBasics && personalGarments.length > 0 && <button type="button" onClick={() => openShareTemplate({ kind: "closet", garments: personalGarments })}>Compartir closet</button>}
                 </div>
                 {(demoMode || showingBasics || personalGarments.length > 0) && <button className="closet-add" type="button" onClick={demoMode ? beginGoogleSignIn : openUpload} aria-label={demoMode ? "Crear mi closet" : "Añadir prendas"}><ClosetActionIcon /><span>{demoMode ? "Crear mi closet" : <>Añadir<span className="closet-add-context"> prendas</span></>}</span></button>}
               </div>
+              {closetSelecting && <div className="bulk-actionbar" role="toolbar" aria-label="Acciones para prendas seleccionadas">
+                <strong>{selectedGarmentIds.size} {selectedGarmentIds.size === 1 ? "seleccionada" : "seleccionadas"}</strong>
+                <button type="button" onClick={() => setSelectedGarmentIds(new Set(catalogItems.filter((item) => item.collection !== "forme").map((item) => item.id)))}>Todas las visibles</button>
+                <button type="button" disabled={!selectedGarmentIds.size || bulkBusy} onClick={() => void bulkSetGarmentVisibility(true)}>Publicar</button>
+                <button type="button" disabled={!selectedGarmentIds.size || bulkBusy} onClick={() => void bulkSetGarmentVisibility(false)}>Hacer privadas</button>
+                <button type="button" className="danger-action" disabled={!selectedGarmentIds.size || bulkBusy} onClick={() => void bulkDeleteGarments()}>Eliminar</button>
+              </div>}
               {filtersOpen && <FormeDialog labelledBy="filter-title" className="filter-dialog" onClose={() => setFiltersOpen(false)}>
                 <header className="dialog-heading"><h2 id="filter-title">Filtros y orden</h2><button type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></header>
                 <label className="catalog-sort"><span>Ordenar por</span><select aria-label="Ordenar prendas" value={catalogSort} onChange={event => setCatalogSort(event.target.value)}><option value="recent">Más recientes</option><option value="name">Nombre A–Z</option></select></label>
@@ -3843,7 +4151,7 @@ export function WardrobeApp({
               </FormeDialog>}
               <div className="catalog-results">
                 {!showingBasics && personalGarments.length === 0 ? <div className="closet-empty-personal"><h2>Tu closet está vacío</h2><p>Añade tus prendas para empezar a combinarlas.</p><button className="primary-action" type="button" onClick={openUpload}>Añadir prendas</button></div> :
-                  <ClosetGarmentGrid garments={catalogItems} emptyLabel={favoritesOnly ? "No hay favoritas con estos filtros." : "No encontramos prendas con esta búsqueda."} onOpen={(item) => openGarmentEditor(item)} onResetFilters={() => { setArchiveFilters(emptyFilters); setCatalogQuery(""); setFavoritesOnly(false); }} />}
+                  <ClosetGarmentGrid garments={catalogItems} emptyLabel={favoritesOnly ? "No hay favoritas con estos filtros." : "No encontramos prendas con esta búsqueda."} onOpen={(item) => openGarmentEditor(item)} selecting={closetSelecting} selectedIds={selectedGarmentIds} onToggle={toggleGarmentSelection} onResetFilters={() => { setArchiveFilters(emptyFilters); setCatalogQuery(""); setFavoritesOnly(false); }} />}
               </div>
             </section>
           ) : wardrobePanel === "looks" ? (
@@ -3855,28 +4163,36 @@ export function WardrobeApp({
                 </div>
                 <nav aria-label="Acciones de Looks">
                   {productFeatures.assistant && <button type="button" onClick={generateLooksQuickly}>Generar</button>}
+                  {savedLooks.length > 0 && <button type="button" onClick={() => { setLookSelecting((value) => !value); setSelectedLookIds(new Set()); }}>{lookSelecting ? "Cancelar" : "Seleccionar"}</button>}
                   {savedLooks.length > 0 && <button type="button" aria-label="Crear look" title="Crear look" className="primary-action" onClick={newLook}><ClosetActionIcon /><span className="closet-action-label">Crear look</span></button>}
                 </nav>
               </header>
+              {lookSelecting && <div className="bulk-actionbar" role="toolbar" aria-label="Acciones para looks seleccionados">
+                <strong>{selectedLookIds.size} {selectedLookIds.size === 1 ? "seleccionado" : "seleccionados"}</strong>
+                <button type="button" onClick={() => setSelectedLookIds(new Set(savedLooks.map((look) => look.id)))}>Todos</button>
+                <button type="button" disabled={!selectedLookIds.size || bulkBusy} onClick={() => void bulkSetLookVisibility(true)}>Publicar</button>
+                <button type="button" disabled={!selectedLookIds.size || bulkBusy} onClick={() => void bulkSetLookVisibility(false)}>Hacer privados</button>
+                <button type="button" className="danger-action" disabled={!selectedLookIds.size || bulkBusy} onClick={() => void bulkDeleteLooks()}>Eliminar</button>
+              </div>}
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
                 {savedLooks.map((look) => (
-                  <article className="saved-look-card" key={look.id}>
-                    <button className="saved-look-open" type="button" onClick={() => openSavedLook(look)} aria-label={`Abrir ${look.name} en el canvas`}>
+                  <article className="saved-look-card" data-selected={selectedLookIds.has(look.id) || undefined} key={look.id}>
+                    <button className="saved-look-open" type="button" onClick={() => lookSelecting ? toggleLookSelection(look) : openSavedLook(look)} aria-pressed={lookSelecting ? selectedLookIds.has(look.id) : undefined} aria-label={lookSelecting ? `${selectedLookIds.has(look.id) ? "Quitar" : "Seleccionar"} ${look.name}` : `Abrir ${look.name} en el canvas`}>
                       <LookPreview look={look} garmentById={garmentById} />
-                      <span>Abrir en Canvas</span>
+                      {lookSelecting ? <span className="bulk-check">{selectedLookIds.has(look.id) ? "✓" : ""}</span> : <span>Abrir en Canvas</span>}
                     </button>
                     <div className="saved-look-meta">
                       <div><strong>{look.name}</strong><small>{demoMode ? "En este navegador" : look.isPublic && profile.profilePublic && profile.showLooks ? "En tu perfil público" : look.isPublic ? "Elegido para tu perfil" : "Privado"}</small></div>
-                      <FormeMenu label={`Acciones de ${look.name}`}>
+                      {!lookSelecting && <FormeMenu label={`Acciones de ${look.name}`}>
                         {!demoMode && <>
                         <button type="button" onClick={() => void toggleOutfitVisibility(look)}>{look.isPublic ? "Ocultar del perfil" : "Mostrar en mi perfil"}</button>
                         {(!profile.profilePublic || !profile.showLooks) && <button type="button" onClick={() => navigateWardrobeRoute("perfil")}>Configurar perfil público</button>}
                         </>}
-                        <button type="button" disabled={Boolean(sharingLookId)} onClick={() => void shareLook(look)}>{sharingLookId === look.id ? "Preparando…" : "Compartir imagen"}</button>
+                        <button type="button" disabled={shareBusy} onClick={() => shareLook(look)}>Compartir imagen</button>
                         <button type="button" disabled={savingOutfit} onClick={() => void duplicateSavedLook(look)}>Duplicar look</button>
                         <button type="button" className="danger-action" onClick={() => void deleteSavedLook(look.id)}>Eliminar look</button>
-                      </FormeMenu>
+                      </FormeMenu>}
                     </div>
                   </article>
                 ))}
@@ -4174,7 +4490,7 @@ export function WardrobeApp({
                 <button type="button" className="history-action" aria-label="Rehacer" title="Rehacer · ⇧⌘Z" disabled={!history.current.future.length || savingOutfit} onClick={() => travelHistory("redo")}><LookActionIcon action="redo" /></button>
                 <div className="canvas-utility-actions" role="group" aria-label="Acciones del look">
                   <button type="button" className="canvas-icon-action" aria-label="Guardar una copia" title="Guardar una copia" onClick={() => void duplicateCurrentOutfit()} disabled={savingOutfit || !canvasPieces.length}><LookActionIcon action="copy" /></button>
-                  <button type="button" className="canvas-icon-action" aria-label={shareLookLabel} title={shareLookLabel} aria-busy={Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName || "Mi look", items: currentSnapshotItems() })} disabled={Boolean(sharingLookId) || !canvasPieces.length}><LookActionIcon action="share" /></button>
+                  <button type="button" className="canvas-icon-action" aria-label={shareLookLabel} title={shareLookLabel} aria-busy={shareBusy} onClick={() => shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName || "Mi look", items: currentSnapshotItems() })} disabled={shareBusy || !canvasPieces.length}><LookActionIcon action="share" /></button>
                   <button type="button" className="canvas-icon-action danger-action" aria-label="Vaciar canvas" title="Vaciar canvas" disabled={savingOutfit || !canvasPieces.length} onClick={() => { canvasGestures.current?.cancel(); checkpoint(); setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setSaved(false); }}><LookActionIcon action="clear" /></button>
                 </div>
                 <button type="button" className={`primary-action save-look-action ${saved ? "saved" : ""}`} aria-label={saveLookLabel} title={saveLookLabel} aria-busy={savingOutfit} disabled={savingOutfit || !canvasPieces.length || saved} onClick={() => void saveCurrentOutfit()}><LookActionIcon action="save" /><span className="canvas-action-label">{saved && !savingOutfit ? "Guardado" : "Guardar"}</span></button>
@@ -4276,6 +4592,7 @@ export function WardrobeApp({
                 {editingGarment.collection !== "forme" && <div className="garment-detail-actions">
                   <button type="button" disabled={savingGarment} aria-pressed={Boolean(editingGarment.favorite)} onClick={() => void toggleFavorite(editingGarment)}>{editingGarment.favorite ? "Quitar de favoritas" : "Añadir a favoritas"}</button>
                   <button type="button" disabled={savingGarment} onClick={() => setGarmentEditing(true)}>Editar ficha</button>
+                  <button type="button" disabled={savingGarment} onClick={() => openShareTemplate({ kind: "garment", garment: editingGarment })}>Compartir imagen</button>
                 </div>}
                 {editingGarment.collection !== "forme" && <div className="garment-sharing" aria-busy={savingGarment}>
                   <label className="item-public-toggle">
@@ -4347,6 +4664,16 @@ export function WardrobeApp({
         <p>{pendingDelete.kind === "look" ? "Se eliminará de tus looks guardados. Tus prendas seguirán en el closet." : "La prenda se quitará de tu closet."}</p>
         <div className="confirmation-actions"><button type="button" className="secondary-action" autoFocus onClick={() => setPendingDelete(null)}>Cancelar</button><button type="button" className="primary-action" onClick={() => { const item = pendingDelete; setPendingDelete(null); if (item.kind === "look") void performDeleteSavedLook(item.id); else { const garment = garmentById.get(item.id); if (garment) void performDeleteGarment(garment); } }}>Eliminar</button></div>
       </FormeDialog>}
+      {shareTarget && <ShareTemplateDialog
+        target={shareTarget}
+        options={shareOptions}
+        garmentById={garmentById}
+        handle={profile.handle}
+        busy={shareBusy}
+        onOptions={setShareOptions}
+        onClose={() => setShareTarget(null)}
+        onExport={() => void exportShareTemplate()}
+      />}
       <FormeMobileNav
         activeRoute={activeRoute}
         view={view}

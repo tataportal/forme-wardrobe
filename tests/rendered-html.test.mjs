@@ -279,6 +279,18 @@ test("Looks has its own primary navigation state and creates a new document", as
   assert.match(html, /Crear look/);
 });
 
+test("Closet and Looks expose bulk publishing plus configurable social exports", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(page, /Todas las visibles/);
+  assert.match(page, /bulkSetGarmentVisibility/);
+  assert.match(page, /bulkSetLookVisibility/);
+  assert.match(page, /Nombre \+ marca/);
+  assert.match(page, /Sin información/);
+  assert.match(page, /Mostrar @usuario/);
+  assert.match(page, /createClosetStoryBlob/);
+  assert.match(page, /createGarmentStoryBlob/);
+});
+
 test("pricing sells only implemented product capabilities", async () => {
   const html = await (await render("/pricing")).text();
   assert.match(html, /Empieza gratis/);
