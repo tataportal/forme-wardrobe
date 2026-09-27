@@ -88,6 +88,7 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(pricingSource, /\/auth\/google\/start\?return_to=%2Fcloset/);
   assert.match(pricingSource, /\/api\/sales-interest/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
+  assert.match(publicProfileSource, /className="public-look-pieces"/);
   assert.match(publicProfileSource, /Aún no hay prendas ni looks publicados\./);
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
   assert.match(closetSource, /WardrobeApp initialRoute="closet"/);

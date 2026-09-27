@@ -63,6 +63,14 @@ function PublicLookPreview({ look }: { look: PublicLook }) {
   </div>;
 }
 
+function PublicLookPieces({ look }: { look: PublicLook }) {
+  return <ul className="public-look-pieces" aria-label={`${look.items.length} prendas en ${look.name}`}>
+    {[...look.items].sort((a, b) => a.z - b.z).map((item) => <li key={item.instanceId}>
+      <img src={item.image} alt="" loading="lazy" />
+    </li>)}
+  </ul>;
+}
+
 export default function PublicProfilePage() {
   const params = useParams<{ handle: string }>();
   const rawHandle = typeof params?.handle === "string" ? decodeURIComponent(params.handle) : "";
@@ -128,7 +136,7 @@ export default function PublicProfilePage() {
 
       {data.outfits.length > 0 && <section className="public-profile-section">
         <header><h2>Looks</h2><span>{data.outfits.length}</span></header>
-        <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><p>{look.items.length} prendas</p></article>)}</div>
+        <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><PublicLookPieces look={look} /></article>)}</div>
       </section>}
 
       {data.garments.length > 0 && <section className="public-profile-section">
