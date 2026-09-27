@@ -1912,6 +1912,12 @@ export function WardrobeApp({
   const showingLibraryBasics = demoMode || (basicsEnabled && librarySource === "basics");
   const catalogItems = showingBasics ? visibleFormeBasics : visiblePersonalGarments;
   const orderedLayers = [...canvasPieces].sort((a, b) => b.z - a.z);
+  const selectedCanvasPiece = canvasPieces.find((item) => item.instanceId === selectedId);
+  const selectedCanvasGarment = selectedCanvasPiece ? garmentById.get(selectedCanvasPiece.garmentId) : undefined;
+  const selectedLayerOrder = [...canvasPieces].sort((a, b) => a.z - b.z);
+  const selectedLayerIndex = selectedCanvasPiece
+    ? selectedLayerOrder.findIndex((item) => item.instanceId === selectedCanvasPiece.instanceId)
+    : -1;
   const assistantGarments = useMemo(() => {
     if (demoMode || personalGarments.length === 0) return sharedBasics;
     const categories = new Set(personalGarments.map((item) => item.category));
@@ -4145,7 +4151,23 @@ export function WardrobeApp({
               </div>
             </div>
 
-              <div className="studio-document-actions" role="group" aria-label="Crear y probar looks">
+              <div className="studio-document-actions" role="group" aria-label="Crear y probar looks" data-piece-selected={selectedCanvasPiece ? "true" : undefined}>
+                {selectedCanvasPiece && selectedCanvasGarment && <div className="selected-piece-actions" role="group" aria-label={`Acciones de ${translateGarmentName(selectedCanvasGarment.name)}`}>
+                  <span className="selected-piece-name">{translateGarmentName(selectedCanvasGarment.name)}</span>
+                  <button type="button" className="canvas-icon-action" aria-label="Bajar una capa" title="Bajar una capa" disabled={savingOutfit || selectedLayerIndex === 0} onClick={() => changeLayer(selectedCanvasPiece.instanceId, "down")}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4M12 3v11M4 15l8 5 8-5M4 11l3 2m10 0 3-2" /></svg>
+                  </button>
+                  <button type="button" className="canvas-icon-action" aria-label="Subir una capa" title="Subir una capa" disabled={savingOutfit || selectedLayerIndex === selectedLayerOrder.length - 1} onClick={() => changeLayer(selectedCanvasPiece.instanceId, "up")}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7 4-4 4 4M12 3v10M4 15l8 5 8-5M4 11l3 2m10 0 3-2" /></svg>
+                  </button>
+                  <button type="button" className="canvas-icon-action" aria-label="Duplicar prenda" title="Duplicar prenda" disabled={savingOutfit} onClick={() => duplicatePiece(selectedCanvasPiece.instanceId)}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M15 8V4H4v11h4" /></svg>
+                  </button>
+                  <button type="button" className="canvas-icon-action danger-action" aria-label="Quitar del look" title="Quitar del look" disabled={savingOutfit} onClick={() => removePiece(selectedCanvasPiece.instanceId)}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                  </button>
+                </div>}
+                <div className="look-document-actions">
                 <button type="button" className="canvas-core-action new-look-action" aria-label="Nuevo look" onClick={newLook} disabled={savingOutfit} title="Nuevo look"><LookActionIcon action="new" /><span className="canvas-action-label">Nuevo</span></button>
                 <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing || arrangingCanvas} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || arrangingCanvas || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
                 <button type="button" className="history-action" aria-label="Deshacer" title="Deshacer · ⌘Z" disabled={!history.current.past.length || savingOutfit} onClick={() => travelHistory("undo")}><LookActionIcon action="undo" /></button>
@@ -4156,6 +4178,7 @@ export function WardrobeApp({
                   <button type="button" className="canvas-icon-action danger-action" aria-label="Vaciar canvas" title="Vaciar canvas" disabled={savingOutfit || !canvasPieces.length} onClick={() => { canvasGestures.current?.cancel(); checkpoint(); setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setSaved(false); }}><LookActionIcon action="clear" /></button>
                 </div>
                 <button type="button" className={`primary-action save-look-action ${saved ? "saved" : ""}`} aria-label={saveLookLabel} title={saveLookLabel} aria-busy={savingOutfit} disabled={savingOutfit || !canvasPieces.length || saved} onClick={() => void saveCurrentOutfit()}><LookActionIcon action="save" /><span className="canvas-action-label">{saved && !savingOutfit ? "Guardado" : "Guardar"}</span></button>
+                </div>
               </div>
             <div className="studio-library-column">
             <aside className="look-controls garment-library-panel panel-open" id="canvas-garment-library" aria-label="Prendas y categorías" data-grid-size={canvasGridSize}>

@@ -146,6 +146,9 @@
 .forme-app.view-studio .studio-document-name input { width: 100%; max-width: 360px; min-width: 0; height: 36px; text-align: center; padding: 0; border: 0; border-radius: 2px; outline-offset: 4px; background: transparent; color: var(--fs-ink); font: 500 16px/1.3 var(--fs-font); letter-spacing: -.015em; text-overflow: ellipsis; }
 .forme-app.view-studio .studio-document-name > span { color: var(--fs-muted); font: 12px/1.3 var(--fs-font); white-space: nowrap; }
 .forme-app.view-studio .studio-document-actions { grid-column: 2; grid-row: 3; position: relative; z-index: 96; display: flex; align-items: center; gap: 4px; container: look-actions / inline-size; min-width: 0; padding-top: 7px; border-top: 1px solid var(--fs-line); }
+.forme-app.view-studio .look-document-actions { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+.forme-app.view-studio .selected-piece-actions { display: none; align-items: center; width: 100%; min-width: 0; gap: 4px; }
+.forme-app.view-studio .selected-piece-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fs-muted); font: 13px/1.3 var(--fs-font); }
 .forme-app.view-studio .studio-document-actions button { flex-shrink: 0; box-shadow: none; letter-spacing: 0; }
 .forme-app.view-studio .history-action { width: 32px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--fs-muted); font-size: 20px; }
 .forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { width: auto; min-height: 36px; height: 36px; padding: 7px 10px; margin: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fs-ink); font: 400 14px/1.3 var(--fs-font); white-space: nowrap; }
@@ -199,8 +202,8 @@
 .forme-app.view-studio .compact-tools .piece-layer-down { left: 0; top: 100%; }
 .forme-app.view-studio .compact-tools .piece-layer-up { left: 33.333333%; top: 100%; }
 .forme-app.view-studio .compact-tools .piece-replace { left: 66.666667%; top: 100%; }
-/* Touch has direct gestures; only actions without a gesture stay around the prenda. */
-.forme-app.view-studio .touch-tools :is(.transform-handle,.piece-keep,.piece-replace) { display: none; }
+/* Touch has direct gestures; actions live in the toolbar instead of covering the garment. */
+.forme-app.view-studio .touch-tools :is(.piece-action,.transform-handle) { display: none; }
 .forme-app.view-studio .touch-tools .piece-layer-up { left: 0; top: 100%; }
 .forme-app.view-studio .touch-tools .piece-layer-down { left: 100%; top: 100%; }
 .forme-app.view-studio .look-canvas { touch-action: none; }
@@ -579,6 +582,8 @@
   .forme-app.view-studio .studio-document-name > span { display: none; }
   .forme-app.view-studio .history-action[aria-label="Rehacer"] { display: none; }
   .forme-app.view-studio .studio-document-actions { gap: 2px; }
+  .forme-app.view-studio .studio-document-actions[data-piece-selected="true"] .look-document-actions { display: none; }
+  .forme-app.view-studio .studio-document-actions[data-piece-selected="true"] .selected-piece-actions { display: flex; }
   .forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { padding-inline: 8px; }
   .forme-app.view-studio .new-look-action { padding-left: 0; }
   .forme-app.view-studio .sticker-tray { grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 24px 16px; }

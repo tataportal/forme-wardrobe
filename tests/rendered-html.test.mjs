@@ -261,6 +261,17 @@ test("Canvas automatically refines new and mixed garments without an adjustment 
   assert.doesNotMatch(page, /className="canvas-core-action arrange-look-action"/);
 });
 
+test("Canvas moves touch actions into the toolbar instead of covering the selected garment", async () => {
+  const [page, styles] = await Promise.all([
+    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-pilot.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /className="selected-piece-actions"/);
+  assert.match(page, /data-piece-selected=\{selectedCanvasPiece \? "true" : undefined\}/);
+  assert.match(styles, /\.touch-tools :is\(\.piece-action,\.transform-handle\) \{ display: none; \}/);
+  assert.match(styles, /\[data-piece-selected="true"\] \.selected-piece-actions \{ display: flex; \}/);
+});
+
 test("Looks has its own primary navigation state and creates a new document", async () => {
   const html = await (await render("/looks")).text();
   assert.match(html, /aria-current="page"[^>]*>Looks<\/button>/);
