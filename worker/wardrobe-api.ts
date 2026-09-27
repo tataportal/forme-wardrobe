@@ -209,6 +209,13 @@ type GarmentPresentation = "auto" | "open" | "closed";
 type GarmentOutputVariant = "closed" | "open";
 type StyleAudience = "hombre" | "mujer";
 
+type ImageGenerationUsage = {
+  input_tokens?: number;
+  input_tokens_details?: { image_tokens?: number; text_tokens?: number };
+  output_tokens?: number;
+  total_tokens?: number;
+};
+
 type StyleFamilyRatingPayload = {
   family: string;
   affinity: number;
@@ -218,6 +225,7 @@ type StyleFamilyRatingPayload = {
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
+const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const categories = new Set(Object.keys(garmentTypesByCategory));
 const garmentTypes = new Set(Object.values(garmentTypesByCategory).flat());
 const styleFamilies = new Set([
@@ -989,7 +997,11 @@ async function prepareRecognizedGarment(env: WardrobeEnv, db: D1Database, garmen
 
 function ghostPrompt(garment: GarmentRow, presentation: GarmentPresentation = "auto"): string {
   const recognized = sourceRecognition(garment);
-  if (recognized) return recognized.prompt;
+  if (recognized) return `${recognized.prompt}
+
+TRANSPARENT OUTPUT
+- Return only the garment on a fully transparent background with a clean alpha channel.
+- No white studio background, matte, halo, floor, cast shadow or contact shadow.`;
   const isLayerable = garment.category === "Outerwear" || garment.category === "Tailoring";
   const construction = presentation === "open"
     ? `PRESENTATION — OPEN STATE REQUIRED
@@ -1038,8 +1050,8 @@ REMOVE ONLY PHOTOGRAPHY ARTIFACTS
 
 CATALOG OUTPUT
 - One garment only, front view, centered with the entire garment visible and comfortable margins in an exact vertical 4:5 composition.
-- Neutral pure-white flat seamless background, soft even studio lighting and faithful source color.
-- No cast shadow, contact shadow, floor shadow, grey halo, vignette or gradient behind the garment. Keep the exterior background uniformly white so it can be removed cleanly.
+- Fully transparent background with a clean alpha channel, soft even studio lighting and faithful source color.
+- No white matte, cast shadow, contact shadow, floor shadow, grey halo, vignette or gradient behind the garment.
 - Natural restrained texture: no aggressive sharpening, fake grain, added distressing or exaggerated gloss.
 
 FINAL CHECK BEFORE OUTPUT
@@ -1060,6 +1072,37 @@ function encodeBase64(value: ArrayBuffer | Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
   }
   return btoa(binary);
+}
+
+export function imageGenerationCostMicrousd(model: string, usage: ImageGenerationUsage | null | undefined): number | null {
+  const imageInput = Number(usage?.input_tokens_details?.image_tokens);
+  const textInput = Number(usage?.input_tokens_details?.text_tokens);
+  const imageOutput = Number(usage?.output_tokens);
+  if (![imageInput, textInput, imageOutput].every(Number.isFinite)) return null;
+  const rates = model.startsWith("gpt-image-2.5")
+    ? { imageInput: 8, textInput: 5, imageOutput: 30 }
+    : model.startsWith("gpt-image-2")
+      ? { imageInput: 4, textInput: 2.5, imageOutput: 15 }
+      : null;
+  if (!rates) return null;
+  // Token rates are USD per million tokens, so token × rate equals micro-USD.
+  return Math.round(imageInput * rates.imageInput + textInput * rates.textInput + imageOutput * rates.imageOutput);
+}
+
+async function recordImageGenerationUsage(
+  db: D1Database,
+  ownerId: string,
+  jobId: string,
+  model: string,
+  usage: ImageGenerationUsage | null | undefined,
+): Promise<void> {
+  const imageInput = Number.isFinite(Number(usage?.input_tokens_details?.image_tokens)) ? Number(usage?.input_tokens_details?.image_tokens) : null;
+  const textInput = Number.isFinite(Number(usage?.input_tokens_details?.text_tokens)) ? Number(usage?.input_tokens_details?.text_tokens) : null;
+  const imageOutput = Number.isFinite(Number(usage?.output_tokens)) ? Number(usage?.output_tokens) : null;
+  await db.prepare(`UPDATE processing_jobs SET image_model = ?, image_input_tokens = ?, text_input_tokens = ?,
+    image_output_tokens = ?, generation_cost_microusd = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND owner_id = ?`)
+    .bind(model, imageInput, textInput, imageOutput, imageGenerationCostMicrousd(model, usage), jobId, ownerId).run();
 }
 
 type GeneratedReview = { passed: boolean; retryable: boolean; score: number; notes: string; layeringPolygon: Array<{ x: number; y: number }>; anatomy: unknown };
@@ -1688,13 +1731,16 @@ async function processGarment(
     const contentType = source.httpMetadata?.contentType || "image/jpeg";
     const filename = source.customMetadata?.filename || `garment.${contentType.split("/")[1] || "jpg"}`;
 
+    const model = env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const form = new FormData();
-    form.append("model", env.OPENAI_IMAGE_MODEL || "gpt-image-2");
+    form.append("model", model);
     form.append("image[]", new File([sourceBytes], filename, { type: contentType }));
     form.append("prompt", prompt);
     form.append("size", "1024x1280");
     form.append("quality", quality);
     form.append("output_format", "png");
+    form.append("background", "transparent");
+    form.append("n", "1");
 
     let response: Response;
     try {
@@ -1721,8 +1767,10 @@ async function processGarment(
     }
     const result = await response.json() as {
       data?: Array<{ b64_json?: string }>;
+      usage?: ImageGenerationUsage;
       error?: { message?: string };
     };
+    await recordImageGenerationUsage(db, ownerId, jobId, model, result.usage);
     if (!response.ok || !result.data?.[0]?.b64_json) {
       const message = result.error?.message || `El generador respondió con ${response.status}.`;
       if (response.status === 429 || response.status >= 500) throw new RetryableProcessingError(message);
@@ -2459,12 +2507,14 @@ async function createGarmentBatch(
       method: "POST",
       url: "/v1/images/edits",
       body: {
-        model: env.OPENAI_IMAGE_MODEL || "gpt-image-2",
+        model: env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL,
         images: [{ file_id: fileId }],
         prompt: ghostPrompt(garment, job.presentation),
         size: "1024x1280",
         quality: "low",
         output_format: "png",
+        background: "transparent",
+        n: 1,
       },
     })).join("\n");
     const inputFileId = await uploadOpenAIFile(env, new File([jsonl], `forme-${Date.now()}.jsonl`, { type: "application/jsonl" }), "batch");
@@ -2537,7 +2587,7 @@ async function reconcileGarmentBatches(
       if (!outputResponse.ok) continue;
       const lines = (await outputResponse.text()).split(/\r?\n/).filter(Boolean);
       for (const line of lines) {
-        let item: { custom_id?: string; response?: { status_code?: number; body?: { data?: Array<{ b64_json?: string }>; error?: { message?: string } } }; error?: { message?: string } };
+        let item: { custom_id?: string; response?: { status_code?: number; body?: { data?: Array<{ b64_json?: string }>; usage?: ImageGenerationUsage; error?: { message?: string } } }; error?: { message?: string } };
         try { item = JSON.parse(line) as typeof item; } catch { continue; }
         if (!item.custom_id) continue;
         const job = await db.prepare(`
@@ -2563,6 +2613,7 @@ async function reconcileGarmentBatches(
         }
         const outputVariant: GarmentOutputVariant = job.output_variant === "open" ? "open" : "closed";
         const quality = imageQuality(job.quality);
+        await recordImageGenerationUsage(db, identity.id, job.id, env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL, item.response?.body?.usage);
         const generated = decodeBase64(encoded);
         const generatedKey = `users/${identity.id}/garments/${garment.client_id}/ghost-${outputVariant}-${quality}-${Date.now()}.png`;
         await env.WARDROBE_MEDIA.put(generatedKey, generated, {

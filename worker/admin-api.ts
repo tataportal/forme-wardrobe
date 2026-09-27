@@ -17,6 +17,11 @@ type AdminJobRow = {
   batch_id: string | null;
   prompt: string | null;
   provider_request_id: string | null;
+  image_model: string | null;
+  image_input_tokens: number | null;
+  text_input_tokens: number | null;
+  image_output_tokens: number | null;
+  generation_cost_microusd: number | null;
   started_at: string | null;
   finished_at: string | null;
   job_created_at: string;
@@ -110,6 +115,13 @@ function serializeJob(row: AdminJobRow) {
     normalizedOpen: mediaUrl(row.open_image_key),
     status: row.status,
     error: row.error,
+    generationCost: {
+      model: row.image_model,
+      imageInputTokens: row.image_input_tokens,
+      textInputTokens: row.text_input_tokens,
+      imageOutputTokens: row.image_output_tokens,
+      usd: row.generation_cost_microusd === null ? null : row.generation_cost_microusd / 1_000_000,
+    },
     promptHistory: [{
       prompt,
       recordedAt: row.started_at ?? row.job_created_at,
@@ -134,6 +146,7 @@ async function generations(env: WardrobeEnv): Promise<Response> {
     SELECT
       j.id, j.status, j.error, j.attempt, j.quality, j.presentation, j.output_variant,
       j.mode, j.batch_id, j.prompt, j.provider_request_id, j.started_at, j.finished_at,
+      j.image_model, j.image_input_tokens, j.text_input_tokens, j.image_output_tokens, j.generation_cost_microusd,
       j.created_at AS job_created_at, j.updated_at AS job_updated_at,
       g.id AS garment_id, g.client_id, g.name, g.source_image_key, g.generated_image_key,
       g.generated_open_image_key, g.image_key, g.open_image_key, g.qa_status, g.qa_notes,
@@ -152,11 +165,14 @@ async function generations(env: WardrobeEnv): Promise<Response> {
     if (current) current.itemCount += 1;
     else accountMap.set(item.account.id, { ...item.account, itemCount: 1 });
   }
+  const measuredCosts = items.filter((item) => item.generationCost.usd !== null);
   return json({
     id: "PRODUCCIÓN LIVE",
     mode: "live-d1-r2",
     syncedAt: new Date().toISOString(),
     itemCount: items.length,
+    measuredCostItems: measuredCosts.length,
+    measuredCostUsd: measuredCosts.reduce((total, item) => total + (item.generationCost.usd ?? 0), 0),
     accounts: [...accountMap.values()],
     items,
   });

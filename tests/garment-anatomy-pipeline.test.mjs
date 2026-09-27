@@ -117,7 +117,15 @@ async function runPipeline(t, { outerwear = false, badFirst = false, badRetry = 
   t.mock.method(globalThis, "fetch", async (url, options) => {
     if (url.endsWith("/images/edits")) {
       requests.push("generate");
-      return Response.json({ data: [{ b64_json: Buffer.from(png).toString("base64") }] });
+      assert.equal(options.body.get("model"), "gpt-image-2.5-sunburst");
+      assert.equal(options.body.get("background"), "transparent");
+      assert.equal(options.body.get("output_format"), "png");
+      assert.equal(options.body.get("size"), "1024x1280");
+      assert.equal(options.body.get("n"), "1");
+      return Response.json({
+        data: [{ b64_json: Buffer.from(png).toString("base64") }],
+        usage: { input_tokens_details: { image_tokens: 1000, text_tokens: 200 }, output_tokens: 300 },
+      });
     }
     assert.equal(url, "https://api.openai.com/v1/responses");
     const body = JSON.parse(options.body), name = body.text.format.name;
@@ -153,6 +161,12 @@ test("real queue -> PNG cutout -> D1 -> API -> Canvas persists torso, collar and
   const row = state.row(), response = app.garmentJson(row);
   assert.equal(row.status, "ready", row.qa_notes);
   assert.deepEqual(state.requests, ["generate", "garment_quality_gate"]);
+  const job = state.sql.prepare("SELECT * FROM processing_jobs WHERE id='job'").get();
+  assert.equal(job.image_model, "gpt-image-2.5-sunburst");
+  assert.equal(job.image_input_tokens, 1000);
+  assert.equal(job.text_input_tokens, 200);
+  assert.equal(job.image_output_tokens, 300);
+  assert.equal(job.generation_cost_microusd, 18000);
   const p = response.anatomy.closed;
   assert.equal(p.slots, 2);
   assert.equal(p.shoulderY, 0.2);

@@ -46,8 +46,8 @@ backend de Formé y las credenciales del proveedor viven únicamente en servidor
 Para retail API ya aprobado:
 
 1. bloquear manifest e inputs aprobados;
-2. enviar únicamente los aprobados al API de segmentación, nunca a una segunda
-   generación;
+2. usar el PNG transparente aprobado como master y hacer únicamente limpieza
+   determinística de alfa; nunca enviarlo a otra generación o segmentación;
 3. ejecutar normalización y QA técnico en paralelo con
    `npm run garments:prepare`;
 4. revisar una sola evidencia conjunta sobre gris y negro;

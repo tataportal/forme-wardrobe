@@ -40,7 +40,9 @@ no se usa para reconocer ni para generar.
 
 Migración aditiva: `drizzle/0010_garment_recognition.sql`.
 Reconocimiento: `OPENAI_RECOGNITION_MODEL`, o el `OPENAI_QA_MODEL` existente.
-Generación: `OPENAI_IMAGE_MODEL` y calidad existentes, sin cambio de modelo.
+Generación: `gpt-image-2.5-sunburst` mediante `OPENAI_IMAGE_MODEL`, PNG transparente
+1024 × 1280 y calidad `low`. La respuesta registra tokens de imagen/texto de
+entrada, tokens de imagen de salida y costo real calculado por job.
 Plantillas: `worker/garment-prompts.json`; no se llama a otro modelo para escribir
 un prompt libre. Contrato de Responses verificado contra la
 [documentación oficial de Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).

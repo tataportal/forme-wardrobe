@@ -22,6 +22,13 @@ type GenerationItem = {
   normalizedOpen: string | null;
   status: string;
   error: string | null;
+  generationCost: {
+    model: string | null;
+    imageInputTokens: number | null;
+    textInputTokens: number | null;
+    imageOutputTokens: number | null;
+    usd: number | null;
+  };
   promptHistory: Array<{
     prompt: string;
     recordedAt: string | null;
@@ -37,6 +44,8 @@ type GenerationBatch = {
   mode: string;
   syncedAt: string;
   itemCount: number;
+  measuredCostItems: number;
+  measuredCostUsd: number;
   accounts: Array<{ id: string; name: string; email: string; itemCount: number }>;
   items: GenerationItem[];
 };
@@ -46,6 +55,8 @@ const emptyBatch: GenerationBatch = {
   mode: "live-d1-r2",
   syncedAt: "",
   itemCount: 0,
+  measuredCostItems: 0,
+  measuredCostUsd: 0,
   accounts: [],
   items: [],
 };
@@ -143,7 +154,9 @@ export default function AdminGenerations() {
     </header>
 
     <section className="ops-toolbar">
-      <div><h1>Generaciones</h1><p>{filtered.length} de {generationBatch.itemCount} piezas</p></div>
+      <div><h1>Generaciones</h1><p>{filtered.length} de {generationBatch.itemCount} piezas · {generationBatch.measuredCostItems
+        ? `costo de imagen medido US$${generationBatch.measuredCostUsd.toFixed(4)} en ${generationBatch.measuredCostItems} generaciones`
+        : "sin costos nuevos medidos"}</p></div>
       <label>Cuenta
         <select value={account} onChange={(event) => setAccount(event.target.value)}>
           <option value="all">Todas las cuentas</option>
@@ -204,6 +217,9 @@ export default function AdminGenerations() {
 
             <section className="prompt-history">
               <h2>Historial de prompts e inputs</h2>
+              <p className="generation-cost">{item.generationCost.usd === null
+                ? "Costo de esta generación: sin telemetría"
+                : `${item.generationCost.model ?? "Modelo sin registrar"} · US$${item.generationCost.usd.toFixed(6)} · ${item.generationCost.imageInputTokens ?? 0} image input · ${item.generationCost.textInputTokens ?? 0} text input · ${item.generationCost.imageOutputTokens ?? 0} image output`}</p>
               {item.promptHistory.map((entry, index) => <details key={`${entry.record}-${index}`} open={index === item.promptHistory.length - 1}>
                 <summary><b>Intento {index + 1}</b><time>{time(entry.recordedAt)}</time><span>{entry.record}</span></summary>
                 <div>

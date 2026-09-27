@@ -58,7 +58,7 @@ Solo se generan `REGENERAR` y `FALTANTE`.
 1. Identificar la prenda y su subtipo.
 2. Elegir el prompt retail corto por tipo.
 3. Enviar una sola edición por pieza a la Image API desde el backend.
-4. Generar retail limpio sobre fondo simple con `n: 1`.
+4. Generar un PNG retail con alfa nativo, `background: "transparent"` y `n: 1`.
 5. Guardar request ID, modelo, prompt y hashes de entrada/salida.
 6. Mostrar el resultado al usuario antes de cualquier calado.
 
@@ -69,9 +69,15 @@ sin cambiar la entrada.
 
 Para una edición aislada de una fuente, la Image API es la ruta directa. El
 modelo de generación vigente se declara en el manifest y no se cambia
-silenciosamente. Si se usa `gpt-image-2`, el retail de aprobación es opaco:
-ese modelo no acepta `background: "transparent"`. El calado posterior sigue
-siendo una operación separada y no una segunda reinterpretación de la prenda.
+silenciosamente. Producción usa `gpt-image-2.5-sunburst`, PNG transparente y
+calidad `low`. El postproceso conserva ese alfa y solo limpia/normaliza píxeles;
+no vuelve a interpretar la prenda ni llama a un proveedor de segmentación.
+
+Cada response registra sus tokens y el costo medido en `processing_jobs`. Las
+tarifas usadas para Sunburst son US$8/M tokens de imagen de entrada, US$5/M de
+texto de entrada y US$30/M de imagen de salida. Como el endpoint directo de
+edición no aplica cached-input pricing, el admin muestra únicamente el costo
+real derivado del `usage` devuelto por esa llamada.
 
 El manifest registra por pieza:
 
@@ -85,7 +91,7 @@ El manifest registra por pieza:
   "generation": {
     "channel": "api",
     "provider": "openai",
-    "model": "gpt-image-2",
+    "model": "gpt-image-2.5-sunburst",
     "endpoint": "images.edits",
     "requestId": "req_...",
     "sourceSha256": "...",
@@ -108,16 +114,15 @@ Preparar un manifest a partir de
 npm run garments:prepare -- --manifest ruta/al/manifest.json
 ```
 
-Antes del comando, el worker de backend envía únicamente los retail aprobados
-al proveedor de background removal configurado. Ese proveedor debe ser de
-segmentación, no de generación: el calado no puede reinterpretar la prenda.
-Su PNG transparente se registra como `cutout` en el manifest.
+El PNG transparente aprobado se registra como `cutout` en el manifest. No se
+envía a otro proveedor: el worker ejecuta limpieza determinística del alfa y
+normalización sobre ese mismo master.
 
 El comando:
 
 - valida IDs, inputs, categorías y aprobación post-generación;
 - valida la procedencia API y los hashes de lotes nuevos;
-- consume el calado API sin volver a generar la prenda;
+- consume el alfa nativo sin volver a generar ni segmentar la prenda;
 - procesa hasta seis piezas en paralelo;
 - elimina fondo, sombra de estudio y contaminación blanca;
 - normaliza a WebP lossless transparente `1024 × 1280`;

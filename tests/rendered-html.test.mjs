@@ -168,6 +168,9 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.doesNotMatch(worker, /value\.items\.slice\(0,\s*15\)/);
   assert.doesNotMatch(worker, /slice\(0, 12\)/);
   assert.match(worker, /endpoint: "\/v1\/images\/edits"/);
+  assert.match(worker, /gpt-image-2\.5-sunburst/);
+  assert.match(worker, /form\.append\("background", "transparent"\)/);
+  assert.match(worker, /imageGenerationCostMicrousd/);
   assert.match(worker, /status = 'awaiting_cutout'/);
   assert.match(worker, /garment\.category === "Outerwear"/);
   assert.match(worker, /garment_type/);

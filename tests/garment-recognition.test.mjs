@@ -71,8 +71,14 @@ async function harness(t, result = recognized()) {
     if (url.endsWith("/images/edits")) {
       calls.push("generate"); prompts.push(options.body.get("prompt"));
       assert.ok(options.body.get("image[]") instanceof File);
+      assert.equal(options.body.get("model"), "gpt-image-2.5-sunburst");
+      assert.equal(options.body.get("background"), "transparent");
+      assert.equal(options.body.get("output_format"), "png");
       if (failGeneration) return Response.json({ error: { message: "Provider unavailable" } }, { status: 503 });
-      return Response.json({ data: [{ b64_json: Buffer.from("master").toString("base64") }] });
+      return Response.json({
+        data: [{ b64_json: Buffer.from("master").toString("base64") }],
+        usage: { input_tokens_details: { image_tokens: 1000, text_tokens: 200 }, output_tokens: 300 },
+      });
     }
     if (url.endsWith("/files")) {
       const file = options.body.get("file");
