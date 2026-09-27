@@ -157,6 +157,29 @@ test("pricing activation captures a deduplicated commercial lead without login",
   assert.equal(h.sql.prepare("SELECT COUNT(*) AS count FROM sales_leads").get().count, 1);
 });
 
+test("public mutations reject cross-site requests and rate-limited actors", async t => {
+  const h = await harness(t);
+  const body = JSON.stringify({ name: "Bot", email: "bot@example.com", planId: "personal", billingCycle: "monthly", company: "" });
+  const crossSite = await h.api("/api/sales-interest", {
+    method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body,
+  });
+  assert.equal(crossSite.status, 403);
+  h.env.PUBLIC_RATE_LIMITER = { async limit() { return { success: false }; } };
+  const limited = await h.api("/api/sales-interest", { method: "POST", headers: { "content-type": "application/json" }, body });
+  assert.equal(limited.status, 429);
+  assert.equal(h.sql.prepare("SELECT COUNT(*) AS count FROM sales_leads").get().count, 0);
+});
+
+test("the backend enforces the 15-photo batch limit", async t => {
+  const h = await harness(t);
+  const items = Array.from({ length: 16 }, (_, index) => ({ clientItemId: `item-${index}`, filename: `${index}.png`, fingerprint: `fingerprint-${index}` }));
+  const response = await h.api("/api/intake-batches", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ clientId: "oversized-batch", items }),
+  });
+  assert.equal(response.status, 400);
+  assert.match(response.body.error, /hasta 15 fotos/);
+});
+
 test("upload -> one visual analysis -> independent data and image messages", async t => {
   const h = await harness(t), id = await h.upload();
   assert.equal(h.row(id).category, "");

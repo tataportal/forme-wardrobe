@@ -187,6 +187,19 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(schema, /garmentType/);
 });
 
+test("the production worker protects expensive and browser-facing routes", async () => {
+  const [worker, config] = await Promise.all([
+    readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.json", import.meta.url), "utf8"),
+  ]);
+  assert.match(config, /"AI_RATE_LIMITER"/);
+  assert.match(config, /"PUBLIC_RATE_LIMITER"/);
+  assert.match(worker, /mutationOriginAllowed/);
+  assert.match(worker, /MAX_DAILY_UPLOADS = 20/);
+  assert.match(worker, /MAX_DAILY_CANVAS_RUNS = 100/);
+  assert.match(worker, /MAX_BATCH_FILES = 15/);
+});
+
 test("ships one sequential final wardrobe directory", async () => {
   const [catalog, manifest, files] = await Promise.all([
     readFile(new URL("../app/imported-garments-2026-07-18.ts", import.meta.url), "utf8"),

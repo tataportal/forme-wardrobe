@@ -38,7 +38,14 @@ export interface WardrobeEnv {
   FORME_CHECKOUT_PACK_10?: string;
   FORME_CHECKOUT_PACK_50?: string;
   FORME_BILLING_ENFORCED?: string;
+  PUBLIC_RATE_LIMITER?: RateLimitBinding;
+  USER_RATE_LIMITER?: RateLimitBinding;
+  AI_RATE_LIMITER?: RateLimitBinding;
 }
+
+type RateLimitBinding = {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+};
 
 export interface WardrobeExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -232,6 +239,10 @@ type StyleFamilyRatingPayload = {
 };
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_BATCH_FILES = 15;
+const MAX_JSON_BYTES = 64 * 1024;
+const MAX_DAILY_UPLOADS = 20;
+const MAX_DAILY_CANVAS_RUNS = 100;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const categories = new Set(Object.keys(garmentTypesByCategory));
@@ -277,7 +288,36 @@ function json(data: unknown, status = 200): Response {
 }
 
 function apiError(message: string, status: number): Response {
-  return json({ error: message }, status);
+  const response = json({ error: message }, status);
+  if (status === 429) response.headers.set("retry-after", "60");
+  return response;
+}
+
+function contentLength(request: Request): number {
+  const value = Number(request.headers.get("content-length") || 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function mutationOriginAllowed(request: Request): boolean {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return true;
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+}
+
+async function enforceRateLimit(binding: RateLimitBinding | undefined, key: string, message: string): Promise<Response | null> {
+  if (!binding) return null;
+  try {
+    const result = await binding.limit({ key });
+    return result.success ? null : apiError(message, 429);
+  } catch {
+    return apiError("La protección de la API no está disponible. Intenta otra vez.", 503);
+  }
+}
+
+async function dailyCount(db: D1Database, query: string, ownerId: string): Promise<number> {
+  const result = await db.prepare(query).bind(ownerId).first<{ count: number }>();
+  return Number(result?.count || 0);
 }
 
 function textValue(value: unknown, fallback = ""): string {
@@ -362,6 +402,7 @@ async function syncIntakeItem(db: D1Database, garmentId: string, status: "upload
 }
 
 async function createIntakeBatch(request: Request, db: D1Database, identity: Identity): Promise<Response> {
+  if (contentLength(request) > MAX_JSON_BYTES) return apiError("La solicitud es demasiado grande.", 413);
   const value = await request.json().catch(() => null) as {
     clientId?: unknown;
     items?: Array<{ clientItemId?: unknown; filename?: unknown; fingerprint?: unknown }>;
@@ -369,6 +410,7 @@ async function createIntakeBatch(request: Request, db: D1Database, identity: Ide
   const clientId = safeClientId(textValue(value?.clientId));
   const rawItems = Array.isArray(value?.items) ? value.items : [];
   if (!clientId || !rawItems.length) return apiError("No se pudieron registrar las fotos. Vuelve a seleccionarlas.", 400);
+  if (rawItems.length > MAX_BATCH_FILES) return apiError(`Puedes subir hasta ${MAX_BATCH_FILES} fotos por lote.`, 400);
   const items = rawItems.map((item) => ({
     clientItemId: safeClientId(textValue(item.clientItemId)),
     filename: textValue(item.filename, "foto").slice(0, 160),
@@ -804,6 +846,11 @@ async function uploadGarment(
   identity: Identity,
 ): Promise<Response> {
   if (!env.WARDROBE_MEDIA) return apiError("No se pueden subir fotos en este momento. Vuelve a intentarlo más tarde.", 503);
+  if (contentLength(request) > MAX_IMAGE_BYTES + 1024 * 1024) return apiError("La carga supera el límite permitido.", 413);
+  const uploadsToday = await dailyCount(db,
+    "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND created_at >= datetime('now', '-1 day')",
+    identity.id);
+  if (uploadsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de procesamiento. Vuelve mañana.", 429);
   if (env.FORME_BILLING_ENFORCED === "true" && await creditBalance(db, identity.id) <= 0) {
     return apiError("Ya usaste tus digitalizaciones. Elige un plan o agrega créditos para continuar.", 402);
   }
@@ -949,7 +996,7 @@ async function recognizeGarment(env: WardrobeEnv, db: D1Database, garment: Garme
       method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
       signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
       body: JSON.stringify({
-        model, store: false,
+        model, store: false, max_output_tokens: 1800,
         input: [{ role: "user", content: [
           { type: "input_text", text: recognitionInstruction },
           { type: "input_image", image_url: `data:${contentType};base64,${encodeBase64(bytes)}`, detail: "high" },
@@ -1181,6 +1228,7 @@ async function reviewGeneratedGarment(
       body: JSON.stringify({
         model,
         store: false,
+        max_output_tokens: 2200,
         input: [{
           role: "user",
           content: [
@@ -1315,7 +1363,7 @@ async function reviewAnatomyOnly(env: WardrobeEnv, db: D1Database, garment: Garm
     headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
     signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
     body: JSON.stringify({
-      model, store: false,
+      model, store: false, max_output_tokens: 1200,
       input: [{ role: "user", content: [
         { type: "input_text", text: `This OUTPUT is already approved. Remeasure anatomy only; do not regenerate or reassess fidelity. Previous measurement failed: ${reason}. ${anatomyInstruction} ${contourGuide}` },
         { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
@@ -1347,7 +1395,7 @@ async function reviewLayeringMaskOnly(env: WardrobeEnv, db: D1Database, garment:
     method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
     signal: AbortSignal.timeout(90 * 1000),
     body: JSON.stringify({
-      model, store: false,
+      model, store: false, max_output_tokens: 1200,
       input: [{ role: "user", content: [
         { type: "input_text", text: "The master is already approved; repair ONLY its interior layering mask. IMAGE 1 is the master; IMAGE 2 adds a numbered 0..1000 grid (x along top, y down left). IMAGE 3, when present, shows the REJECTED mask in magenta. Follow the actual inner panel edges, safely inside the lining. Preserve the complete back-neck collar band, lapels, buttons, graphics and outer panels. At the hem join the already-empty central gap without widening into fabric. Coordinates cover the WHOLE image, not the garment bounding box. Confidence is a percentage 0..100: 95, NOT 9.5 or 9. Preserve the approved anatomy." },
         { type: "input_text", text: `Return the opening as exactly 12 horizontal sections, in top-to-bottom order, at these FIXED normalized y positions: ${JSON.stringify(rows)}. For each section return ONLY left_x and right_x (0..1000 over whole image width). Do NOT return or convert y coordinates. The first section is below the back collar and the last is at the hem. Follow the actual inner panel edges; the opening usually narrows downwards. Sections are converted to a polygon by code, so no point list is needed.` },
@@ -1401,6 +1449,7 @@ async function reviewLayeringCutout(
       body: JSON.stringify({
         model,
         store: false,
+        max_output_tokens: 800,
         input: [{
           role: "user",
           content: [
@@ -2153,6 +2202,16 @@ async function retryGarment(
   const enabled = processingEnabled(env);
   const body = await request.json().catch(() => null) as { quality?: unknown; presentation?: unknown; outputVariant?: unknown } | null;
   let quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
+  const generationsToday = await dailyCount(db,
+    "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'garment_generation' AND created_at >= datetime('now', '-1 day')",
+    identity.id);
+  if (generationsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de generación. Vuelve mañana.", 429);
+  if (quality === "medium") {
+    const mediumToday = await dailyCount(db,
+      "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND quality = 'medium' AND created_at >= datetime('now', '-1 day')",
+      identity.id);
+    if (mediumToday >= 3) return apiError("Ya usaste las tres mejoras de calidad de hoy.", 429);
+  }
   const requestedVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
   const recognized = sourceRecognition(garment);
   const outputVariant: GarmentOutputVariant = recognized || garment.category === "Outerwear" ? "closed" : requestedVariant;
@@ -2534,11 +2593,13 @@ async function createGarmentBatch(
   identity: Identity,
 ): Promise<Response> {
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("No se pueden preparar imágenes en este momento. Vuelve a intentarlo más tarde.", 503);
+  if (contentLength(request) > MAX_JSON_BYTES) return apiError("La solicitud es demasiado grande.", 413);
   const body = await request.json().catch(() => null) as { garmentIds?: unknown } | null;
   const garmentIds = Array.isArray(body?.garmentIds)
     ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))]
     : [];
   if (!garmentIds.length) return apiError("Selecciona al menos una foto.", 400);
+  if (garmentIds.length > MAX_BATCH_FILES) return apiError(`Puedes procesar hasta ${MAX_BATCH_FILES} prendas por lote.`, 400);
 
   const candidates = await Promise.all(garmentIds.map(id => findGarment(db, identity.id, id)));
   if (candidates.some(item => item && item.recognition_status !== "legacy" && item.recognition_status !== "failed" && !sourceRecognition(item))) {
@@ -2873,6 +2934,11 @@ export function canvasPlacementCostUsd(model: string, usage: CanvasPlacementUsag
 
 async function suggestCanvasPlacement(request: Request, env: WardrobeEnv, db: D1Database, identity: Identity): Promise<Response> {
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El ajuste inteligente no está disponible.", 503);
+  if (contentLength(request) > MAX_JSON_BYTES) return apiError("La solicitud es demasiado grande.", 413);
+  const runsToday = await dailyCount(db,
+    "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'canvas_placement' AND created_at >= datetime('now', '-1 day')",
+    identity.id);
+  if (runsToday >= MAX_DAILY_CANVAS_RUNS) return apiError("Llegaste al límite diario del ajuste automático. Vuelve mañana.", 429);
   const value = await request.json().catch(() => null) as { items?: unknown } | null;
   const rawItems = Array.isArray(value?.items) ? value.items : [];
   if (!rawItems.length || rawItems.length > 8) return apiError("Prueba el ajuste con entre 1 y 8 prendas.", 400);
@@ -3440,10 +3506,10 @@ export async function handleWardrobeApi(
   if (url.pathname === "/api/internal/garment-operation") {
     return internalGarmentOperation(request, env, ctx);
   }
+  if (!mutationOriginAllowed(request)) return apiError("Origen de solicitud no permitido.", 403);
   if (url.pathname === "/api/sales-interest" && request.method === "POST") {
     if (!env.DB) return apiError("Formé no está disponible en este momento.", 503);
-    const contentLength = Number(request.headers.get("content-length") || 0);
-    if (contentLength > 8_192) return apiError("Solicitud demasiado grande.", 413);
+    if (contentLength(request) > 8_192) return apiError("Solicitud demasiado grande.", 413);
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
     if (!payload) return apiError("Solicitud inválida.", 400);
     if (typeof payload.company === "string" && payload.company.trim()) return json({ ok: true }, 201);
@@ -3454,6 +3520,11 @@ export async function handleWardrobeApi(
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return apiError("Escribe un correo válido.", 400);
     if (!["personal", "club", "pack-10", "pack-50"].includes(planId)) return apiError("El plan no es válido.", 400);
     if (!["monthly", "annual", "once"].includes(billingCycle)) return apiError("El periodo no es válido.", 400);
+    const publicActor = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const actorLimited = await enforceRateLimit(env.PUBLIC_RATE_LIMITER, `sales-ip:${await hash(publicActor)}`, "Demasiados intentos. Espera un minuto.");
+    if (actorLimited) return actorLimited;
+    const emailLimited = await enforceRateLimit(env.PUBLIC_RATE_LIMITER, `sales-email:${await hash(email)}`, "Demasiados intentos. Espera un minuto.");
+    if (emailLimited) return emailLimited;
     const dedupeKey = `${email}:${planId}:${billingCycle}`;
     await env.DB.prepare(`INSERT INTO sales_leads
       (id, email, name, plan_id, billing_cycle, status, source, dedupe_key)
@@ -3503,6 +3574,11 @@ export async function handleWardrobeApi(
   if (auth instanceof Response) return auth;
   const { db, identity } = auth;
 
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const limited = await enforceRateLimit(env.USER_RATE_LIMITER, `mutation:${identity.id}`, "Demasiadas acciones seguidas. Espera un minuto.");
+    if (limited) return limited;
+  }
+
   try {
     if (url.pathname === "/api/profile" && request.method === "PUT") {
       const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
@@ -3525,15 +3601,24 @@ export async function handleWardrobeApi(
     }
     if (url.pathname === "/api/wardrobe" && request.method === "GET") return getWardrobe(db, identity.id);
     if (url.pathname === "/api/intake-batches" && request.method === "POST") return createIntakeBatch(request, db, identity);
-    if (url.pathname === "/api/upload" && request.method === "POST") return uploadGarment(request, env, ctx, db, identity);
-    if (url.pathname === "/api/batches" && request.method === "POST") return createGarmentBatch(request, env, ctx, db, identity);
+    if (url.pathname === "/api/upload" && request.method === "POST") {
+      const limited = await enforceRateLimit(env.AI_RATE_LIMITER, `upload:${identity.id}`, "Estás subiendo demasiado rápido. Espera un minuto.");
+      return limited ?? uploadGarment(request, env, ctx, db, identity);
+    }
+    if (url.pathname === "/api/batches" && request.method === "POST") {
+      const limited = await enforceRateLimit(env.AI_RATE_LIMITER, `batch:${identity.id}`, "Demasiados lotes seguidos. Espera un minuto.");
+      return limited ?? createGarmentBatch(request, env, ctx, db, identity);
+    }
     if (url.pathname === "/api/batches/status" && request.method === "GET") return reconcileGarmentBatches(env, ctx, db, identity);
     if (url.pathname === "/api/outfits" && request.method === "GET") return getOutfits(db, identity.id);
     if (url.pathname === "/api/week" && request.method === "GET") return getWeeklyPlan(db, identity.id);
     if (url.pathname === "/api/week" && request.method === "POST") return saveWeeklyPlan(request, db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "GET") return getStyleProfile(db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "PUT") return saveStyleProfile(request, db, identity.id);
-    if (url.pathname === "/api/canvas-placement" && request.method === "POST") return suggestCanvasPlacement(request, env, db, identity);
+    if (url.pathname === "/api/canvas-placement" && request.method === "POST") {
+      const limited = await enforceRateLimit(env.AI_RATE_LIMITER, `canvas:${identity.id}`, "Demasiados ajustes seguidos. Espera un minuto.");
+      return limited ?? suggestCanvasPlacement(request, env, db, identity);
+    }
 
     const intakeFailMatch = url.pathname.match(/^\/api\/intake-batches\/([^/]+)\/items\/([^/]+)\/fail$/);
     if (intakeFailMatch && request.method === "POST") {
@@ -3570,7 +3655,9 @@ export async function handleWardrobeApi(
     const retryMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/retry$/);
     if (retryMatch && request.method === "POST") {
       const clientId = safeClientId(decodeURIComponent(retryMatch[1]));
-      return clientId ? retryGarment(request, env, ctx, db, identity, clientId) : apiError("Ruta inválida.", 400);
+      if (!clientId) return apiError("Ruta inválida.", 400);
+      const limited = await enforceRateLimit(env.AI_RATE_LIMITER, `retry:${identity.id}`, "Demasiados reintentos seguidos. Espera un minuto.");
+      return limited ?? retryGarment(request, env, ctx, db, identity, clientId);
     }
 
     const cutoutMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/cutout$/);
@@ -3635,7 +3722,7 @@ export async function handleWardrobeApi(
     }
     return apiError("Ruta no encontrada.", 404);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Ocurrió un error inesperado.";
-    return apiError(message.slice(0, 300), 500);
+    console.error("wardrobe_api_error", error instanceof Error ? error.message : "unknown");
+    return apiError("Ocurrió un error inesperado. Intenta otra vez.", 500);
   }
 }
