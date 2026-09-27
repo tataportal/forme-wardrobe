@@ -70,7 +70,7 @@ export default function PricingPage() {
 
       <section className="pricing-free" aria-labelledby="free-title">
         <div><h2 id="free-title">Empieza gratis</h2><p>10 prendas de por vida y hasta 5 looks guardados. Sin tarjeta.</p></div>
-        <a href="/auth/google?return_to=/closet">Crear mi closet</a>
+        <a href="/auth/google/start?return_to=%2Fcloset">Crear mi closet</a>
       </section>
 
       <section className="pricing-paid" aria-labelledby="plans-title">

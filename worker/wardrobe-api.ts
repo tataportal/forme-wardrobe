@@ -243,6 +243,8 @@ const MAX_BATCH_FILES = 15;
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_DAILY_UPLOADS = 20;
 const MAX_DAILY_CANVAS_RUNS = 100;
+const MONTHLY_CANVAS_RUNS: Record<string, number> = { trial: 100, personal: 300, club: 1000 };
+const PROCESSING_JOB_ALLOWANCE: Record<string, number> = { trial: 15, personal: 25, club: 60 };
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const categories = new Set(Object.keys(garmentTypesByCategory));
@@ -318,6 +320,25 @@ async function enforceRateLimit(binding: RateLimitBinding | undefined, key: stri
 async function dailyCount(db: D1Database, query: string, ownerId: string): Promise<number> {
   const result = await db.prepare(query).bind(ownerId).first<{ count: number }>();
   return Number(result?.count || 0);
+}
+
+async function accountPlanId(db: D1Database, ownerId: string): Promise<string> {
+  const account = await db.prepare("SELECT plan_id FROM billing_accounts WHERE owner_id = ? LIMIT 1")
+    .bind(ownerId).first<{ plan_id: string }>();
+  return account?.plan_id || "trial";
+}
+
+async function monthlyCanvasAllowance(db: D1Database, ownerId: string): Promise<{ planId: string; limit: number }> {
+  const planId = await accountPlanId(db, ownerId);
+  return { planId, limit: MONTHLY_CANVAS_RUNS[planId] ?? MONTHLY_CANVAS_RUNS.trial };
+}
+
+async function processingAllowanceReached(db: D1Database, ownerId: string): Promise<{ reached: boolean; limit: number; planId: string }> {
+  const planId = await accountPlanId(db, ownerId);
+  const limit = PROCESSING_JOB_ALLOWANCE[planId] ?? PROCESSING_JOB_ALLOWANCE.trial;
+  const window = planId === "trial" ? "" : " AND created_at >= datetime('now', 'start of month')";
+  const count = await dailyCount(db, `SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ?${window}`, ownerId);
+  return { reached: count >= limit, limit, planId };
 }
 
 function textValue(value: unknown, fallback = ""): string {
@@ -851,6 +872,12 @@ async function uploadGarment(
     "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND created_at >= datetime('now', '-1 day')",
     identity.id);
   if (uploadsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de procesamiento. Vuelve mañana.", 429);
+  const allowance = await processingAllowanceReached(db, identity.id);
+  if (allowance.reached) {
+    return apiError(allowance.planId === "trial"
+      ? `Tu cuenta gratuita permite hasta ${allowance.limit} intentos de procesamiento.`
+      : `Llegaste al límite mensual de ${allowance.limit} intentos de procesamiento de tu plan.`, 429);
+  }
   if (env.FORME_BILLING_ENFORCED === "true" && await creditBalance(db, identity.id) <= 0) {
     return apiError("Ya usaste tus digitalizaciones. Elige un plan o agrega créditos para continuar.", 402);
   }
@@ -2206,6 +2233,8 @@ async function retryGarment(
     "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'garment_generation' AND created_at >= datetime('now', '-1 day')",
     identity.id);
   if (generationsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de generación. Vuelve mañana.", 429);
+  const allowance = await processingAllowanceReached(db, identity.id);
+  if (allowance.reached) return apiError("Llegaste al límite de intentos de procesamiento de tu plan.", 429);
   if (quality === "medium") {
     const mediumToday = await dailyCount(db,
       "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND quality = 'medium' AND created_at >= datetime('now', '-1 day')",
@@ -2939,6 +2968,13 @@ async function suggestCanvasPlacement(request: Request, env: WardrobeEnv, db: D1
     "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'canvas_placement' AND created_at >= datetime('now', '-1 day')",
     identity.id);
   if (runsToday >= MAX_DAILY_CANVAS_RUNS) return apiError("Llegaste al límite diario del ajuste automático. Vuelve mañana.", 429);
+  const allowance = await monthlyCanvasAllowance(db, identity.id);
+  const runsThisMonth = await dailyCount(db,
+    "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'canvas_placement' AND created_at >= datetime('now', 'start of month')",
+    identity.id);
+  if (runsThisMonth >= allowance.limit) {
+    return apiError(`Llegaste al límite mensual de ${allowance.limit} ajustes automáticos de tu plan.`, 429);
+  }
   const value = await request.json().catch(() => null) as { items?: unknown } | null;
   const rawItems = Array.isArray(value?.items) ? value.items : [];
   if (!rawItems.length || rawItems.length > 8) return apiError("Prueba el ajuste con entre 1 y 8 prendas.", 400);

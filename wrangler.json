@@ -20,6 +20,7 @@
     "not_found_handling": "none",
     "binding": "ASSETS",
     "run_worker_first": [
+      "/auth/*",
       "/forme-social-instagram-v1.gif",
       "/admin",
       "/admin/*",
@@ -83,6 +84,7 @@
     "OPENAI_IMAGE_QUALITY": "low",
     "OPENAI_QA_MODEL": "gpt-5-mini",
     "OPENAI_CANVAS_MODEL": "gpt-5.6-luna",
+    "FORME_BILLING_ENFORCED": "true",
     "FORME_OWNER_EMAIL": "tatayamigos@gmail.com"
   },
   "observability": {

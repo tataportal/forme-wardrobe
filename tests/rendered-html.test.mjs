@@ -85,6 +85,7 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(pricingSource, /name: "Personal", monthly: 7\.99, annual: 79\.99/);
   assert.match(pricingSource, /name: "Club", monthly: 12\.99, annual: 129\.99/);
   assert.match(pricingSource, /10 prendas de por vida y hasta 5 looks guardados/);
+  assert.match(pricingSource, /\/auth\/google\/start\?return_to=%2Fcloset/);
   assert.match(pricingSource, /\/api\/sales-interest/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /Aún no hay prendas ni looks publicados\./);
@@ -194,9 +195,13 @@ test("the production worker protects expensive and browser-facing routes", async
   ]);
   assert.match(config, /"AI_RATE_LIMITER"/);
   assert.match(config, /"PUBLIC_RATE_LIMITER"/);
+  assert.match(config, /"\/auth\/\*"/);
+  assert.match(config, /"FORME_BILLING_ENFORCED": "true"/);
   assert.match(worker, /mutationOriginAllowed/);
   assert.match(worker, /MAX_DAILY_UPLOADS = 20/);
   assert.match(worker, /MAX_DAILY_CANVAS_RUNS = 100/);
+  assert.match(worker, /trial: 100, personal: 300, club: 1000/);
+  assert.match(worker, /trial: 15, personal: 25, club: 60/);
   assert.match(worker, /MAX_BATCH_FILES = 15/);
 });
 
