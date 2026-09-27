@@ -97,6 +97,13 @@ test("keeps the main product areas on stable routes", async () => {
   assert.doesNotMatch(`${closetSource}${looksSource}${canvasSource}${profileSource}`, /closetVariant/);
 });
 
+test("Google login returns to the product route that started it", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(page, /window\.location\.pathname/);
+  assert.match(page, /login\.searchParams\.set\("return_to", returnTo/);
+  assert.doesNotMatch(page, /auth\/google\/start\?return_to=%2F["']/);
+});
+
 test("redirects the brand entry to About and server-renders the wardrobe", async () => {
   const homeSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(homeSource, /["']use client["']|WardrobeApp/);

@@ -2355,7 +2355,10 @@ export function WardrobeApp({
   }
 
   function beginGoogleSignIn() {
-    window.location.assign("/auth/google/start?return_to=%2F");
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const login = new URL("/auth/google/start", window.location.origin);
+    login.searchParams.set("return_to", returnTo || "/closet");
+    window.location.assign(`${login.pathname}${login.search}`);
   }
 
   async function saveStyleCalibration(nextProfile: StyleProfile) {

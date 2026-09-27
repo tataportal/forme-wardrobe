@@ -27,3 +27,14 @@ test("Google always receives the HTTPS production callback", async () => {
     assert.equal(location.searchParams.get("redirect_uri"), "https://forme.gallery/auth/google/callback");
   }
 });
+
+test("login defaults to the real closet instead of the red brand page", async () => {
+  const env = { GOOGLE_CLIENT_ID: "test-client", GOOGLE_CLIENT_SECRET: "test-secret", SESSION_SECRET: "test-session" };
+  const response = await handleGoogleAuth(new Request("https://forme.gallery/auth/google/start"), env);
+  const stateCookie = response.headers.get("set-cookie") ?? "";
+  const encodedState = stateCookie.match(/__Host-forme_oauth_state=([^;]+)/)?.[1];
+  assert.ok(encodedState);
+  const padded = encodedState.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(encodedState.length / 4) * 4, "=");
+  const state = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  assert.equal(state.returnTo, "/closet");
+});

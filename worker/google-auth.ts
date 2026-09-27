@@ -32,13 +32,13 @@ function authConfigured(env: GoogleAuthEnv): env is Required<GoogleAuthEnv> {
 }
 
 function safeReturnTo(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/closet";
   try {
     const url = new URL(value, "https://forme.gallery");
-    if (url.origin !== "https://forme.gallery" || url.pathname.startsWith("/auth/")) return "/";
+    if (url.origin !== "https://forme.gallery" || url.pathname.startsWith("/auth/")) return "/closet";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return "/";
+    return "/closet";
   }
 }
 
