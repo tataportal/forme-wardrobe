@@ -25,6 +25,7 @@ export interface WardrobeEnv {
   OPENAI_IMAGE_QUALITY?: string;
   OPENAI_QA_MODEL?: string;
   OPENAI_RECOGNITION_MODEL?: string;
+  OPENAI_CANVAS_MODEL?: string;
   FORME_OPS_TOKEN?: string;
   FORME_OWNER_EMAIL?: string;
   GOOGLE_CLIENT_ID?: string;
@@ -2724,6 +2725,124 @@ async function getOutfits(db: D1Database, ownerId: string): Promise<Response> {
   });
 }
 
+type CanvasPlacementUsage = {
+  input_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number };
+  output_tokens?: number;
+};
+
+export function canvasPlacementCostUsd(model: string, usage: CanvasPlacementUsage | null | undefined): number | null {
+  const input = Number(usage?.input_tokens);
+  const output = Number(usage?.output_tokens);
+  const cached = Math.min(input, Math.max(0, Number(usage?.input_tokens_details?.cached_tokens) || 0));
+  if (![input, output].every(Number.isFinite) || !model.startsWith("gpt-5.6-luna")) return null;
+  return ((input - cached) * 0.2 + cached * 0.02 + output * 1.2) / 1_000_000;
+}
+
+async function suggestCanvasPlacement(request: Request, env: WardrobeEnv, db: D1Database, identity: Identity): Promise<Response> {
+  if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El ajuste inteligente no está disponible.", 503);
+  const value = await request.json().catch(() => null) as { items?: unknown } | null;
+  const rawItems = Array.isArray(value?.items) ? value.items : [];
+  if (!rawItems.length || rawItems.length > 8) return apiError("Prueba el ajuste con entre 1 y 8 prendas.", 400);
+  const items = rawItems.map((raw) => {
+    const item = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    return {
+      instanceId: safeClientId(textValue(item.instanceId)),
+      garmentId: safeClientId(textValue(item.garmentId)),
+      variant: item.variant === "open" ? "open" as const : "closed" as const,
+      name: textValue(item.name, "Prenda"),
+      category: textValue(item.category, "Other"),
+      garmentType: textValue(item.garmentType, "Garment"),
+    };
+  });
+  if (items.some((item) => !item.instanceId || !item.garmentId) || new Set(items.map((item) => item.instanceId)).size !== items.length) {
+    return apiError("Las prendas del Canvas no son válidas.", 400);
+  }
+
+  const content: Array<Record<string, unknown>> = [{
+    type: "input_text",
+    text: `Arrange this complete fashion look on a blank portrait Canvas with aspect ratio 2:3. Return one placement per item. Coordinates x and y are percentages over the whole Canvas and refer to the center of each item's 4:5 image box. At scale 1.0 that box is 76% of Canvas width and 63.3% of Canvas height. Estimate a believable shared human-body scale: head around y=13, shoulders=24, natural waist=42, hips=53, knees=72 and feet=91. Tops meet bottoms at the waist; outerwear covers tops; full-body garments replace top and bottom; footwear sits at the feet; hats and glasses sit at the head; bags sit beside the torso or hip. Keep the complete silhouettes visible. Use straight catalog placement with no rotation. layer 1 is farthest back and layer ${items.length} is frontmost. Return only the requested JSON.`,
+  }];
+
+  for (const item of items) {
+    const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE owner_id = ? AND client_id = ? AND deleted = 0 LIMIT 1`)
+      .bind(identity.id, item.garmentId).first<GarmentRow>();
+    content.push({
+      type: "input_text",
+      text: `ITEM ${item.instanceId}: ${garment?.name || item.name}; category=${garment?.category || item.category}; type=${garment?.garment_type || item.garmentType}; variant=${item.variant}.`,
+    });
+    const imageKey = item.variant === "open" ? garment?.open_image_key ?? garment?.image_key : garment?.image_key;
+    if (!imageKey) continue;
+    const image = await env.WARDROBE_MEDIA.get(imageKey);
+    if (!image) continue;
+    const bytes = await image.arrayBuffer();
+    const contentType = image.httpMetadata?.contentType || "image/webp";
+    content.push({ type: "input_image", image_url: `data:${contentType};base64,${encodeBase64(bytes)}`, detail: "low" });
+  }
+
+  const model = env.OPENAI_CANVAS_MODEL || "gpt-5.6-luna";
+  const ids = items.map((item) => item.instanceId as string);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+    signal: AbortSignal.timeout(30_000),
+    body: JSON.stringify({
+      model,
+      store: false,
+      reasoning: { effort: "low" },
+      max_output_tokens: 1200,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_schema", name: "canvas_placement", strict: true, schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          items: { type: "array", minItems: items.length, maxItems: items.length, items: {
+            type: "object", additionalProperties: false,
+            properties: {
+              instanceId: { type: "string", enum: ids },
+              x: { type: "number", minimum: 5, maximum: 95 },
+              y: { type: "number", minimum: 5, maximum: 95 },
+              scale: { type: "number", minimum: 0.08, maximum: 1.35 },
+              layer: { type: "integer", minimum: 1, maximum: items.length },
+              confidence: { type: "integer", minimum: 0, maximum: 100 },
+            },
+            required: ["instanceId", "x", "y", "scale", "layer", "confidence"],
+          } },
+        },
+        required: ["items"],
+      } } },
+    }),
+  });
+  const result = await response.json() as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ text?: string }> }>;
+    usage?: CanvasPlacementUsage;
+    error?: { message?: string };
+  };
+  if (!response.ok) return apiError(result.error?.message || "No se pudo ajustar el look.", response.status >= 500 ? 503 : 400);
+  const raw = result.output_text || result.output?.flatMap((entry) => entry.content || []).map((entry) => entry.text || "").join("") || "";
+  const parsed = JSON.parse(raw) as { items?: Array<{ instanceId?: string; x?: number; y?: number; scale?: number; layer?: number; confidence?: number }> };
+  const placements = Array.isArray(parsed.items) ? parsed.items : [];
+  if (placements.length !== items.length || new Set(placements.map((item) => item.instanceId)).size !== items.length
+    || placements.some((item) => !ids.includes(item.instanceId || "") || ![item.x, item.y, item.scale, item.layer, item.confidence].every(Number.isFinite))) {
+    return apiError("El asistente devolvió un armado incompleto.", 502);
+  }
+  const ordered = [...placements].sort((a, b) => Number(a.layer) - Number(b.layer));
+  const zById = new Map(ordered.map((item, index) => [item.instanceId, index + 1]));
+  return json({
+    model,
+    costUsd: canvasPlacementCostUsd(model, result.usage),
+    placements: placements.map((item) => ({
+      instanceId: item.instanceId,
+      x: Math.min(95, Math.max(5, Number(item.x))),
+      y: Math.min(95, Math.max(5, Number(item.y))),
+      scale: Math.min(1.35, Math.max(0.08, Number(item.scale))),
+      z: zById.get(item.instanceId) || 1,
+      confidence: Math.min(100, Math.max(0, Math.round(Number(item.confidence)))),
+    })),
+  });
+}
+
 async function saveOutfit(request: Request, db: D1Database, ownerId: string, outfitId: string): Promise<Response> {
   const value = await request.json().catch(() => null) as { name?: unknown; items?: unknown; isPublic?: unknown } | null;
   if (!value || !Array.isArray(value.items) || value.items.length > 30) return apiError("El look no es válido.", 400);
@@ -3217,6 +3336,7 @@ export async function handleWardrobeApi(
     if (url.pathname === "/api/week" && request.method === "POST") return saveWeeklyPlan(request, db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "GET") return getStyleProfile(db, identity.id);
     if (url.pathname === "/api/style-profile" && request.method === "PUT") return saveStyleProfile(request, db, identity.id);
+    if (url.pathname === "/api/canvas-placement" && request.method === "POST") return suggestCanvasPlacement(request, env, db, identity);
 
     const intakeFailMatch = url.pathname.match(/^\/api\/intake-batches\/([^/]+)\/items\/([^/]+)\/fail$/);
     if (intakeFailMatch && request.method === "POST") {

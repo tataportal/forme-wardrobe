@@ -227,11 +227,20 @@ test("Canvas keeps its garment library and iteration actions visible; optional p
   assert.match(html, /aria-label="Crear y probar looks"/);
   assert.match(html, /Nuevo look/);
   assert.match(html, /Mezclar/);
+  assert.doesNotMatch(html, /Ajustar look con IA/);
   assert.match(html, /aria-label="Favoritas"[^>]*aria-pressed="false"/);
   assert.match(html, /aria-label="Tamaño de miniaturas"/);
   assert.match(html, /aria-controls="canvas-layers"/);
   assert.match(html, /aria-controls="canvas-saved-looks"/);
   assert.doesNotMatch(html, /<aside[^>]+id="canvas-(layers|saved-looks)"/);
+});
+
+test("Canvas automatically refines new and mixed garments without an adjustment control", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(page, /fetch\("\/api\/canvas-placement"/);
+  assert.match(page, /void arrangeCanvasAutomatically\(next, generationAtStart\)/);
+  assert.match(page, /await arrangeCanvasAutomatically\(next, generationAtStart\)/);
+  assert.doesNotMatch(page, /className="canvas-core-action arrange-look-action"/);
 });
 
 test("Looks has its own primary navigation state and creates a new document", async () => {

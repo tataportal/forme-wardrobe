@@ -61,9 +61,19 @@ async function harness(t, result = recognized()) {
   t.mock.method(globalThis, "fetch", async (url, options) => {
     if (url.endsWith("/responses")) {
       const body = JSON.parse(options.body);
-      assert.equal(body.text.format.name, "garment_recognition");
       assert.equal(body.store, false);
       assert.equal(body.input[0].content.filter(item => item.type === "input_image").length, 1);
+      if (body.text.format.name === "canvas_placement") {
+        assert.equal(body.model, "gpt-5.6-luna");
+        assert.equal(body.reasoning.effort, "low");
+        const instanceId = body.text.format.schema.properties.items.items.properties.instanceId.enum[0];
+        calls.push("canvas-placement");
+        return Response.json({
+          output_text: JSON.stringify({ items: [{ instanceId, x: 50, y: 41, scale: .52, layer: 1, confidence: 93 }] }),
+          usage: { input_tokens: 1000, input_tokens_details: { cached_tokens: 200 }, output_tokens: 100 },
+        });
+      }
+      assert.equal(body.text.format.name, "garment_recognition");
       assert.ok(!JSON.stringify(body).includes("WRONG_FILENAME"));
       calls.push("recognize");
       return Response.json({ output_text: JSON.stringify(result) }, { headers: { "x-request-id": "recognition-request" } });
@@ -113,6 +123,22 @@ async function harness(t, result = recognized()) {
   const row = id => sql.prepare("SELECT * FROM garments WHERE client_id = ?").get(id);
   return { sql, env, queued, calls, prompts, api, upload, deliver, row, failMetadata(value) { failMetadata = value; }, failGeneration(value) { failGeneration = value; } };
 }
+
+test("Canvas placement uses the garment image, structured output and exact model cost", async t => {
+  const h = await harness(t), garmentId = await h.upload();
+  h.sql.prepare("UPDATE garments SET image_key = source_image_key, status = 'ready' WHERE client_id = ?").run(garmentId);
+  const response = await h.api("/api/canvas-placement", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ items: [{ instanceId: "piece-1", garmentId, variant: "closed", name: "Casaca", category: "Outerwear", garmentType: "Jacket" }] }),
+  });
+  assert.equal(response.status, 200, JSON.stringify(response.body));
+  assert.deepEqual(response.body.placements, [{ instanceId: "piece-1", x: 50, y: 41, scale: .52, z: 1, confidence: 93 }]);
+  assert.equal(response.body.model, "gpt-5.6-luna");
+  assert.equal(response.body.costUsd, .000284);
+  assert.deepEqual(h.calls, ["canvas-placement"]);
+  assert.equal(app.canvasPlacementCostUsd("gpt-5.6-luna", { input_tokens: 1000, input_tokens_details: { cached_tokens: 200 }, output_tokens: 100 }), .000284);
+});
 
 test("upload -> one visual analysis -> independent data and image messages", async t => {
   const h = await harness(t), id = await h.upload();

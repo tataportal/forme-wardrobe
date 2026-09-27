@@ -65,6 +65,7 @@
     "OPENAI_IMAGE_MODEL": "gpt-image-2.5-sunburst",
     "OPENAI_IMAGE_QUALITY": "low",
     "OPENAI_QA_MODEL": "gpt-5-mini",
+    "OPENAI_CANVAS_MODEL": "gpt-5.6-luna",
     "FORME_OWNER_EMAIL": "tatayamigos@gmail.com"
   },
   "observability": {

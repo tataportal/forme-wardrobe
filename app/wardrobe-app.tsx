@@ -1799,7 +1799,9 @@ export function WardrobeApp({
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lockedPieceIds, setLockedPieceIds] = useState<Set<string>>(new Set());
   const [randomizing, setRandomizing] = useState(false);
+  const [arrangingCanvas, setArrangingCanvas] = useState(false);
   const randomizingRef = useRef(false);
+  const arrangementRequest = useRef(0);
   const latestCanvasPieces = useRef(canvasPieces);
   latestCanvasPieces.current = canvasPieces;
   const [selectedId, setSelectedId] = useState("");
@@ -2830,43 +2832,49 @@ export function WardrobeApp({
     const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
 
     if (selectedPiece && selectedGarment) {
-      const variant = garment.openImage ? "open" : "closed";
+      const variant = garment.openImage ? "open" as const : "closed" as const;
       const placement = autoPlacedIds.current.has(selectedPiece.instanceId)
         ? defaultPlacement(garment, variant)
         : replacementPlacement(selectedPiece, selectedGarment, garment, variant);
-      setCanvasPieces((items) => items.map((item) => item.instanceId === selectedPiece.instanceId
+      const next = latestCanvasPieces.current.map((item) => item.instanceId === selectedPiece.instanceId
         ? {
             ...item,
             garmentId,
             variant,
             ...placement,
           }
-        : item));
+        : item);
+      latestCanvasPieces.current = next;
+      setCanvasPieces(next);
       setSelectedId(selectedPiece.instanceId);
       setSelectedGroupIds([]);
       setSaved(false);
+      void arrangeCanvasAutomatically(next, generationAtStart);
       return;
     }
 
     const instanceId = crypto.randomUUID();
     autoPlacedIds.current.add(instanceId);
-    const placement = defaultPlacement(garment);
-    setCanvasPieces((items) => {
-      const top = Math.max(0, ...items.map(item => item.z)) + 1;
-      return [...items, {
+    const variant = garment.openImage ? "open" as const : "closed" as const;
+    const placement = defaultPlacement(garment, variant);
+    const current = latestCanvasPieces.current;
+    const top = Math.max(0, ...current.map(item => item.z)) + 1;
+    const next = [...current, {
         instanceId,
         garmentId,
-        variant: garment.openImage ? "open" : "closed",
+        variant,
         x: placement.x,
         y: placement.y,
         scale: placement.scale,
         rotation: 0,
         z: top,
       }];
-    });
+    latestCanvasPieces.current = next;
+    setCanvasPieces(next);
     setSelectedId(instanceId);
     setSelectedGroupIds([]);
     setSaved(false);
+    void arrangeCanvasAutomatically(next, generationAtStart);
   }
 
   async function addAndOpenStudio(garmentId: string) {
@@ -3143,27 +3151,54 @@ export function WardrobeApp({
     });
   }
 
-  async function adjustCurrentLookProportions() {
-    if (savingOutfit || randomizingRef.current || !canvasPieces.length) return;
-    const snapshot = canvasPieces;
-    const generationAtStart = documentGeneration.current;
+  async function arrangeCanvasAutomatically(snapshot: CanvasPiece[], generationAtStart: number) {
+    if (demoMode || !snapshot.length || snapshot.length > 8) return;
+    const requestId = arrangementRequest.current + 1;
+    arrangementRequest.current = requestId;
+    setArrangingCanvas(true);
+    setWardrobeError("");
+    setShareNotice("");
     try {
-      await Promise.all(snapshot.map(piece => garmentById.get(piece.garmentId)).filter((item): item is Garment => Boolean(item)).map(ensureGarmentLayout));
-      if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
-      const next = snapshot.map(piece => {
-        const garment = garmentById.get(piece.garmentId);
-        return garment ? { ...piece, ...defaultPlacement(garment, piece.variant) } : piece;
+      const response = await fetch("/api/canvas-placement", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items: snapshot.map((piece) => {
+          const garment = garmentById.get(piece.garmentId);
+          return {
+            instanceId: piece.instanceId,
+            garmentId: piece.garmentId,
+            variant: piece.variant,
+            name: garment?.name || "Prenda",
+            category: garment?.category || "Other",
+            garmentType: garment?.garmentType || "Garment",
+          };
+        }) }),
       });
-      checkpoint();
-      autoPlacedIds.current = new Set(next.filter(piece => piece.rotation === 0).map(piece => piece.instanceId));
+      const result = await response.json().catch(() => null) as { placements?: Array<Pick<CanvasPiece, "instanceId" | "x" | "y" | "scale" | "z"> & { confidence: number }>; costUsd?: number | null; error?: string } | null;
+      if (!response.ok || !result?.placements) throw new Error(result?.error || "No se pudo ajustar el look.");
+      if (arrangementRequest.current !== requestId || latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
+      const placementById = new Map(result.placements.map((placement) => [placement.instanceId, placement]));
+      if (placementById.size !== snapshot.length) throw new Error("El asistente no pudo ubicar todas las prendas.");
+      const next = snapshot.map((piece) => {
+        const placement = placementById.get(piece.instanceId);
+        return placement ? { ...piece, x: placement.x, y: placement.y, scale: placement.scale, rotation: 0, z: placement.z } : piece;
+      });
+      autoPlacedIds.current = new Set(next.map(piece => piece.instanceId));
+      latestCanvasPieces.current = next;
       setCanvasPieces(next);
       setSaved(false);
-      setWardrobeError("");
-    } catch { setWardrobeError("No se pudo ajustar una de las prendas. Vuelve a intentarlo."); }
+      setShareNotice(result.costUsd == null ? "Look ajustado con IA" : `Look ajustado con IA. Costo US$${result.costUsd.toFixed(5)}`);
+    } catch (error) {
+      if (arrangementRequest.current === requestId && latestCanvasPieces.current === snapshot && documentGeneration.current === generationAtStart) {
+        setWardrobeError(error instanceof Error ? error.message : "No se pudo ajustar el look.");
+      }
+    } finally {
+      if (arrangementRequest.current === requestId) setArrangingCanvas(false);
+    }
   }
 
   async function randomizeCurrentLook() {
-    if (randomizingRef.current || savingOutfit) return;
+    if (randomizingRef.current || savingOutfit || arrangingCanvas) return;
     randomizingRef.current = true;
     setRandomizing(true);
     const snapshot = canvasPieces;
@@ -3183,11 +3218,13 @@ export function WardrobeApp({
         });
         checkpoint();
         autoPlacedIds.current = new Set(next.map(piece => piece.instanceId));
+        latestCanvasPieces.current = next;
         setCanvasPieces(next);
         setSelectedId(""); setSelectedGroupIds([]); setLockedPieceIds(new Set()); setReplacingId(null);
         setClearedLook(null);
         setSaved(false);
         setWardrobeError("");
+        await arrangeCanvasAutomatically(next, generationAtStart);
         return;
       }
       const replacements = randomGarmentReplacements(garments, snapshot, lockedPieceIds, Math.random, basicsEnabled);
@@ -3209,9 +3246,11 @@ export function WardrobeApp({
         return { ...piece, garmentId: garment.id, variant, ...placement };
       });
       checkpoint();
+      latestCanvasPieces.current = next;
       setCanvasPieces(next);
       setSaved(false);
       setWardrobeError("");
+      await arrangeCanvasAutomatically(next, generationAtStart);
     } catch {
       setWardrobeError("No se pudo preparar una de las prendas para mezclar.");
     } finally {
@@ -3965,7 +4004,7 @@ export function WardrobeApp({
 
       {view === "studio" && (
         <section className="content studio-view" data-pending={!accountDataReady || undefined} inert={!accountDataReady}>
-          <div className="studio-layout" aria-busy={savingOutfit}>
+          <div className="studio-layout" aria-busy={savingOutfit || arrangingCanvas}>
             <header className="studio-heading">
               <div className="studio-document-name"><label className="sr-only" htmlFor="look-name">Nombre del look</label><input id="look-name" disabled={savingOutfit} value={activeLookName} maxLength={80} onFocus={() => { nameCheckpoint.current = false; }} onChange={event => { if (!nameCheckpoint.current) { checkpoint(); nameCheckpoint.current = true; } setActiveLookName(event.target.value); setSaved(false); }} /><span className="sr-only" aria-live="polite">{savingOutfit ? "Guardando…" : saved ? "Guardado en Looks" : demoMode ? "Borrador en este navegador" : "Borrador"}</span></div>
               <nav className="canvas-panel-nav" aria-label="Paneles del canvas">
@@ -4108,11 +4147,10 @@ export function WardrobeApp({
 
               <div className="studio-document-actions" role="group" aria-label="Crear y probar looks">
                 <button type="button" className="canvas-core-action new-look-action" aria-label="Nuevo look" onClick={newLook} disabled={savingOutfit} title="Nuevo look"><LookActionIcon action="new" /><span className="canvas-action-label">Nuevo</span></button>
-                <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
+                <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing || arrangingCanvas} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || arrangingCanvas || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
                 <button type="button" className="history-action" aria-label="Deshacer" title="Deshacer · ⌘Z" disabled={!history.current.past.length || savingOutfit} onClick={() => travelHistory("undo")}><LookActionIcon action="undo" /></button>
                 <button type="button" className="history-action" aria-label="Rehacer" title="Rehacer · ⇧⌘Z" disabled={!history.current.future.length || savingOutfit} onClick={() => travelHistory("redo")}><LookActionIcon action="redo" /></button>
                 <div className="canvas-utility-actions" role="group" aria-label="Acciones del look">
-                  <button type="button" className="canvas-icon-action" aria-label="Ajustar proporciones" title="Ajustar proporciones" onClick={() => void adjustCurrentLookProportions()} disabled={savingOutfit || randomizing || !canvasPieces.length}><LookActionIcon action="fit" /></button>
                   <button type="button" className="canvas-icon-action" aria-label="Guardar una copia" title="Guardar una copia" onClick={() => void duplicateCurrentOutfit()} disabled={savingOutfit || !canvasPieces.length}><LookActionIcon action="copy" /></button>
                   <button type="button" className="canvas-icon-action" aria-label={shareLookLabel} title={shareLookLabel} aria-busy={Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName || "Mi look", items: currentSnapshotItems() })} disabled={Boolean(sharingLookId) || !canvasPieces.length}><LookActionIcon action="share" /></button>
                   <button type="button" className="canvas-icon-action danger-action" aria-label="Vaciar canvas" title="Vaciar canvas" disabled={savingOutfit || !canvasPieces.length} onClick={() => { canvasGestures.current?.cancel(); checkpoint(); setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setSaved(false); }}><LookActionIcon action="clear" /></button>
