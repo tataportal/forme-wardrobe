@@ -175,6 +175,18 @@ type ShareTemplateOptions = {
   includeHandle: boolean;
 };
 
+type ClosetReading = {
+  summary: string;
+  detail: string;
+  categories: Array<[string, number]>;
+  colors: Array<[string, number]>;
+  materials: Array<[string, number]>;
+  usedCount: number;
+  unusedCount: number;
+  mostUsed: Array<{ garment: Garment; count: number }>;
+  visualGarments: Garment[];
+};
+
 type WeeklyOccasion = "daily" | "work" | "dinner" | "event" | "weekend";
 type WeeklyPlanEntry = {
   date: string;
@@ -438,7 +450,7 @@ const valueTranslations: Record<string, string> = {
   All: "Todos",
   Outerwear: "Abrigos",
   Tops: "Prendas superiores",
-  Bottoms: "Pantalones",
+  Bottoms: "Pantalones y faldas",
   Tailoring: "Sastrería",
   Footwear: "Calzado",
   Accessories: "Accesorios",
@@ -1256,6 +1268,47 @@ function countGarments(garments: Garment[], value: (garment: Garment) => string)
   const counts = new Map<string, number>();
   for (const garment of garments) counts.set(value(garment), (counts.get(value(garment)) ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+const closetSwatches: Record<string, string> = {
+  Black: "#171817", White: "#efefea", Grey: "#9b9d9a", Gray: "#9b9d9a", Blue: "#405f8b",
+  Navy: "#26354d", Brown: "#765743", Green: "#60755d", Red: "#a43d32", Orange: "#c86935",
+  Pink: "#c78e9c", Purple: "#76658d", Yellow: "#c6a844", Cream: "#ded7c7", Multicolor: "conic-gradient(#405f8b,#a43d32,#c6a844,#60755d,#405f8b)",
+  "Red / orange": "linear-gradient(135deg,#a43d32 0 50%,#c86935 50%)", "Other": "#b8b6ae",
+};
+
+function closetSwatch(color: string) {
+  return closetSwatches[color] ?? closetSwatches[color.split(" / ")[0]] ?? "#b8b6ae";
+}
+
+function buildClosetReading(garments: Garment[], looks: SavedLook[]): ClosetReading {
+  const categories = countGarments(garments, garment => garment.category);
+  const colors = countGarments(garments, garment => garment.colorFamily);
+  const materials = countGarments(garments, garment => garment.material);
+  const usage = new Map<string, number>();
+  for (const look of looks) for (const item of look.items) usage.set(item.garmentId, (usage.get(item.garmentId) ?? 0) + 1);
+  const usedCount = garments.filter(garment => usage.has(garment.id)).length;
+  const mostUsed = garments
+    .flatMap(garment => usage.has(garment.id) ? [{ garment, count: usage.get(garment.id)! }] : [])
+    .sort((a, b) => b.count - a.count || translateGarmentName(a.garment.name).localeCompare(translateGarmentName(b.garment.name), "es"))
+    .slice(0, 4);
+  const mostUsedGarments = mostUsed.map(item => item.garment);
+  const visualGarments = [...mostUsedGarments, ...garments.filter(garment => !usage.has(garment.id))].slice(0, 4);
+  if (!garments.length) return {
+    summary: "Tu lectura aparecerá cuando añadas tus primeras prendas.",
+    detail: "Formé usa la categoría, el color, el material y los looks guardados. No inventa un estilo sin evidencia.",
+    categories, colors, materials, usedCount: 0, unusedCount: 0, mostUsed, visualGarments,
+  };
+  const [mainCategory, mainCategoryCount] = categories[0];
+  const [secondCategory] = categories[1] ?? [];
+  const dominantShare = Math.round(mainCategoryCount / garments.length * 100);
+  const summary = dominantShare >= 45
+    ? `${translateValue(mainCategory)} concentra ${dominantShare}% de tu closet.`
+    : secondCategory
+      ? `Tu closet se apoya en ${translateValue(mainCategory).toLocaleLowerCase()} y ${translateValue(secondCategory).toLocaleLowerCase()}.`
+      : `${translateValue(mainCategory)} define la base de tu closet.`;
+  const detail = `${translateValue(colors[0]?.[0] ?? "varios colores")} es el color más presente. ${translateValue(materials[0]?.[0] ?? "Varios materiales")} es el material que más se repite.`;
+  return { summary, detail, categories, colors, materials, usedCount, unusedCount: Math.max(0, garments.length - usedCount), mostUsed, visualGarments };
 }
 
 function buildAssistantAnswer({
@@ -2099,6 +2152,7 @@ export function WardrobeApp({
     [garments],
   );
   const personalGarments = garments.filter((item) => item.collection !== "forme" && item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
+  const closetReading = buildClosetReading(personalGarments, savedLooks);
   const basicsEnabled = demoMode || profile.includeFormeBasics === true;
   const sharedBasics = basicsEnabled ? garments.filter((item) => item.collection === "forme") : [];
   const filterCatalog = (items: Garment[]) => items.filter(item => matchFilters(item, archiveFilters) && matchesSearch(item, catalogQuery) && (!favoritesOnly || item.favorite))
@@ -4055,6 +4109,44 @@ export function WardrobeApp({
         </header>
 
         {profileShareNotice && <p className="profile-share-notice" role="status">{profileShareNotice}</p>}
+        <section className="closet-reading" aria-labelledby="closet-reading-title">
+          <header className="closet-reading-heading">
+            <span>LECTURA PRIVADA</span>
+            <h2 id="closet-reading-title">Lo que realmente hay en tu closet</h2>
+            <p>{closetReading.summary} {closetReading.detail}</p>
+          </header>
+          <div className="closet-reading-layout">
+            <figure className="closet-reading-visual" aria-label="Prendas representativas del closet">
+              {closetReading.visualGarments.map((garment) => <div key={garment.id}>
+                <img src={imageSrc(garmentPhotoFor(garment, "complete").image)} alt={translateGarmentName(garment.name)} loading="lazy" />
+              </div>)}
+              {!closetReading.visualGarments.length && <p>Añade prendas para construir tu lectura.</p>}
+            </figure>
+            <div className="closet-reading-data">
+              <section className="closet-reading-composition">
+                <h3>Composición</h3>
+                <ol>{closetReading.categories.slice(0, 6).map(([category, count]) => <li key={category}><span>{translateValue(category)}</span><strong>{count}</strong></li>)}</ol>
+              </section>
+              <section className="closet-reading-palette">
+                <h3>Paleta</h3>
+                <ul>{closetReading.colors.slice(0, 5).map(([color, count]) => <li key={color}><i style={{ background: closetSwatch(color) }} /><span>{translateValue(color)}</span><strong>{count}</strong></li>)}</ul>
+              </section>
+              <section className="closet-reading-use">
+                <h3>Uso en looks</h3>
+                <dl>
+                  <div><dt>Ya combinadas</dt><dd>{closetReading.usedCount}</dd></div>
+                  <div><dt>Por explorar</dt><dd>{closetReading.unusedCount}</dd></div>
+                </dl>
+                {closetReading.mostUsed.length > 0 ? <ol>{closetReading.mostUsed.slice(0, 3).map(({ garment, count }) => <li key={garment.id}><span>{translateGarmentName(garment.name)}</span><strong>{count} {count === 1 ? "look" : "looks"}</strong></li>)}</ol> : <p>Guarda looks para reconocer qué prendas sostienen más combinaciones.</p>}
+                <div><button type="button" onClick={newLook}>Crear look</button><button type="button" onClick={() => navigateWardrobeRoute("looks")}>Ver Looks</button></div>
+              </section>
+              <section className="closet-reading-materials">
+                <h3>Materiales que dominan</h3>
+                <p>{closetReading.materials.slice(0, 4).map(([material, count]) => `${translateValue(material)} ${count}`).join(" / ") || "Todavía sin datos"}</p>
+              </section>
+            </div>
+          </div>
+        </section>
         <div className="profile-page-body">
           <section className="profile-page-editor" aria-labelledby="profile-editor-title">
             <div className="profile-edit-columns">
