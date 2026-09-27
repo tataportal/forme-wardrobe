@@ -16,7 +16,8 @@
     "model:prepare-forme-scene": "node scripts/prepare-forme-scene.mjs",
     "social:generate": "node scripts/generate-forme-social-gif.mjs",
     "validate:garments": "node scripts/validate-garments.mjs",
-    "test": "npm run validate:garments && npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run validate:garments && npm run build && node --test tests/*.test.mjs",
+    "garments:analyze-layout": "node scripts/analyze-garment-layout.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate:remote": "wrangler d1 migrations apply forme-gallery --remote"

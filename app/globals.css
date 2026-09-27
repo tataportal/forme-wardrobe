@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Legacy foundations; the product system in forme-pilot.css takes precedence. */
+@layer forme-legacy {
+
+
 :root {
   color-scheme:light;
   --paper:#f2f0e9;
@@ -20,7 +24,8 @@
 }
 
 * { box-sizing:border-box; }
-html { background:var(--paper); scroll-behavior:smooth; }
+/* Keep the shared navigation still when Closet scrolls but Canvas fits the viewport. */
+html { background:var(--paper); scroll-behavior:smooth; scrollbar-gutter:stable; }
 body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial,Helvetica,sans-serif; }
 button,input,select { font:inherit; }
 button { color:inherit; }
@@ -1313,7 +1318,9 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .look-canvas { width:100%; height:100%; position:relative; overflow:hidden; isolation:isolate; touch-action:none; container-type:size; background:var(--canvas-greige); }
 .look-canvas::before { content:none; }
 .look-artboard { position:absolute; left:50%; top:50%; width:min(100cqw,66.6667cqh); height:min(100cqh,150cqw); aspect-ratio:2/3; transform:translate(-50%,-50%); isolation:isolate; touch-action:none; transition:left .3s cubic-bezier(.22,1,.36,1); }
-.canvas-piece { position:absolute; width:76%; aspect-ratio:4/5; transform-origin:center; user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab; will-change:left,top,transform; }
+.canvas-piece,.canvas-piece-ui { position:absolute; width:76%; aspect-ratio:4/5; transform-origin:center; user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab; will-change:left,top,transform; }
+.canvas-piece-ui { pointer-events:none; }
+.canvas-piece-ui button { pointer-events:auto; }
 .canvas-piece.expanded-hitbox::before { content:""; position:absolute; inset:var(--piece-hitbox-inset); border-radius:24px; }
 .canvas-piece img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; -webkit-user-drag:none; filter:drop-shadow(0 10px 12px rgba(17,17,15,.1)); }
 .canvas-piece.selected img { filter:drop-shadow(0 13px 15px rgba(17,17,15,.15)) drop-shadow(0 0 7px rgba(232,59,37,.1)); }
@@ -1325,20 +1332,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .empty-canvas p { margin:10px auto 0; max-width:250px; color:var(--muted); font-size:var(--type-meta); line-height:1.45; }
 .empty-canvas button { min-height:42px; margin-top:20px; padding:0 17px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); font-size:var(--type-kicker); letter-spacing:.12em; cursor:pointer; }
 .empty-canvas button:hover,.empty-canvas button:focus-visible { background:var(--signal); border-color:var(--signal); }
-.mix-canvas-navigator { position:absolute; z-index:9000; left:10px; right:10px; bottom:146px; min-height:76px; border:1px solid var(--ink); background:rgba(248,247,242,.97); display:grid; grid-template-columns:44px minmax(0,1fr) 44px; box-shadow:0 18px 48px rgba(17,17,15,.16); backdrop-filter:blur(20px); }
-.mix-step { border:0; background:transparent; font:22px/1 Georgia,serif; cursor:pointer; }
-.mix-step.previous { border-right:1px solid var(--line); }
-.mix-step.next { border-left:1px solid var(--line); }
-.mix-step:hover,.mix-step:focus-visible { background:var(--ink); color:var(--paper); }
-.mix-current-look { min-width:0; padding:9px 12px 8px; display:grid; align-content:center; }
-.mix-current-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.mix-current-heading span { color:var(--signal); font-size:var(--type-kicker); letter-spacing:.14em; }
-.mix-current-heading button { width:22px; height:22px; padding:0; border:0; background:transparent; font:17px/1 Georgia,serif; cursor:pointer; }
-.mix-current-look > strong { margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:400 16px/1.05 Georgia,serif; }
-.mix-current-look > small { margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:var(--type-kicker); }
-.mix-progress { margin-top:7px; display:grid; grid-template-columns:repeat(5,1fr); gap:3px; }
-.mix-progress i { height:2px; background:var(--line); }
-.mix-progress i.active { background:var(--signal); }
 .floating-panel-toggle { position:fixed; z-index:84; bottom:146px; min-width:108px; height:34px; padding:0 11px; border:1px solid var(--line); background:rgba(248,247,242,.94); display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 8px 28px rgba(17,17,15,.08); backdrop-filter:blur(14px); cursor:pointer; transition:opacity .18s ease,transform .25s ease; }
 .library-panel-toggle { left:12px; }
 .saved-panel-toggle { right:12px; }
@@ -1467,12 +1460,12 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .week-heading { min-height:0; flex-direction:column; align-items:stretch; gap:18px; }
   .week-heading-actions { width:100%; justify-content:space-between; }
   .week-auto-plan { min-height:34px; }
-  .canvas-piece.selected .canvas-selection-box { display:block; position:absolute; inset:0; z-index:10; border:var(--piece-outline-width) solid var(--signal); pointer-events:none; }
-  .canvas-piece.selected .duplicate-handle,.canvas-piece.selected .delete-handle { position:absolute; z-index:12; width:var(--piece-handle-size); height:var(--piece-handle-size); padding:0; border:var(--piece-outline-width) solid var(--ink); border-radius:50%; background:var(--panel); display:grid; place-items:center; color:var(--ink); touch-action:manipulation; user-select:none; box-shadow:0 3px 10px rgba(17,17,15,.16); }
-  .canvas-piece.selected .transform-handle svg { width:var(--piece-handle-icon); height:var(--piece-handle-icon); overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
-  .canvas-piece.selected .duplicate-handle { left:var(--piece-handle-half); top:var(--piece-handle-half); }
-  .canvas-piece.selected .delete-handle { right:var(--piece-handle-half); top:var(--piece-handle-half); }
-  .canvas-piece.selected .duplicate-handle:active,.canvas-piece.selected .delete-handle:active { background:var(--signal); color:var(--paper); }
+  .canvas-piece-ui.selected .canvas-selection-box { display:block; position:absolute; inset:0; z-index:10; border:var(--piece-outline-width) solid var(--signal); pointer-events:none; }
+  .canvas-piece-ui.selected .duplicate-handle,.canvas-piece-ui.selected .delete-handle { position:absolute; z-index:12; width:var(--piece-handle-size); height:var(--piece-handle-size); padding:0; border:var(--piece-outline-width) solid var(--ink); border-radius:50%; background:var(--panel); display:grid; place-items:center; color:var(--ink); touch-action:manipulation; user-select:none; box-shadow:0 3px 10px rgba(17,17,15,.16); }
+  .canvas-piece-ui.selected .transform-handle svg { width:var(--piece-handle-icon); height:var(--piece-handle-icon); overflow:visible; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .canvas-piece-ui.selected .duplicate-handle { left:var(--piece-handle-half); top:var(--piece-handle-half); }
+  .canvas-piece-ui.selected .delete-handle { right:var(--piece-handle-half); top:var(--piece-handle-half); }
+  .canvas-piece-ui.selected .duplicate-handle:active,.canvas-piece-ui.selected .delete-handle:active { background:var(--signal); color:var(--paper); }
 }
 
 @media (min-width:760px) {
@@ -1649,7 +1642,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .view-studio .zone-nav { background:rgba(248,247,242,.75); backdrop-filter:blur(12px); }
   .view-studio .studio-view { inset:0; }
   .view-studio .look-artboard { left:0; top:0; width:100%; height:100%; aspect-ratio:auto; transform:none; cursor:crosshair; }
-  .view-studio .canvas-piece { width:min(76cqw,50.6667cqh); }
+  .view-studio .canvas-piece,.view-studio .canvas-piece-ui { width:min(76cqw,50.6667cqh); }
   .view-studio .snapshot-frame { position:absolute; z-index:0; left:50%; top:50%; width:auto; height:min(calc(100cqh - 136px),150cqw); max-width:calc(100cqw - 96px); aspect-ratio:2/3; transform:translate(-50%,-50%); display:block; border:1px dashed rgba(17,17,15,.36); background:transparent; box-shadow:none; pointer-events:none; }
   .view-studio .snapshot-frame::before,.view-studio .snapshot-frame::after { content:""; position:absolute; width:13px; height:13px; border-color:rgba(17,17,15,.55); }
   .view-studio .snapshot-frame::before { left:-1px; top:-1px; border-left:1px solid; border-top:1px solid; }
@@ -1663,7 +1656,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
   .view-studio .canvas-marquee { position:absolute; z-index:9500; display:block; border:1px solid var(--signal); background:rgba(232,59,37,.08); pointer-events:none; }
   .view-studio .canvas-piece.group-selected::after { content:""; position:absolute; z-index:11; inset:0; border:calc(var(--piece-outline-width) * .8) dashed var(--signal); pointer-events:none; }
   .view-studio .look-canvas.library-open .look-artboard,.view-studio .look-canvas.saved-looks-open .look-artboard { left:0; }
-  .view-studio .mix-canvas-navigator { left:50%; right:auto; bottom:82px; width:min(640px,calc(100vw - 760px)); min-width:500px; transform:translateX(-50%); }
   .view-studio .look-controls,.view-studio .saved-looks-panel { top:78px; bottom:18px; width:min(330px,calc(100vw - 36px)); height:auto; padding:13px; box-shadow:0 14px 40px rgba(17,17,15,.09); transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .18s ease; }
   .view-studio .look-controls { right:auto; left:18px; }
   .view-studio .saved-looks-panel { right:18px; left:auto; }
@@ -3131,4 +3123,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .forme-app .sticker-tray img,
 .forme-app .closet-specimens img {
   filter:var(--garment-sticker-filter);
+}
+
 }

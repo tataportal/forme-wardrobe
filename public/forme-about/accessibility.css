@@ -1,0 +1,10 @@
+#forme-manifesto { box-sizing: border-box; width: min(760px,calc(100vw - 40px)); max-height: calc(100dvh - 40px); margin: auto; padding: 32px; border: 0; border-radius: 10px; background: #f3f3ef; color: #1c1d1b; overflow: auto; font: 18px/1.65 Arial,sans-serif; }
+#forme-manifesto::backdrop { background: rgb(20 20 16 / .45); backdrop-filter: blur(6px); }
+#forme-manifesto header { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+#forme-manifesto h1 { margin: 0 0 28px; font: 500 30px/1.15 Arial,sans-serif; letter-spacing: -.04em; }
+#forme-manifesto p { margin: 0 0 20px; font: inherit; }
+#forme-close-manifesto { flex: 0 0 auto; width: 44px; height: 44px; border: 0; background: none; font-size: 28px; cursor: pointer; }
+#forme-manifesto > a { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; padding: 12px 18px; border-radius: 6px; background: #1c1d1b; color: #fff; font: 14px/1.4 Arial,sans-serif; text-decoration: none; }
+#forme-manifesto :focus-visible { outline: 2px solid #1c1d1b; outline-offset: 4px; }
+@media (max-width: 767px) { #forme-manifesto { padding: 24px; font-size: 16px; } #forme-manifesto h1 { font-size: 26px; } }
+@media (prefers-reduced-motion: reduce) { #forme-manifesto, #forme-manifesto * { scroll-behavior: auto; animation: none; transition: none; } }

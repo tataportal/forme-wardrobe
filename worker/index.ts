@@ -2,7 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleGarmentQueue, handleWardrobeApi, WardrobeEnv, WardrobeQueueBatch } from "./wardrobe-api";
-import { handleGoogleAuth } from "./google-auth";
+import { enforceProductionHttps, handleGoogleAuth } from "./google-auth";
 import { guardAdminPage, handleAdminApi } from "./admin-api";
 
 interface Env extends WardrobeEnv {
@@ -22,6 +22,8 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const httpsRedirect = enforceProductionHttps(request);
+    if (httpsRedirect) return httpsRedirect;
     const url = new URL(request.url);
     if (url.hostname === "admin.forme.gallery") {
       const canonical = new URL(request.url);

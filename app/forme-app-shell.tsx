@@ -1,5 +1,7 @@
+import { productFeatures } from "./product-features";
+
 type ProductRoute = "closet" | "looks" | "asistente";
-type PrimaryDestination = "closet" | "canvas" | "asistente";
+type PrimaryDestination = "closet" | "canvas" | "looks" | "asistente";
 
 type FormeAppHeaderProps = {
   activeRoute: string;
@@ -11,13 +13,13 @@ type FormeAppHeaderProps = {
   onNavigate: (route: ProductRoute | "perfil") => void;
   onOpenCanvas: () => void;
   onSignIn: () => void;
-  onOpenPricing: () => void;
 };
 
 const primaryDestinations: Array<{ destination: PrimaryDestination; label: string }> = [
-  { destination: "closet", label: "Closet" },
+  { destination: "closet", label: "Mi closet" },
   { destination: "canvas", label: "Canvas" },
-  { destination: "asistente", label: "Asistente" },
+  { destination: "looks", label: "Looks" },
+  ...(productFeatures.assistant ? [{ destination: "asistente" as const, label: "Asistente" }] : []),
 ];
 
 export function FormeAppHeader({
@@ -30,7 +32,6 @@ export function FormeAppHeader({
   onNavigate,
   onOpenCanvas,
   onSignIn,
-  onOpenPricing,
 }: FormeAppHeaderProps) {
   return (
     <header className="topbar">
@@ -43,12 +44,13 @@ export function FormeAppHeader({
           {primaryDestinations.map(({ destination, label }) => (
             <button
               key={destination}
+              aria-current={(destination === "canvas" ? view === "studio" : view === "wardrobe" && activeRoute === destination) ? "page" : undefined}
               className={
                 destination === "canvas"
                   ? view === "studio" ? "active" : ""
                   : view === "wardrobe" && (
                     destination === "closet"
-                      ? activeRoute === "closet" || activeRoute === "looks"
+                      ? activeRoute === "closet"
                       : activeRoute === destination
                   ) ? "active" : ""
               }
@@ -68,7 +70,6 @@ export function FormeAppHeader({
             </button>
           ) : (
             <div className="topbar-account">
-              <button className="pricing-entry" type="button" onClick={onOpenPricing}>Planes</button>
               <button className="avatar" onClick={() => onNavigate("perfil")} aria-label="Abrir mi perfil">
                 <img className={profileImageClass} src={profileImage} alt="" />
               </button>
@@ -93,21 +94,21 @@ export function FormeMobileNav({
 }) {
   return (
     <nav className="mobile-nav" aria-label="Secciones principales">
-      {primaryDestinations.map(({ destination, label }, index) => (
+      {primaryDestinations.map(({ destination, label }) => (
         <button
           key={destination}
+              aria-current={(destination === "canvas" ? view === "studio" : view === "wardrobe" && activeRoute === destination) ? "page" : undefined}
           className={
             destination === "canvas"
               ? view === "studio" ? "active" : ""
               : view === "wardrobe" && (
                 destination === "closet"
-                  ? activeRoute === "closet" || activeRoute === "looks"
+                  ? activeRoute === "closet"
                   : activeRoute === destination
               ) ? "active" : ""
           }
           onClick={() => destination === "canvas" ? onOpenCanvas() : onNavigate(destination)}
         >
-          <span aria-hidden="true">0{index + 1}</span>
           {label}
         </button>
       ))}

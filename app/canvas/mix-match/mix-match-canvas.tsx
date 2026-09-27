@@ -561,7 +561,6 @@ export function MixMatchCanvas({
         <nav className={styles.navigation} aria-label="Navegación principal">
           <Link href="/closet">Closet</Link>
           <span aria-current="page">Canvas</span>
-          <Link href="/asistente">Asistente</Link>
         </nav>
 
         <div className={styles.headerActions}>

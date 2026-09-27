@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Fragment,
   CSSProperties,
   ChangeEvent,
-  DragEvent,
   PointerEvent as ReactPointerEvent,
   KeyboardEvent as ReactKeyboardEvent,
   useEffect,
@@ -20,12 +20,26 @@ import {
   garmentTypesByCategory,
   starterGarments,
 } from "./garments";
+import { garmentRegion, lengthOptions, type LengthOverride } from "../shared/garment-proportions";
+import { processingFileFor, uploadFileAccept, uploadFileError, uploadFingerprint } from "./garment-upload";
 import { FormeAppHeader, FormeMobileNav } from "./forme-app-shell";
+import { productFeatures } from "./product-features";
+import { FormeMenu } from "./forme-menu";
+import { GarmentViewControls, useGarmentGridSize } from "./garment-view-controls";
+import { FormeDialog } from "./forme-dialog";
+import { CanvasHistory, snapshotLook, sameDocument, readCanvasDraft, type CanvasDocument } from "./canvas-document";
+import { moveCanvasLayer } from "./canvas-layers";
+import { availableMixGarments, randomGarmentReplacements, randomLookGarments } from "./canvas-random";
+import { CanvasPieceOverlay } from "./canvas-piece-overlay";
+import { CanvasGestures, type GesturePoint } from "./canvas-gestures";
+import { fitLookPreview } from "./look-preview";
+import { LookActionIcon } from "./look-action-icon";
+import { ensureGarmentLayout, garmentLayout, layoutAnchorY, slotPlacement, REFERENCE_FRAME, type LayoutFrame } from "./garment-layout";
 
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
 type ClosetMode = "browse" | "upload";
-type StudioLibraryFilter = "all" | "outerwear" | "tops" | "bottoms" | "footwear" | "accessories";
+type StudioLibraryFilter = "all" | "outerwear" | "tops" | "bottoms" | "footwear" | "accessories" | "one-pieces";
 type CanvasPiece = {
   instanceId: string;
   garmentId: string;
@@ -35,36 +49,6 @@ type CanvasPiece = {
   scale: number;
   rotation: number;
   z: number;
-};
-
-type DragSession = {
-  instanceId: string;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  originX: number;
-  originY: number;
-  width: number;
-  height: number;
-};
-
-type PointerTrack = {
-  instanceId: string;
-  startX: number;
-  startY: number;
-  x: number;
-  y: number;
-  moved: boolean;
-  startedAt: number;
-};
-
-type PinchSession = {
-  instanceId: string;
-  pointerIds: [number, number];
-  startDistance: number;
-  startScale: number;
-  startAngle: number;
-  startRotation: number;
 };
 
 type TransformHandleSession = {
@@ -77,6 +61,9 @@ type TransformHandleSession = {
   startAngle: number;
   startScale: number;
   startRotation: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
 };
 
 type MarqueeRect = {
@@ -106,7 +93,8 @@ type WardrobeFilters = {
 
 type FilterKey = keyof WardrobeFilters;
 type FilterOptions = Record<FilterKey, string[]> & { tonesByColor: Record<string, string[]> };
-type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "colorFamily" | "tone" | "material" | "finish" | "silhouette"> & {
+type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "colorFamily" | "tone" | "material" | "finish" | "silhouette" | "lengthOverride"> & {
+  description: string;
   brand: string;
   tags: string[];
   isPublic: boolean;
@@ -114,6 +102,9 @@ type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "
 
 type ApiGarment = Omit<GarmentDraft, "id"> & {
   id: string;
+  anatomy?: Garment["anatomy"];
+  recognitionStatus?: Garment["recognitionStatus"];
+  metadataStatus?: Garment["metadataStatus"];
   favorite?: boolean;
   isPublic?: boolean;
   deleted?: boolean;
@@ -136,19 +127,19 @@ type WardrobeProfile = {
   discoverable: boolean;
   showCloset: boolean;
   showLooks: boolean;
+  includeFormeBasics: boolean;
   isOwner?: boolean;
 };
-type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks">;
+type ProfileDraft = Pick<WardrobeProfile, "name" | "handle" | "bio" | "profilePublic" | "discoverable" | "showCloset" | "showLooks" | "includeFormeBasics">;
 type SessionStatus = "checking" | "guest" | "authenticated";
 export type WardrobeRoute = "closet" | "looks" | "canvas" | "perfil" | "ajustes" | "asistente";
 type UploadStatus = "ready" | "uploading" | "processing" | "done" | "waiting" | "review" | "failed";
 type UploadItem = {
   id: string;
   file: File;
+  processingFile: File;
   preview: string;
   name: string;
-  category: Garment["category"];
-  garmentType: Garment["garmentType"];
   status: UploadStatus;
   garmentId?: string;
   error?: string;
@@ -247,13 +238,6 @@ type StyleProfile = {
   completedAt?: string | null;
   ratings: StyleFamilyRating[];
 };
-type LookIteration = {
-  id: string;
-  title: string;
-  detail: string;
-  items: CanvasPiece[];
-};
-
 const emptyFilters: WardrobeFilters = {
   category: "All",
   garmentType: "All",
@@ -270,15 +254,14 @@ const sessionProfileStorageKey = "forme-session-profile-v1";
 const sessionProfileMaxAge = 12 * 60 * 60 * 1000;
 const currentOutfitId = "current-look";
 const discountedBatchThreshold = 5;
-const maxUploadBytes = 20 * 1024 * 1024;
 const uploadStatusLabels: Record<UploadStatus, string> = {
-  ready: "LISTA",
-  uploading: "SUBIENDO",
-  processing: "PREPARANDO",
-  done: "LISTA",
-  waiting: "EN ESPERA",
-  review: "NECESITA REVISIÓN",
-  failed: "REVISAR",
+  ready: "Por añadir",
+  uploading: "Subiendo…",
+  processing: "Preparando…",
+  done: "Lista",
+  waiting: "En espera",
+  review: "Necesita revisión",
+  failed: "No se pudo preparar",
 };
 
 const styleCodeLabels: Record<StyleCode, string> = { casual: "Casual", smart: "Pulido", formal: "Formal", experimental: "Experimental" };
@@ -477,6 +460,8 @@ const valueTranslations: Record<string, string> = {
   Hat: "Gorro / sombrero",
   Glasses: "Lentes",
   Accessory: "Accesorio",
+  "One-pieces": "Vestidos y enterizos",
+  Dress: "Vestido", Jumpsuit: "Enterizo", Overalls: "Overol", Belt: "Cinturón", Scarf: "Bufanda / pañuelo",
   Black: "Negro",
   Blue: "Azul",
   Brown: "Marrón",
@@ -522,7 +507,14 @@ const valueTranslations: Record<string, string> = {
   Longline: "Largo",
   Oversized: "Oversize",
   Regular: "Regular",
-  Relaxed: "Relajado",
+  Relaxed: "Holgado",
+  Boxy: "Recto y amplio",
+  Structured: "Estructurado",
+  Graphic: "Estampado",
+  Smooth: "Liso",
+  Shiny: "Brillante",
+  Synthetic: "Sintético",
+  Polyester: "Poliéster",
 };
 
 const garmentNameTranslations: Record<string, string> = {
@@ -594,7 +586,10 @@ const garmentNameTranslations: Record<string, string> = {
   "Black Tote": "Tote negro",
 };
 
-const translateValue = (value: string) => valueTranslations[value] ?? value;
+const extraTranslations: Record<string, string> = { "Lightweight woven": "Tejido ligero", Pink: "Rosa", Yellow: "Amarillo", Black: "Negro", Amber: "Ámbar", Light: "Claro", Dark: "Oscuro", Straight: "Recto", Orange: "Naranja", Purple: "Morado", Red: "Rojo", Green: "Verde", Blue: "Azul", White: "Blanco", Grey: "Gris", Gray: "Gris", Brown: "Marrón", Navy: "Azul marino", Silver: "Plata", Gold: "Dorado", Multicolor: "Multicolor", Regular: "Regular", Slim: "Entallado", Relaxed: "Holgado", Oversized: "Amplio", Cropped: "Corto", Fitted: "Ajustado", Cotton: "Algodón", Wool: "Lana", Leather: "Cuero", Other: "Otro" };
+const translateValue = (value: string) => valueTranslations[value] ?? extraTranslations[value] ?? value.split(/([ /-]+)/).map(part => valueTranslations[part] ?? extraTranslations[part] ?? part).join("");
+const searchText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim();
+const matchesSearch = (item: Garment, query: string) => searchText([translateGarmentName(item.name), item.brand, translateValue(item.category), translateValue(item.colorFamily), translateValue(item.garmentType), ...(item.tags ?? [])].join(" ")).includes(searchText(query));
 const translateGarmentName = (name: string) => garmentNameTranslations[name] ?? name;
 const canonicalTranslatedAutocompleteValue = (value: string, options: string[]) => {
   const trimmed = value.trim();
@@ -644,6 +639,7 @@ function profileDraftFrom(profile: WardrobeProfile): ProfileDraft {
     discoverable: profile.discoverable,
     showCloset: profile.showCloset,
     showLooks: profile.showLooks,
+    includeFormeBasics: profile.includeFormeBasics === true,
   };
 }
 
@@ -657,22 +653,19 @@ function AttributeFilters({ value, options, compact = false, onChange, onReset }
   onReset: () => void;
 }) {
   const activeCount = Object.values(value).filter((item) => item !== "All").length;
-  return (
-    <div className={`attribute-filters ${compact ? "compact" : ""}`} aria-label="Filtrar prendas">
-      {filterLabels.map(({ key, label }) => {
-        const values = key === "tone" && value.colorFamily !== "All" ? options.tonesByColor[value.colorFamily] ?? [] : options[key];
-        return (
-          <label key={key}>{label}
-            <select value={value[key]} onChange={(event) => onChange(key, event.target.value)}>
-              <option value="All">Todos</option>
-              {values.map((item) => <option value={item} key={item}>{translateValue(item)}</option>)}
-            </select>
-          </label>
-        );
-      })}
-      <button type="button" className="reset-filters" disabled={activeCount === 0} onClick={onReset}>LIMPIAR {activeCount > 0 ? `(${activeCount})` : ""}</button>
-    </div>
-  );
+  const field = ({ key, label }: typeof filterLabels[number]) => {
+    const values = key === "tone" && value.colorFamily !== "All" ? options.tonesByColor[value.colorFamily] ?? [] : options[key];
+    return <label key={key}>{label}<select value={value[key]} onChange={event => onChange(key, event.target.value)}>
+      <option value="All">Todos</option>{values.map(item => <option value={item} key={item}>{translateValue(item)}</option>)}
+    </select></label>;
+  };
+  return <div className={`attribute-filters ${compact ? "compact" : ""}`} aria-label="Filtrar prendas">
+    <div className="filter-fields">{filterLabels.filter(item => ["category", "colorFamily"].includes(item.key)).map(field)}</div>
+    <details className="advanced-filters"><summary>Más filtros{activeCount > 0 ? ` · ${activeCount} activos` : ""}</summary>
+      <div className="filter-fields">{filterLabels.filter(item => !["category", "colorFamily"].includes(item.key)).map(field)}</div>
+    </details>
+    <button type="button" className="reset-filters" disabled={activeCount === 0} onClick={onReset}>Limpiar filtros{activeCount > 0 ? ` (${activeCount})` : ""}</button>
+  </div>;
 }
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -681,30 +674,6 @@ const imageSrc = (path: string) => (path.startsWith("/") ? asset(path) : path);
 const cleanCanvasImage = (path: string) => path;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const normalizeDegrees = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
-
-async function processingFileFor(file: File): Promise<File> {
-  try {
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const maxEdge = 2048;
-    const ratio = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-    const width = Math.max(1, Math.round(bitmap.width * ratio));
-    const height = Math.max(1, Math.round(bitmap.height * ratio));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) throw new Error("Canvas no disponible");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-    if (!blob) throw new Error("No se pudo optimizar la foto");
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}-processing.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
-  } catch {
-    return file;
-  }
-}
 
 async function whiteStudioCutout(sourceUrl: string): Promise<{ file: File; qaStatus: "passed" | "review"; qaNotes: string }> {
   const response = await fetch(sourceUrl, { cache: "no-store" });
@@ -780,7 +749,9 @@ async function whiteStudioCutout(sourceUrl: string): Promise<{ file: File; qaSta
   return { file: new File([blob], "cutout.png", { type: "image/png" }), qaStatus: needsReview ? "review" : "passed", qaNotes };
 }
 const apiPayload = (garment: Garment | GarmentDraft) => ({
+  lengthOverride: garment.lengthOverride ?? null,
   name: garment.name.trim() || "Prenda sin nombre",
+  description: garment.description ?? "",
   brand: garment.brand ?? "",
   category: garment.category,
   garmentType: garment.garmentType,
@@ -798,9 +769,9 @@ function mergeApiGarments(current: Garment[], updates: ApiGarment[]): Garment[] 
   const hidden = new Set(updates.filter((item) => item.deleted).map((item) => item.id));
   const byId = new Map(current.filter((item) => !hidden.has(item.id)).map((item) => [item.id, item]));
   for (const item of updates) {
-    if (item.deleted) continue;
+    if (item.deleted || !garmentTypesByCategory[item.category]) continue;
     const existing = byId.get(item.id);
-    const image = item.image || item.originalImage || existing?.image;
+    const image = item.image || (item.qaStatus === "passed" ? item.generatedImage : undefined) || item.originalImage || existing?.image;
     if (!image) continue;
     byId.set(item.id, {
       ...(existing ?? {}),
@@ -819,114 +790,70 @@ function mergeApiGarments(current: Garment[], updates: ApiGarment[]): Garment[] 
 }
 const layerBase = (category: Garment["category"]) => {
   if (category === "Bottoms") return 1000;
-  if (category === "Tops") return 2000;
+  if (category === "Tops" || category === "One-pieces") return 2000;
   if (category === "Outerwear" || category === "Tailoring") return 3000;
   if (category === "Footwear") return 4000;
   return 5000;
 };
-const upperBodyAnchor = { x: 50, y: 34 } as const;
 const lowerBodyAnchor = { x: 50, y: 61.5 } as const;
-const defaultPlacement = (garment: Garment) => {
-  if (garment.category === "Footwear") return { x: 50, y: 86, scale: 0.34 };
-  if (garment.category === "Accessories") {
-    if (garment.id.includes("sunglasses")) return { x: 50, y: 17.5, scale: 0.14 };
-    if (garment.id.includes("tote")) return { x: 74, y: 58, scale: 0.28 };
-    return { x: 50, y: 10.5, scale: 0.22 };
-  }
-  if (garment.category === "Bottoms") {
-    const scale = garment.silhouette === "Oversized" ? 0.55 : garment.silhouette === "Relaxed" ? 0.57 : 0.59;
-    return { ...lowerBodyAnchor, scale };
-  }
-  if (garment.category === "Tops") {
-    const scale = garment.silhouette === "Oversized"
-      ? 0.43
-      : garment.silhouette === "Longline"
-        ? 0.45
-        : garment.silhouette === "Relaxed"
-          ? 0.46
-          : 0.48;
-    return { ...upperBodyAnchor, scale };
-  }
-  const outerScale: Record<string, number> = {
-    Cropped: 0.56,
-    Longline: 0.46,
-    Oversized: 0.49,
-    Draped: 0.49,
-    Relaxed: 0.51,
-    Regular: 0.52,
-  };
-  return { ...upperBodyAnchor, scale: outerScale[garment.silhouette] ?? outerScale.Regular };
-};
+function currentLayoutFrame(): LayoutFrame {
+  // Portrait document coordinates are independent of screen size and open panels.
+  return REFERENCE_FRAME;
+}
 
-const roundedScale = (scale: number) => Math.round(scale * 1000) / 1000;
+const defaultPlacement = (garment: Garment, variant: "closed" | "open" = garment.openImage ? "open" : "closed", frame = currentLayoutFrame()) => slotPlacement(garment, variant, frame);
+
+function replacementPlacement(piece: CanvasPiece, previous: Garment, next: Garment, variant: "closed" | "open") {
+  const frame = currentLayoutFrame();
+  const oldDefault = defaultPlacement(previous, piece.variant, frame);
+  const newDefault = defaultPlacement(next, variant, frame);
+  const scale = clamp(newDefault.scale * piece.scale / oldDefault.scale, 0.08, 1.35);
+  if (Math.abs(piece.rotation) > 0.01) return { x: piece.x, y: piece.y, scale };
+  const oldLayout = garmentLayout(previous, piece.variant);
+  const newLayout = garmentLayout(next, variant);
+  const [oldLeft, , oldWidth] = oldLayout.bounds;
+  const [newLeft, , newWidth] = newLayout.bounds;
+  const oldTop = layoutAnchorY(oldLayout);
+  const newTop = layoutAnchorY(newLayout);
+  return {
+    x: piece.x + ((oldLeft + oldWidth / 2 - 0.5) * piece.scale - (newLeft + newWidth / 2 - 0.5) * scale) * frame.baseWidth / frame.width * 100,
+    y: piece.y + ((oldTop - 0.5) * piece.scale - (newTop - 0.5) * scale) * frame.baseWidth * 1.25 / frame.height * 100,
+    scale,
+  };
+}
 
 function recommendationOuterPlacement(garment: Garment) {
-  const placement = defaultPlacement(garment);
-  const searchable = searchableGarment(garment);
-
-  if (/funnel-neck cape|cape coat|poncho/.test(searchable)) {
-    return { ...placement, scale: roundedScale(placement.scale * 1.18) };
-  }
-  if (/puffer/.test(searchable)) {
-    return { ...placement, scale: roundedScale(placement.scale * 1.12) };
-  }
-  return placement;
+  return defaultPlacement(garment);
 }
 
-function recommendationTopPlacement(top: Garment, outer: Garment) {
-  const placement = defaultPlacement(top);
-  const outerText = searchableGarment(outer);
-
-  if (/funnel-neck cape|cape coat|poncho/.test(outerText)) {
-    return { ...placement, scale: roundedScale(placement.scale * 0.88) };
-  }
-  if (/puffer/.test(outerText)) {
-    return { ...placement, scale: roundedScale(placement.scale * 0.92) };
-  }
-  return placement;
+function recommendationTopPlacement(top: Garment, _outer: Garment) {
+  return defaultPlacement(top, "closed");
 }
 
-function normalizedCanvasPiece(piece: CanvasPiece, garment?: Garment): CanvasPiece {
-  if (!garment) return piece;
-  let next = piece;
-  if (garment.category === "Bottoms" && piece.scale >= 0.66) {
-    next = { ...next, scale: Math.round(piece.scale * 0.81 * 1000) / 1000 };
-  }
-  if (Math.abs(piece.rotation) > 0.01) return next;
-  if (garment.category === "Bottoms" && Math.abs(piece.x - lowerBodyAnchor.x) < 0.05 && Math.abs(piece.y - 66.5) < 0.05) {
-    return { ...next, ...lowerBodyAnchor };
-  }
-  if (garment.category === "Tops") {
-    const previousY = garment.silhouette === "Longline" ? 35.5 : 34;
-    if (Math.abs(piece.x - upperBodyAnchor.x) < 0.05 && (Math.abs(piece.y - 31.5) < 0.05 || Math.abs(piece.y - previousY) < 0.05)) {
-      return { ...next, ...upperBodyAnchor };
-    }
-  }
-  if (garment.category === "Footwear" && Math.abs(piece.y - 87) < 0.05) return { ...next, y: 86 };
-  if (garment.category === "Outerwear" || garment.category === "Tailoring") {
-    const legacyY: Record<string, number> = { Cropped: 30.5, Longline: 38, Oversized: 34, Draped: 34.5, Relaxed: 32.5, Regular: 32 };
-    const previousY: Record<string, number> = { Cropped: 32.75, Longline: 39, Oversized: 36.25, Draped: 36.75, Relaxed: 34.75, Regular: 34.25 };
-    const knownDefaultY = [legacyY[garment.silhouette] ?? legacyY.Regular, previousY[garment.silhouette] ?? previousY.Regular];
-    if (Math.abs(piece.x - upperBodyAnchor.x) < 0.05 && knownDefaultY.some((y) => Math.abs(piece.y - y) < 0.05)) {
-      return { ...next, ...upperBodyAnchor };
-    }
-  }
-  return next;
+function normalizedCanvasPiece(piece: CanvasPiece, _garment?: Garment): CanvasPiece {
+  // Saved coordinates are user-owned. Slot placement applies to new pieces,
+  // never as a scale/position migration when an existing look is opened.
+  return piece;
 }
 
-const initialCanvas: CanvasPiece[] = [
+function initialSlotPiece(piece: CanvasPiece): CanvasPiece {
+  const garment = starterGarments.find(item => item.id === piece.garmentId);
+  return garment ? { ...piece, ...defaultPlacement(garment, piece.variant, REFERENCE_FRAME) } : piece;
+}
+
+const initialCanvas = ([
   { instanceId: "initial-bottom", garmentId: "bottom-blue-jeans", variant: "closed", ...lowerBodyAnchor, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "initial-tee", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
   { instanceId: "initial-jacket", garmentId: "archive-002", variant: "open", x: 50, y: 34, scale: 0.51, rotation: 0, z: 3001 },
-];
+] as CanvasPiece[]).map(initialSlotPiece);
 
-const initialDemoCanvas: CanvasPiece[] = [
+const initialDemoCanvas = ([
   { instanceId: "demo-bottom", garmentId: "bottom-blue-jeans", variant: "closed", ...lowerBodyAnchor, scale: 0.59, rotation: 0, z: 1001 },
   { instanceId: "demo-top", garmentId: "top-basic-white-tee", variant: "closed", x: 50, y: 34, scale: 0.48, rotation: 0, z: 2001 },
   { instanceId: "demo-shoes", garmentId: "footwear-white-sneakers", variant: "closed", x: 50, y: 86, scale: 0.34, rotation: 0, z: 4001 },
   { instanceId: "demo-glasses", garmentId: "accessory-black-sunglasses", variant: "closed", x: 50, y: 17.5, scale: 0.14, rotation: 0, z: 5001 },
   { instanceId: "demo-tote", garmentId: "accessory-black-tote", variant: "closed", x: 74, y: 58, scale: 0.28, rotation: 0, z: 5002 },
-];
+] as CanvasPiece[]).map(initialSlotPiece);
 
 const stylingNeutralFamilies = new Set(["Black", "White", "Grey", "Brown", "Blue"]);
 
@@ -1282,86 +1209,6 @@ function buildDemoRecommendations(code: StyleCode, moment: StyleMoment, occasion
   }));
 }
 
-const iterationProfiles = [
-  { id: "clean", title: "Limpio", outer: /collarless|coach|field|shell/, footwear: /white|sneaker/, accessory: /tote/ },
-  { id: "contrast", title: "Contraste", outer: /puffer|fleece|tan|camel|sage|denim/, footwear: /black leather/, accessory: /sunglasses/ },
-  { id: "statement", title: "Protagonista", outer: /graphic|embroidered|cape|poncho|transparent|varsity/, footwear: /pump|black/, accessory: /sunglasses|beanie/ },
-  { id: "tailored", title: "Pulido", outer: /blazer|coat|trench|leather/, footwear: /brown|black leather/, accessory: /tote/ },
-  { id: "relaxed", title: "Relajado", outer: /parka|puffer|coach|fleece|bomber|blouson/, footwear: /sneaker/, accessory: /cap|beanie/ },
-] as const;
-
-function buildLookIterations(garments: Garment[], current: CanvasPiece[]): LookIteration[] {
-  const byId = new Map(garments.map((item) => [item.id, item]));
-  const fixed = current.filter((piece) => {
-    const garment = byId.get(piece.garmentId);
-    return garment?.category === "Tops" || garment?.category === "Bottoms";
-  });
-  const hasTop = fixed.some((piece) => byId.get(piece.garmentId)?.category === "Tops");
-  const hasBottom = fixed.some((piece) => byId.get(piece.garmentId)?.category === "Bottoms");
-  if (!hasTop || !hasBottom) return [];
-
-  const baseColors = new Set(fixed.map((piece) => byId.get(piece.garmentId)?.colorFamily).filter(Boolean));
-  const outerwear = garments.filter((item) => item.category === "Outerwear" || item.category === "Tailoring");
-  const footwear = garments.filter((item) => item.category === "Footwear");
-  const accessories = garments.filter((item) => item.category === "Accessories");
-  const usedOuter = new Set<string>();
-  const usedFootwear = new Set<string>();
-  const usedAccessories = new Set<string>();
-
-  return iterationProfiles.map((profile, profileIndex) => {
-    const rankedOuter = [...outerwear].sort((a, b) => {
-      const score = (garment: Garment) => {
-        const text = searchableGarment(garment);
-        let value = profile.outer.test(text) ? 20 : 0;
-        if (profile.id === "contrast" && !baseColors.has(garment.colorFamily)) value += 8;
-        if (profile.id === "statement" && ["Textured", "Glossy", "Transparent"].includes(garment.finish)) value += 6;
-        if (profile.id === "tailored" && garment.category === "Tailoring") value += 9;
-        if (profile.id === "clean" && stylingNeutralFamilies.has(garment.colorFamily)) value += 5;
-        if (profile.id === "relaxed" && ["Relaxed", "Oversized"].includes(garment.silhouette)) value += 5;
-        return value;
-      };
-      return score(b) - score(a) || a.id.localeCompare(b.id);
-    });
-    const outer = rankedOuter.find((item) => !usedOuter.has(item.id)) ?? rankedOuter[profileIndex % Math.max(rankedOuter.length, 1)];
-    if (outer) usedOuter.add(outer.id);
-
-    const rankedFootwear = [...footwear].sort((a, b) => {
-      const aMatch = profile.footwear.test(searchableGarment(a)) ? 1 : 0;
-      const bMatch = profile.footwear.test(searchableGarment(b)) ? 1 : 0;
-      return bMatch - aMatch || a.id.localeCompare(b.id);
-    });
-    const shoe = rankedFootwear.find((item) => !usedFootwear.has(item.id)) ?? rankedFootwear[profileIndex % Math.max(rankedFootwear.length, 1)];
-    if (shoe) usedFootwear.add(shoe.id);
-    const rankedAccessories = [...accessories].sort((a, b) => {
-      const aMatch = profile.accessory.test(searchableGarment(a)) ? 1 : 0;
-      const bMatch = profile.accessory.test(searchableGarment(b)) ? 1 : 0;
-      return bMatch - aMatch || a.id.localeCompare(b.id);
-    });
-    const accessory = rankedAccessories.find((item) => !usedAccessories.has(item.id)) ?? rankedAccessories[profileIndex % Math.max(rankedAccessories.length, 1)];
-    if (accessory) usedAccessories.add(accessory.id);
-
-    const additions = [outer, shoe, accessory].filter((item): item is Garment => Boolean(item));
-    const items: CanvasPiece[] = [
-      ...fixed.map((piece) => ({ ...piece, instanceId: `iterate-${profile.id}-${piece.instanceId}` })),
-      ...additions.map((garment, index) => {
-        const placement = garment.category === "Outerwear" || garment.category === "Tailoring"
-          ? recommendationOuterPlacement(garment)
-          : defaultPlacement(garment);
-        return {
-          instanceId: `iterate-${profile.id}-${garment.id}`,
-          garmentId: garment.id,
-          variant: garment.openImage ? "open" as const : "closed" as const,
-          ...placement,
-          rotation: 0,
-          z: layerBase(garment.category) + index + 1,
-        };
-      }),
-    ];
-    const detail = [outer, shoe, accessory].filter((item): item is Garment => Boolean(item)).map((item) => translateGarmentName(item.name)).join(" · ");
-    return { id: profile.id, title: profile.title, detail, items };
-  });
-}
-
 function utcDateKey(date: Date): string {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -1484,47 +1331,10 @@ function centeredLookPreviewItems(look: SavedLook, garmentById: Map<string, Garm
     if (!garment) return [];
     return [{ piece: normalizedCanvasPiece(piece, garment), garment }];
   });
-  if (!items.length) return items;
-
-  // Frame the outfit from its dressed silhouette. Hats, glasses and bags can sit
-  // outside that silhouette, but they should not make the whole thumbnail shrink.
-  const coreItems = items.filter(({ garment }) => garment.category !== "Accessories");
-  const framingItems = coreItems.length ? coreItems : items;
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const { piece } of framingItems) {
-    const radians = piece.rotation * Math.PI / 180;
-    const cosine = Math.abs(Math.cos(radians));
-    const sine = Math.abs(Math.sin(radians));
-    const halfWidth = 38 * piece.scale;
-    const halfHeight = 47.5 * piece.scale;
-    const rotatedHalfWidth = cosine * halfWidth + sine * halfHeight;
-    const rotatedHalfHeight = sine * halfWidth + cosine * halfHeight;
-    const centerY = piece.y * 1.5;
-    minX = Math.min(minX, piece.x - rotatedHalfWidth);
-    maxX = Math.max(maxX, piece.x + rotatedHalfWidth);
-    minY = Math.min(minY, centerY - rotatedHalfHeight);
-    maxY = Math.max(maxY, centerY + rotatedHalfHeight);
-  }
-
-  const boundsWidth = Math.max(1, maxX - minX);
-  const boundsHeight = Math.max(1, maxY - minY);
-  const fit = Math.min(1.15, 88 / boundsWidth, 132 / boundsHeight);
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-  return items.map(({ piece, garment }) => ({
-    garment,
-    piece: {
-      ...piece,
-      x: 50 + (piece.x - centerX) * fit,
-      y: 50 + ((piece.y * 1.5 - centerY) * fit) / 1.5,
-      scale: piece.scale * fit,
-    },
-  }));
+  const fitted = fitLookPreview(items.map(item => item.piece), piece => garmentLayout(garmentById.get(piece.garmentId)!, piece.variant).bounds);
+  return items.map((item, index) => ({ ...item, piece: fitted[index] }));
 }
+
 
 function LookPreview({ look, garmentById }: { look: SavedLook; garmentById: Map<string, Garment> }) {
   const previewItems = centeredLookPreviewItems(look, garmentById);
@@ -1587,7 +1397,7 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
 
-  context.fillStyle = "#d9d5cc";
+  context.fillStyle = "#f3f3ef";
   context.fillRect(0, 0, width, height);
   context.fillStyle = "rgba(17,17,15,.13)";
   for (let x = 46; x < width; x += 28) {
@@ -1601,15 +1411,15 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   context.fillStyle = "#11110f";
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
-  context.fillText("FORMÉ® / LOOK GUARDADO", 72, 92);
-  context.font = "400 72px Georgia, serif";
+  context.fillText("FORMÉ®", 72, 92);
+  context.font = "500 64px Helvetica, Arial, sans-serif";
   context.letterSpacing = "-2px";
   context.fillText(look.name, 72, 185, width - 144);
 
   const artboard = { x: 92, y: 266, width: 896, height: 1344 };
-  context.fillStyle = "rgba(248,247,242,.42)";
+  context.fillStyle = "#f3f3ef";
   context.fillRect(artboard.x, artboard.y, artboard.width, artboard.height);
-  context.strokeStyle = "rgba(17,17,15,.42)";
+  context.strokeStyle = "rgba(17,17,15,.10)";
   context.lineWidth = 2;
   context.strokeRect(artboard.x, artboard.y, artboard.width, artboard.height);
 
@@ -1641,7 +1451,7 @@ async function createInstagramStoryBlob(look: SavedLook, garmentById: Map<string
   }
 
   context.fillStyle = "#11110f";
-  context.font = "400 46px Georgia, serif";
+  context.font = "400 36px Helvetica, Arial, sans-serif";
   context.letterSpacing = "-1px";
   context.fillText("Vístete con lo que ya tienes.", 72, 1738);
   context.font = "600 19px Arial, sans-serif";
@@ -1725,7 +1535,7 @@ function WeeklyPlanView({
           {selectedLook && selectedEntry ? <>
             <button type="button" className="day-look-preview" onClick={() => onOpenLook(selectedLook)} aria-label={`Abrir ${selectedLook.name} en el canvas`}>
               <LookPreview look={selectedLook} garmentById={garmentById} />
-              <span>ABRIR EN CANVAS ↗</span>
+              <span>Abrir en Canvas</span>
             </button>
             <div className="day-look-meta"><div><p>LOOK DEL DÍA</p><h3>{selectedLook.name}</h3><span>{selectedLook.items.length} piezas · {weeklyOccasionLabels[selectedEntry.occasion]}</span></div><button type="button" onClick={() => onToggleWorn(selectedEntry)}>{selectedEntry.worn ? "DESMARCAR" : "YA LO USÉ ✓"}</button></div>
             <button className="week-remove" type="button" onClick={() => onRemove(selectedDate)}>QUITAR DEL DÍA</button>
@@ -1740,7 +1550,7 @@ function WeeklyPlanView({
           <div className="week-look-grid">
             {savedLooks.map((look) => <button type="button" className={selectedEntry?.outfitId === look.id ? "active" : ""} onClick={() => onAssign(selectedDate, look.id, occasion)} disabled={busy} key={look.id}>
               <LookPreview look={look} garmentById={garmentById} />
-              <span><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></span>
+              <span><strong>{look.name}</strong><small>{look.items.length} prendas</small></span>
             </button>)}
             {savedLooks.length === 0 && <div className="week-library-empty"><p>Cuando guardes un look, aparecerá aquí para asignarlo a un día.</p></div>}
           </div>
@@ -1750,66 +1560,33 @@ function WeeklyPlanView({
   );
 }
 
-function ClosetGarmentGrid({
-  garments,
-  emptyLabel,
-  onOpen,
-  onAdd,
-  onFavorite,
-  onResetFilters,
-}: {
+function ClosetGarmentGrid({ garments, emptyLabel, onOpen, onResetFilters }: {
   garments: Garment[];
   emptyLabel: string;
   onOpen: (garment: Garment) => void;
-  onAdd: (garment: Garment) => void;
-  onFavorite: (garment: Garment) => void;
   onResetFilters: () => void;
 }) {
   return <div className="garment-grid">
     {garments.map((item) => <article className="garment-card" key={item.id}>
-      <div className="image-wrap">
-        <img src={imageSrc(garmentPhotoFor(item, "complete").image)} alt={translateGarmentName(item.name)} loading="lazy" data-photo-role="complete" />
-        {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">PREPARANDO PRENDA</span>}
-        {item.status === "failed" && <span className="processing-badge failed">NECESITA REVISIÓN</span>}
-        <button
-          className="card-detail-open"
-          onClick={() => item.collection === "forme" ? onAdd(item) : onOpen(item)}
-          aria-label={`${item.collection === "forme" ? "Añadir al Canvas" : "Editar"}: ${translateGarmentName(item.name)}`}
-        />
-        {item.collection !== "forme" && <button className={`heart ${item.favorite ? "active" : ""}`} onClick={() => onFavorite(item)} aria-label={`${item.favorite ? "Quitar de" : "Añadir a"} favoritas: ${translateGarmentName(item.name)}`}>♥</button>}
-        <div className="card-hover-row">
-          <div className="card-meta" aria-hidden="true">
-            <span>
-              <strong>{translateGarmentName(item.name)}</strong>
-              {item.brand && <small>{item.brand}</small>}
-            </span>
-          </div>
-          <div className="card-hover-actions">
-            {item.collection !== "forme" && <button type="button" className="card-edit-open" onClick={() => onOpen(item)}>Editar</button>}
-            <button type="button" className="card-studio-add" onClick={() => onAdd(item)} aria-label={`Añadir al Canvas: ${translateGarmentName(item.name)}`}>Añadir</button>
-          </div>
-        </div>
-      </div>
+      <button type="button" className="garment-open" onClick={() => onOpen(item)} aria-label={`Ver prenda: ${translateGarmentName(item.name)}`}>
+        <span className="image-wrap">
+          <img src={imageSrc(garmentPhotoFor(item, "complete").image)} alt="" loading="lazy" data-photo-role="complete" />
+          {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">Preparando</span>}
+          {item.status === "failed" && <span className="processing-badge failed">Necesita revisión</span>}
+        </span>
+        <span className="garment-caption" title={translateGarmentName(item.name)}>{translateGarmentName(item.name)}</span>
+      </button>
     </article>)}
-    {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>LIMPIAR FILTROS</button></div>}
+    {garments.length === 0 && <div className="filter-empty">{emptyLabel}<button onClick={onResetFilters}>Limpiar filtros</button></div>}
   </div>;
 }
 
-function ClosetLooksNav({
-  active,
-  onNavigate,
-}: {
-  active: "closet" | "looks";
-  onNavigate: (route: "closet" | "looks") => void;
-}) {
-  return (
-    <nav className="closet-looks-nav" aria-label="Closet y Looks">
-      <button type="button" className={active === "closet" ? "active" : ""} aria-current={active === "closet" ? "page" : undefined} onClick={() => onNavigate("closet")}>Closet</button>
-      <span aria-hidden="true">/</span>
-      <button type="button" className={active === "looks" ? "active" : ""} aria-current={active === "looks" ? "page" : undefined} onClick={() => onNavigate("looks")}>Looks</button>
-    </nav>
-  );
+function ClosetActionIcon({ filter = false }: { filter?: boolean }) {
+  return <svg className="closet-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+    {filter ? <><path d="M4 7h4m4 0h8M4 17h8m4 0h4" /><circle cx="10" cy="7" r="2" /><circle cx="14" cy="17" r="2" /></> : <path d="M12 5v14M5 12h14" />}
+  </svg>;
 }
+
 
 function StyleOnboarding({ profile, saving, dismissible, onClose, onSave }: {
   profile: StyleProfile | null;
@@ -1967,6 +1744,7 @@ export function WardrobeApp({
   const [demoMode, setDemoMode] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [accountDataReady, setAccountDataReady] = useState(false);
+  const [canvasDataReady, setCanvasDataReady] = useState(false);
   const [activeRoute, setActiveRoute] = useState<WardrobeRoute>(initialRoute);
   const [view, setView] = useState<View>(initialRoute === "canvas" ? "studio" : "wardrobe");
   const [wardrobePanel, setWardrobePanel] = useState<WardrobePanel>(initialWardrobePanel);
@@ -1978,6 +1756,9 @@ export function WardrobeApp({
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [uploadIntakeBatchId, setUploadIntakeBatchId] = useState<string | null>(null);
   const [uploadBatchSummary, setUploadBatchSummary] = useState<IntakeBatchSummary | null>(null);
+  const preparingUploadRef = useRef(false);
+  const [preparingUploads, setPreparingUploads] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState("");
   const [uploadingBatch, setUploadingBatch] = useState(false);
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -1990,6 +1771,7 @@ export function WardrobeApp({
     discoverable: false,
     showCloset: false,
     showLooks: false,
+    includeFormeBasics: false,
   });
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -2015,29 +1797,63 @@ export function WardrobeApp({
   const [assistantFollowupId, setAssistantFollowupId] = useState("");
   const [assistantAnswer, setAssistantAnswer] = useState<AssistantAnswer | null>(null);
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
-  const [lookIterations, setLookIterations] = useState<LookIteration[]>([]);
-  const [activeIterationIndex, setActiveIterationIndex] = useState(-1);
+  const [lockedPieceIds, setLockedPieceIds] = useState<Set<string>>(new Set());
+  const [randomizing, setRandomizing] = useState(false);
+  const randomizingRef = useRef(false);
+  const latestCanvasPieces = useRef(canvasPieces);
+  latestCanvasPieces.current = canvasPieces;
   const [selectedId, setSelectedId] = useState("");
+  const [clearedLook, setClearedLook] = useState<{ items: CanvasPiece[]; id: string | null; name: string; saved: boolean; locked: Set<string>; automatic: Set<string> } | null>(null);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [saved, setSaved] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [savedLooksOpen, setSavedLooksOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [garmentEditing, setGarmentEditing] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ kind: "look" | "garment"; id: string; name: string } | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogSource, setCatalogSource] = useState<"personal" | "basics">("personal");
+  const [catalogSort, setCatalogSort] = useState("recent");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [libraryFavoritesOnly, setLibraryFavoritesOnly] = useState(false);
+  const [closetGridSize, setClosetGridSize] = useGarmentGridSize("closet");
+  const [canvasGridSize, setCanvasGridSize] = useGarmentGridSize("canvas");
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [librarySource, setLibrarySource] = useState<"personal" | "basics">("personal");
+  const history = useRef(new CanvasHistory());
+  const documentGeneration = useRef(0);
+  const nameCheckpoint = useRef(false);
+  const routeScroll = useRef(new Map<string, number>());
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const restoredDraftKey = useRef("");
+  const currentDocument = useRef<CanvasDocument>({ items: canvasPieces, id: activeOutfitId, name: activeLookName });
+  currentDocument.current = { items: canvasPieces, id: activeOutfitId, name: activeLookName };
   const [garmentDraft, setGarmentDraft] = useState<GarmentDraft | null>(null);
-  const [editorPhotoRole, setEditorPhotoRole] = useState<GarmentPhotoRole>("complete");
   const [tagInput, setTagInput] = useState("");
   const [garmentSaved, setGarmentSaved] = useState(false);
+  const [savingGarment, setSavingGarment] = useState(false);
   const [garmentSaveError, setGarmentSaveError] = useState("");
   const [savingOutfit, setSavingOutfit] = useState(false);
+  const [deletingLookId, setDeletingLookId] = useState<string | null>(null);
   const [sharingLookId, setSharingLookId] = useState<string | null>(null);
   const [shareNotice, setShareNotice] = useState("");
+  const [profileShareNotice, setProfileShareNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const snapshotFrameRef = useRef<HTMLDivElement>(null);
-  const dragSession = useRef<DragSession | null>(null);
-  const pointerTracks = useRef(new Map<number, PointerTrack>());
-
-  const pinchSession = useRef<PinchSession | null>(null);
+  const autoPlacedIds = useRef(new Set(initialDemoCanvas.map(piece => piece.instanceId)));
+  const canvasGestures = useRef<CanvasGestures | null>(null);
+  if (!canvasGestures.current) canvasGestures.current = new CanvasGestures({
+    select: instanceId => { setSelectedId(instanceId); setSelectedGroupIds([]); setMarqueeRect(null); },
+    checkpoint,
+    change: (instanceId, geometry) => {
+      autoPlacedIds.current.delete(instanceId);
+      setCanvasPieces(items => items.map(item => item.instanceId === instanceId ? { ...item, ...geometry } : item));
+      setSaved(false);
+    },
+    replace: beginReplacingPiece,
+    lock: toggleRandomLock,
+  });
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const marqueeSession = useRef<MarqueeSession | null>(null);
   const finalizingCutouts = useRef(new Set<string>());
@@ -2084,9 +1900,16 @@ export function WardrobeApp({
     [garments],
   );
   const personalGarments = garments.filter((item) => item.collection !== "forme" && item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
-  const sharedBasics = garments.filter((item) => item.collection === "forme");
-  const visiblePersonalGarments = personalGarments.filter((item) => matchFilters(item, archiveFilters));
-  const visibleFormeBasics = sharedBasics.filter((item) => matchFilters(item, archiveFilters));
+  const basicsEnabled = demoMode || profile.includeFormeBasics === true;
+  const sharedBasics = basicsEnabled ? garments.filter((item) => item.collection === "forme") : [];
+  const filterCatalog = (items: Garment[]) => items.filter(item => matchFilters(item, archiveFilters) && matchesSearch(item, catalogQuery) && (!favoritesOnly || item.favorite))
+    .sort((a, b) => catalogSort === "name" ? translateGarmentName(a.name).localeCompare(translateGarmentName(b.name), "es") : 0);
+  const visiblePersonalGarments = filterCatalog(personalGarments);
+  const visibleFormeBasics = filterCatalog(sharedBasics);
+  const showingBasics = demoMode || (basicsEnabled && catalogSource === "basics");
+  const showingLibraryBasics = demoMode || (basicsEnabled && librarySource === "basics");
+  const catalogItems = showingBasics ? visibleFormeBasics : visiblePersonalGarments;
+  const orderedLayers = [...canvasPieces].sort((a, b) => b.z - a.z);
   const assistantGarments = useMemo(() => {
     if (demoMode || personalGarments.length === 0) return sharedBasics;
     const categories = new Set(personalGarments.map((item) => item.category));
@@ -2095,29 +1918,30 @@ export function WardrobeApp({
   }, [demoMode, personalGarments, sharedBasics]);
   const matchesStudioLibraryFilter = (item: Garment) => {
     if (studioLibraryFilter === "outerwear") return item.category === "Outerwear" || item.category === "Tailoring";
+    if (studioLibraryFilter === "one-pieces") return item.category === "One-pieces";
     if (studioLibraryFilter === "tops") return item.category === "Tops";
     if (studioLibraryFilter === "bottoms") return item.category === "Bottoms";
     if (studioLibraryFilter === "footwear") return item.category === "Footwear";
     if (studioLibraryFilter === "accessories") return item.category === "Accessories";
     return true;
   };
-  const studioPersonalGarments = personalGarments.filter(matchesStudioLibraryFilter);
-  const studioBasicGarments = sharedBasics.filter(matchesStudioLibraryFilter);
-  const studioGarments = [...studioPersonalGarments, ...studioBasicGarments];
+  const studioPersonalGarments = personalGarments.filter(item => matchesStudioLibraryFilter(item) && matchesSearch(item, libraryQuery) && (!libraryFavoritesOnly || item.favorite));
+  const studioBasicGarments = sharedBasics.filter(item => matchesStudioLibraryFilter(item) && matchesSearch(item, libraryQuery) && (!libraryFavoritesOnly || item.favorite));
   const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
-  const activeLookIteration = activeIterationIndex >= 0 ? lookIterations[activeIterationIndex] : undefined;
-  const canIterate = canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Tops")
-    && canvasPieces.some((piece) => garmentById.get(piece.garmentId)?.category === "Bottoms");
+  const canRandomize = canvasPieces.length
+    ? canvasPieces.some(piece => !lockedPieceIds.has(piece.instanceId))
+    : availableMixGarments(garments, basicsEnabled).length > 0;
   const archiveFilterCount = Object.values(archiveFilters).filter((item) => item !== "All").length;
   const editingGarment = garmentDraft ? garmentById.get(garmentDraft.id) : undefined;
-  const editorPhoto = editingGarment ? garmentPhotoFor(editingGarment, editorPhotoRole) : undefined;
+  const editorPhoto = editingGarment ? garmentPhotoFor(editingGarment, "complete") : undefined;
   const uploadRetryableCount = uploadItems.filter((item) => item.status === "ready" || item.status === "failed" || item.status === "review").length;
-  const uploadFinishedCount = uploadItems.filter((item) => item.status === "done" || item.status === "waiting" || item.status === "review" || item.status === "failed").length;
   const uploadAllPassed = uploadItems.length > 0 && uploadItems.every((item) => item.status === "done");
   const editorTones = garmentDraft
     ? Array.from(new Set([garmentDraft.tone, ...(filterOptions.tonesByColor[garmentDraft.colorFamily] ?? [])])).filter(Boolean)
     : [];
-  const editorGarmentTypes = garmentDraft ? garmentTypesByCategory[garmentDraft.category] : [];
+  const editorLengths = garmentDraft ? Object.entries(lengthOptions[garmentRegion(garmentDraft)]) : [];
+  const detectedLength = editingGarment?.anatomy?.closed?.bodyLength;
+  const detectedLengthLabel = editorLengths.find(([key]) => key === detectedLength)?.[1];
   const profileImage = profile.avatarUrl || asset("/profile/tata.png");
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
   const profileTopStyles = styleProfile?.completed
@@ -2141,6 +1965,17 @@ export function WardrobeApp({
   ].filter(Boolean);
 
   useEffect(() => {
+    const cancel = () => canvasGestures.current?.cancel();
+    const onVisibility = () => { if (document.hidden) cancel(); };
+    window.addEventListener("blur", cancel);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { cancel(); window.removeEventListener("blur", cancel); document.removeEventListener("visibilitychange", onVisibility); };
+  }, []);
+  useEffect(() => {
+    if (view !== "studio" || savingOutfit) canvasGestures.current?.cancel();
+  }, [view, savingOutfit]);
+
+  useEffect(() => {
     if (!selectedPlanDate && weekDays.length) setSelectedPlanDate(weekDays.find((day) => day.isToday)?.key ?? weekDays[0].key);
   }, [selectedPlanDate, weekDays]);
 
@@ -2153,7 +1988,6 @@ export function WardrobeApp({
           sessionAuthenticated = true;
           setDemoMode(false);
           setSessionStatus("authenticated");
-          setAccountDataReady(true);
           setProfile(cachedProfile);
           if (profileOpen) setProfileDraft(profileDraftFrom(cachedProfile));
         }
@@ -2165,6 +1999,7 @@ export function WardrobeApp({
           setDemoMode(true);
           setSessionStatus("guest");
           setAccountDataReady(true);
+          setCanvasDataReady(true);
           try {
             const storedLooks = localStorage.getItem(demoLooksStorageKey);
             setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
@@ -2172,7 +2007,7 @@ export function WardrobeApp({
             setSavedLooks([]);
           }
           try {
-            const storedWeek = localStorage.getItem(demoWeekStorageKey);
+            const storedWeek = productFeatures.weeklyPlanner ? localStorage.getItem(demoWeekStorageKey) : null;
             setWeeklyPlan(storedWeek ? JSON.parse(storedWeek) as WeeklyPlanEntry[] : []);
           } catch {
             setWeeklyPlan([]);
@@ -2186,7 +2021,6 @@ export function WardrobeApp({
         sessionAuthenticated = true;
         setDemoMode(false);
         setSessionStatus("authenticated");
-        setAccountDataReady(true);
         setProfile(session.user);
         if (profileOpen) setProfileDraft(profileDraftFrom(session.user));
         cacheSessionProfile(session.user);
@@ -2194,7 +2028,7 @@ export function WardrobeApp({
         const [wardrobeResponse, outfitsResponse, weekResponse, styleProfileResponse] = await Promise.all([
           batchesReady.then(() => fetch("/api/wardrobe", { cache: "no-store" })),
           fetch("/api/outfits", { cache: "no-store" }),
-          fetch("/api/week", { cache: "no-store" }),
+          productFeatures.weeklyPlanner ? fetch("/api/week", { cache: "no-store" }) : Promise.resolve(null),
           fetch("/api/style-profile", { cache: "no-store" }),
         ]);
         if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu closet.");
@@ -2202,7 +2036,7 @@ export function WardrobeApp({
         const outfits = outfitsResponse.ok
           ? await outfitsResponse.json() as { outfits: SavedLook[] }
           : { outfits: [] };
-        const week = weekResponse.ok
+        const week = weekResponse?.ok
           ? await weekResponse.json() as { entries: WeeklyPlanEntry[] }
           : { entries: [] };
         const loadedStyleProfile = styleProfileResponse.ok
@@ -2218,22 +2052,27 @@ export function WardrobeApp({
           ...look,
           items: look.items.map((item) => normalizedCanvasPiece(item, loadedGarmentById.get(item.garmentId))),
         }));
+        setCanvasDataReady(true);
         setGarments(loadedGarments);
         setSavedLooks(normalizedLooks);
         setWeeklyPlan(week.entries);
         setStyleProfile(loadedStyleProfile);
         setAccountDataReady(true);
-        setStyleOnboardingOpen(!loadedStyleProfile.completed);
+        setStyleOnboardingOpen(productFeatures.styleTest && !loadedStyleProfile.completed);
         setWardrobePanel(initialWardrobePanel);
         void Promise.all(wardrobe.garments.map((item) => finalizePendingCutouts(item))).catch(() => null);
         const savedLook = normalizedLooks.find((outfit) => outfit.id === currentOutfitId);
         if (savedLook?.items.length) {
+          autoPlacedIds.current.clear();
           setCanvasPieces(savedLook.items);
           setActiveOutfitId(savedLook.id);
           setActiveLookName(savedLook.name);
           setSaved(true);
         } else {
-          setCanvasPieces(ownerCatalogEnabled ? initialCanvas : initialDemoCanvas);
+          const initialPieces = (ownerCatalogEnabled ? initialCanvas : initialDemoCanvas)
+            .filter(piece => session.user.includeFormeBasics || loadedGarmentById.get(piece.garmentId)?.collection !== "forme");
+          autoPlacedIds.current = new Set(initialPieces.map(piece => piece.instanceId));
+          setCanvasPieces(initialPieces);
           setActiveOutfitId(null);
           setActiveLookName("Nuevo look");
           setSaved(false);
@@ -2253,23 +2092,38 @@ export function WardrobeApp({
   }, []);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (view !== "studio" || !canvas) return;
+    const alignNewPieces = () => {
+      const frame = currentLayoutFrame();
+      setCanvasPieces(items => {
+        let changed = false;
+        const next = items.map(piece => {
+          const garment = garmentById.get(piece.garmentId);
+          if (!garment || !autoPlacedIds.current.has(piece.instanceId)) return piece;
+          const placement = defaultPlacement(garment, piece.variant, frame);
+          if (Math.abs(piece.x - placement.x) + Math.abs(piece.y - placement.y) + Math.abs(piece.scale - placement.scale) < 0.00001) return piece;
+          changed = true;
+          return { ...piece, ...placement };
+        });
+        return changed ? next : items;
+      });
+    };
+    alignNewPieces();
+
+  }, [view, canvasPieces.length, garmentById]);
+
+  useEffect(() => {
     const syncRouteFromHistory = () => {
       const routePath = window.location.pathname.replace(/^\//, "");
       const route = routePath as WardrobeRoute;
       if (["closet", "looks", "canvas", "perfil", "ajustes", "asistente"].includes(route)) applyWardrobeRoute(route);
+      if (route === "closet" && new URLSearchParams(window.location.search).get("view") === "upload") setClosetMode("upload");
     };
+    syncRouteFromHistory();
     window.addEventListener("popstate", syncRouteFromHistory);
     return () => window.removeEventListener("popstate", syncRouteFromHistory);
   }, []);
-
-  useEffect(() => {
-    if (!garmentDraft) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setGarmentDraft(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [garmentDraft]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -2287,6 +2141,12 @@ export function WardrobeApp({
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
+  }
+
+  function signOut() {
+    clearCachedSessionProfile();
+    try { sessionStorage.removeItem(`forme-canvas-draft-v1:${profile.handle}`); } catch { /* Logout works without storage. */ }
+    window.location.replace("/auth/logout?return_to=%2Fcloset");
   }
 
   function beginGoogleSignIn() {
@@ -2322,6 +2182,7 @@ export function WardrobeApp({
   }
 
   function updateProfileDraft<Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) {
+    setProfileShareNotice("");
     setProfileDraft((current) => current ? { ...current, [key]: value } : current);
     setProfileSaved(false);
     setProfileSaveError("");
@@ -2340,6 +2201,10 @@ export function WardrobeApp({
       const result = await response.json().catch(() => null) as { profile?: WardrobeProfile; error?: string } | null;
       if (!response.ok || !result?.profile) throw new Error(result?.error || "No se pudo guardar tu perfil.");
       setProfile(result.profile);
+      if (!result.profile.includeFormeBasics) {
+        setCatalogSource("personal");
+        setLibrarySource("personal");
+      }
       cacheSessionProfile(result.profile);
       setProfileDraft(profileDraftFrom(result.profile));
       setProfileSaved(true);
@@ -2378,9 +2243,12 @@ export function WardrobeApp({
     }
     const url = `${window.location.origin}/${profile.handle}`;
     try {
-      if (navigator.share) await navigator.share({ title: `${profile.name} en Formé`, text: `Mira mi closet en Formé`, url });
-      else await navigator.clipboard.writeText(url);
-      setProfileSaved(true);
+      if (navigator.share) {
+        await navigator.share({ title: `${profile.name} en Formé`, text: `Mira mi closet en Formé`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setProfileShareNotice("Enlace copiado");
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setProfileSaveError("No se pudo compartir el perfil.");
@@ -2397,17 +2265,20 @@ export function WardrobeApp({
         body: JSON.stringify({ name: look.name, items: look.items, isPublic: nextPublic }),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo cambiar la visibilidad del look.");
+      setShareNotice(!nextPublic ? "Look oculto del perfil" : profile.profilePublic && profile.showLooks ? "Look visible en tu perfil" : "Look elegido. Activa su visibilidad en Perfil para publicarlo.");
     } catch (error) {
       setSavedLooks((looks) => looks.map((item) => item.id === look.id ? look : item));
       setWardrobeError(error instanceof Error ? error.message : "No se pudo cambiar la visibilidad del look.");
     }
   }
 
-  function openGarmentEditor(item: Garment) {
-    setEditorPhotoRole("complete");
+  function openGarmentEditor(item: Garment, edit = false) {
+    setGarmentEditing(edit);
     setGarmentDraft({
       id: item.id,
       name: translateGarmentName(item.name),
+      lengthOverride: item.lengthOverride ?? null,
+      description: item.description ?? "",
       brand: item.brand ?? "",
       category: item.category,
       garmentType: item.garmentType,
@@ -2471,7 +2342,9 @@ export function WardrobeApp({
   }
 
   async function saveGarmentDraft() {
-    if (!garmentDraft) return;
+    if (!garmentDraft || savingGarment) return;
+    const previous = garments.find(item => item.id === garmentDraft.id);
+    setSavingGarment(true);
     const { id, ...edit } = garmentDraft;
     const normalized = {
       ...edit,
@@ -2495,10 +2368,32 @@ export function WardrobeApp({
       const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
       if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudieron guardar los cambios.");
       setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+      setGarmentDraft(current => current ? { ...current, ...normalized, lengthOverride: result.garment?.lengthOverride ?? null } : current);
       setGarmentSaved(true);
     } catch (error) {
+      if (previous) setGarments(items => items.map(item => item.id === previous.id ? previous : item));
       setGarmentSaveError(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
-    }
+    } finally { setSavingGarment(false); }
+  }
+
+  async function setGarmentVisibility(item: Garment, isPublic: boolean) {
+    if (savingGarment || item.collection === "forme") return;
+    setSavingGarment(true);
+    setGarmentSaveError("");
+    setGarmentSaved(false);
+    try {
+      const response = await fetch(`/api/garments/${encodeURIComponent(item.id)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...apiPayload(item), isPublic }),
+      });
+      const result = await response.json().catch(() => null) as { garment?: ApiGarment; error?: string } | null;
+      if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo cambiar la visibilidad de la prenda.");
+      setGarments((items) => mergeApiGarments(items, [result.garment as ApiGarment]));
+      setGarmentDraft((current) => current?.id === item.id ? { ...current, isPublic: Boolean(result.garment?.isPublic) } : current);
+    } catch (error) {
+      setGarmentSaveError(error instanceof Error ? error.message : "No se pudo cambiar la visibilidad de la prenda.");
+    } finally { setSavingGarment(false); }
   }
 
   async function toggleFavorite(item: Garment) {
@@ -2517,7 +2412,9 @@ export function WardrobeApp({
     }
   }
 
-  async function deleteGarment(item: Garment) {
+  function deleteGarment(item: Garment) { setPendingDelete({ kind: "garment", id: item.id, name: translateGarmentName(item.name) }); }
+
+  async function performDeleteGarment(item: Garment) {
     setGarments((items) => items.filter((garment) => garment.id !== item.id));
     setCanvasPieces((items) => items.filter((piece) => piece.garmentId !== item.id));
     setGarmentDraft(null);
@@ -2546,7 +2443,7 @@ export function WardrobeApp({
       return;
     }
     if (route === "perfil" || route === "ajustes") {
-      if (route === "perfil") setView("wardrobe");
+      setView("wardrobe");
       setProfileOpen(true);
       return;
     }
@@ -2554,17 +2451,18 @@ export function WardrobeApp({
     setView("wardrobe");
     setWardrobePanel(route === "looks" ? "looks" : route === "asistente" ? "assistant" : "closet");
     if (route === "closet") setClosetMode("browse");
-    setLibraryOpen(false);
     setSavedLooksOpen(false);
   }
 
   function navigateWardrobeRoute(route: WardrobeRoute) {
+    routeScroll.current.set(activeRoute, window.scrollY);
     if (route === "perfil" || route === "ajustes") {
       if (!profileOpen) profileReturnRoute.current = view === "studio" ? "canvas" : routeForPanel(wardrobePanel);
     }
     applyWardrobeRoute(route);
+    requestAnimationFrame(() => window.scrollTo({ top: routeScroll.current.get(route) ?? 0, behavior: "instant" }));
     const nextPath = `/${route}`;
-    if (window.location.pathname !== nextPath) window.history.pushState({ formeRoute: route }, "", nextPath);
+    if (window.location.pathname + window.location.search !== nextPath) window.history.pushState({ formeRoute: route }, "", nextPath);
   }
 
   function closeProfileRoute() {
@@ -2572,6 +2470,7 @@ export function WardrobeApp({
   }
 
   function openStudio(returnPanel: WardrobePanel = wardrobePanel) {
+    if (view !== "studio") routeScroll.current.set(activeRoute, window.scrollY);
     setStudioReturnPanel(returnPanel);
     setProfileOpen(false);
     setView("studio");
@@ -2615,42 +2514,45 @@ export function WardrobeApp({
       if (item.preview.startsWith("blob:")) URL.revokeObjectURL(item.preview);
     });
     setUploadItems([]);
+    setUploadNotice("");
     setUploadIntakeBatchId(null);
     setUploadBatchSummary(null);
     if (fileInput.current) fileInput.current.value = "";
     setUploadError("");
   }
 
-  function acceptFiles(source: FileList | File[] | undefined) {
-    if (uploadIntakeBatchId) {
-      setUploadError("Termina este lote antes de añadir nuevas fotos.");
-      return;
-    }
+  async function acceptFiles(source: FileList | File[] | undefined) {
+    if (uploadIntakeBatchId || preparingUploadRef.current) return;
     const incoming = Array.from(source ?? []);
     if (!incoming.length) return;
-    const existing = new Set(uploadItems.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
-    const images = incoming.filter((item) => item.type.startsWith("image/") && item.size <= maxUploadBytes && !existing.has(`${item.name}:${item.size}:${item.lastModified}`));
-    const accepted = images.map<UploadItem>((next) => ({
-      id: crypto.randomUUID(),
-      file: next,
-      preview: URL.createObjectURL(next),
-      name: next.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-      category: "Outerwear",
-      garmentType: "Jacket",
-      status: "ready",
-    }));
-    setUploadItems((items) => [...items, ...accepted]);
-    setUploadIntakeBatchId(null);
-    setUploadBatchSummary(null);
-    if (fileInput.current) fileInput.current.value = "";
-
-    const oversized = incoming.filter((item) => item.type.startsWith("image/") && item.size > maxUploadBytes).length;
-    const invalid = incoming.filter((item) => !item.type.startsWith("image/")).length;
-    const notices = [
-      oversized ? `${oversized} ${oversized === 1 ? "foto supera" : "fotos superan"} 20 MB` : "",
-      invalid ? `${invalid} ${invalid === 1 ? "archivo no es una imagen" : "archivos no son imágenes"}` : "",
-    ].filter(Boolean);
-    setUploadError(notices.join(" · "));
+    preparingUploadRef.current = true;
+    setPreparingUploads(true);
+    setUploadError("");
+    setUploadNotice("");
+    const existing = new Set(uploadItems.map(item => uploadFingerprint(item.file)));
+    const accepted: UploadItem[] = [];
+    const errors: string[] = [];
+    let duplicates = 0;
+    try {
+      for (const file of incoming) {
+        const fingerprint = uploadFingerprint(file);
+        if (existing.has(fingerprint)) { duplicates++; continue; }
+        const error = uploadFileError(file);
+        if (error) { errors.push(`${file.name}: ${error}`); continue; }
+        try {
+          const processingFile = await processingFileFor(file);
+          accepted.push({ id: crypto.randomUUID(), file, processingFile, preview: URL.createObjectURL(processingFile), name: file.name, status: "ready" });
+          existing.add(fingerprint);
+        } catch (error) { errors.push(`${file.name}: ${error instanceof Error ? error.message : "No se pudo abrir."}`); }
+      }
+      setUploadItems(items => [...items, ...accepted]);
+      setUploadError(errors.join("\n"));
+      if (duplicates) setUploadNotice(`${duplicates} ${duplicates === 1 ? "foto repetida omitida" : "fotos repetidas omitidas"}.`);
+    } finally {
+      preparingUploadRef.current = false;
+      setPreparingUploads(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
   }
 
   function updateUploadItem(id: string, patch: Partial<UploadItem>) {
@@ -2668,7 +2570,7 @@ export function WardrobeApp({
 
   async function ghostGarments() {
     const pending = uploadItems.filter((item) => item.status === "ready" || item.status === "failed" || item.status === "review");
-    if (!pending.length) return;
+    if (!pending.length || preparingUploadRef.current || uploadingBatch) return;
     let intakeBatchId = uploadIntakeBatchId;
     if (!intakeBatchId) {
       const nextBatchId = crypto.randomUUID();
@@ -2681,17 +2583,17 @@ export function WardrobeApp({
             items: uploadItems.map((item) => ({
               clientItemId: item.id,
               filename: item.file.name,
-              fingerprint: `${item.file.name}:${item.file.size}:${item.file.lastModified}`,
+              fingerprint: uploadFingerprint(item.file),
             })),
           }),
         });
         const intakeResult = await intakeResponse.json().catch(() => null) as { batch?: IntakeBatchSummary; error?: string } | null;
-        if (!intakeResponse.ok || !intakeResult?.batch) throw new Error(intakeResult?.error || "No se pudo registrar el lote.");
+        if (!intakeResponse.ok || !intakeResult?.batch) throw new Error(intakeResult?.error || "No se pudo iniciar la subida. Vuelve a intentarlo.");
         intakeBatchId = nextBatchId;
         setUploadIntakeBatchId(nextBatchId);
         setUploadBatchSummary(intakeResult.batch);
       } catch (error) {
-        setUploadError(error instanceof Error ? error.message : "No se pudo registrar el lote.");
+        setUploadError(error instanceof Error ? error.message : "No se pudo iniciar la subida. Vuelve a intentarlo.");
         return;
       }
     }
@@ -2718,23 +2620,13 @@ export function WardrobeApp({
           }
           continue;
         }
-        const custom = { name: item.name || "Prenda sin nombre", category: item.category, color: "Custom" };
-        const attributes = classifyGarment(custom);
-        const processingFile = await processingFileFor(item.file);
+        const processingFile = item.processingFile;
         const body = new FormData();
         body.append("file", processingFile);
         body.append("original", item.file);
         body.append("intakeBatchId", intakeBatchId);
         body.append("intakeItemId", item.id);
         if (useDiscountedBatch) body.append("processingMode", "batch");
-        body.append("name", custom.name);
-        body.append("category", item.category);
-        body.append("garmentType", item.garmentType);
-        body.append("colorFamily", attributes.colorFamily);
-        body.append("tone", attributes.tone);
-        body.append("material", attributes.material);
-        body.append("finish", attributes.finish);
-        body.append("silhouette", attributes.silhouette);
         const response = await fetch("/api/upload", { method: "POST", body });
         const result = await response.json().catch(() => null) as { garment?: ApiGarment; job?: { status?: string }; error?: string } | null;
         if (!response.ok || !result?.garment) throw new Error(result?.error || "No se pudo cargar la prenda.");
@@ -2760,18 +2652,32 @@ export function WardrobeApp({
       }
     }
 
-    if (useDiscountedBatch && remote.size > 1) {
+    if (useDiscountedBatch && remote.size > 0) {
       try {
+        let batchResult: { batch?: { status?: string }; fallback?: string; recognizing?: boolean; error?: string } | null = null;
+        for (let recognitionAttempt = 0; recognitionAttempt < 90; recognitionAttempt += 1) {
         const batchResponse = await fetch("/api/batches", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ garmentIds: [...remote.values()] }),
         });
-        const batchResult = await batchResponse.json().catch(() => null) as { batch?: { status?: string }; fallback?: string; error?: string } | null;
+        batchResult = await batchResponse.json().catch(() => null) as { batch?: { status?: string }; fallback?: string; recognizing?: boolean; error?: string } | null;
         if (!batchResponse.ok) throw new Error(batchResult?.error || "No se pudieron procesar las prendas.");
+        if (!batchResult?.recognizing) break;
+        await Promise.all([...remote.entries()].map(async ([localId, garmentId]) => {
+          const check = await fetch(`/api/garments/${encodeURIComponent(garmentId)}/status`, { cache: "no-store" });
+          const result = await check.json() as { garment?: ApiGarment };
+          if (result.garment) {
+            setGarments(items => mergeApiGarments(items, [result.garment!]));
+            if (result.garment.metadataStatus === "ready") updateUploadItem(localId, { name: result.garment.name });
+          }
+        }));
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        if (batchResult?.recognizing) throw new Error("El reconocimiento sigue pendiente. Reintenta cuando termine.");
         remote.forEach((_, localId) => updateUploadItem(localId, {
           status: "processing",
-          error: batchResult?.fallback ? "Procesando ahora" : "Puede tardar hasta 24 h",
+          error: batchResult?.fallback ? undefined : "Puede tardar hasta 24 h",
         }));
       } catch (error) {
         failedCount += remote.size;
@@ -2780,7 +2686,6 @@ export function WardrobeApp({
       }
     }
 
-    let timedOut = false;
     const maxAttempts = useDiscountedBatch ? 15 : 90;
     for (let attempt = 0; attempt < maxAttempts && remote.size > 0; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, useDiscountedBatch ? 4000 : 2000));
@@ -2801,65 +2706,140 @@ export function WardrobeApp({
           try { updatedGarment = await finalizePendingCutouts(updatedGarment); } catch { /* It will retry on the next status pass. */ }
         }
         setGarments((items) => mergeApiGarments(items, [updatedGarment as ApiGarment]));
-        if (updatedGarment.status === "ready") {
+        if (updatedGarment.metadataStatus === "ready") updateUploadItem(localId, { name: updatedGarment.name });
+        if (updatedGarment.status === "ready" && updatedGarment.metadataStatus !== "pending") {
           updateUploadItem(localId, { status: "done", error: undefined });
           remote.delete(localId);
         } else if (updatedGarment.status === "review" || statusResult.job?.status === "review") {
           failedCount += 1;
-          updateUploadItem(localId, { status: "review", error: updatedGarment.qaNotes || statusResult.job?.error || "La imagen no coincide con la prenda original" });
+          updateUploadItem(localId, { status: "review", error: "No pudimos comprobar que la imagen sea fiel a tu prenda. Reintenta." });
           remote.delete(localId);
         } else if (statusResult.job?.status === "failed" || statusResult.garment.status === "failed") {
           failedCount += 1;
-          updateUploadItem(localId, { status: "failed", error: statusResult.job?.error || "No se pudo preparar la imagen" });
+          updateUploadItem(localId, { status: "failed", error: "Vuelve a intentarlo." });
           remote.delete(localId);
         }
       }
     }
     if (remote.size > 0) {
-      timedOut = true;
-      remote.forEach((_, localId) => updateUploadItem(localId, { status: "processing", error: "Continúa en segundo plano" }));
+      remote.forEach((_, localId) => updateUploadItem(localId, { status: "processing", error: useDiscountedBatch ? "Puede tardar hasta 24 h" : undefined }));
     }
     try {
       const summaryResponse = await fetch(`/api/intake-batches/${encodeURIComponent(intakeBatchId)}`, { cache: "no-store" });
       const summaryResult = await summaryResponse.json().catch(() => null) as { batch?: IntakeBatchSummary } | null;
       if (summaryResponse.ok && summaryResult?.batch) setUploadBatchSummary(summaryResult.batch);
     } catch { /* El estado individual sigue visible aunque falle el resumen. */ }
-    if (failedCount) setUploadError(`${failedCount} ${failedCount === 1 ? "prenda necesita" : "prendas necesitan"} revisión.`);
-    else if (waitingCount) setUploadError(waitingCount === 1 ? "La prenda quedó guardada y se procesará cuando el servicio esté disponible." : `${waitingCount} prendas quedaron guardadas y se procesarán cuando el servicio esté disponible.`);
-    else if (timedOut) setUploadError("Las prendas siguen preparándose y aparecerán en tu closet al terminar.");
+    if (!failedCount && waitingCount) setUploadNotice(waitingCount === 1 ? "La prenda quedó guardada y se procesará cuando el servicio esté disponible." : `${waitingCount} prendas quedaron guardadas y se procesarán cuando el servicio esté disponible.`);
     setUploadingBatch(false);
   }
 
-  function bringToFront(instanceId: string) {
-    setCanvasPieces((items) => {
-      const piece = items.find((item) => item.instanceId === instanceId);
-      const garment = piece ? garmentById.get(piece.garmentId) : undefined;
-      if (!piece || !garment) return items;
-      const base = layerBase(garment.category);
-      const top = Math.max(base, ...items.filter((item) => {
-        const itemGarment = garmentById.get(item.garmentId);
-        return itemGarment && layerBase(itemGarment.category) === base;
-      }).map((item) => item.z)) + 1;
-      return items.map((item) => item.instanceId === instanceId ? { ...item, z: top } : item);
-    });
+  useEffect(() => {
+    if (!canvasDataReady) return;
+    const key = `forme-canvas-draft-v1:${demoMode ? "guest" : profile.handle}`;
+    if (restoredDraftKey.current !== key) {
+      restoredDraftKey.current = key;
+      try {
+        const payload = JSON.parse(sessionStorage.getItem(key) ?? "null");
+        const draft = readCanvasDraft(payload?.document);
+        if (draft && draft.items.every(item => garmentById.has(item.garmentId))) {
+          history.current.past = (Array.isArray(payload?.history) ? payload.history : []).map(readCanvasDraft).filter((item: CanvasDocument | null): item is CanvasDocument => Boolean(item && item.items.every(piece => garmentById.has(piece.garmentId)))).slice(-20);
+          restoreDocument(draft);
+          return;
+        }
+      } catch { /* A malformed or unavailable local draft does not block the closet. */ }
+    }
+    try { sessionStorage.setItem(key, JSON.stringify({ document: currentDocument.current, history: history.current.past.slice(-20) })); }
+    catch { /* Private browsing may disallow session storage. */ }
+  }, [canvasDataReady, demoMode, profile.handle, canvasPieces, activeOutfitId, activeLookName, historyRevision]);
+
+  useEffect(() => {
+    if (view !== "studio" || garmentDraft) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLElement && event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault(); travelHistory(event.shiftKey ? "redo" : "undo");
+      }
+      if (event.key === "Escape") { setSelectedId(""); setSelectedGroupIds([]); setSavedLooksOpen(false); setLayersOpen(false); setReplacingId(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, garmentDraft, savedLooks]);
+
+  function checkpoint() {
+    history.current.checkpoint(currentDocument.current);
+    setHistoryRevision(value => value + 1);
   }
 
-  function addToCanvas(garmentId: string) {
+  function restoreDocument(document: CanvasDocument) {
+    canvasGestures.current?.cancel();
+    documentGeneration.current += 1;
+    autoPlacedIds.current.clear();
+    setCanvasPieces(snapshotLook(document.items));
+    setActiveOutfitId(document.id);
+    setActiveLookName(document.name);
+    setSelectedId(""); setSelectedGroupIds([]); setLockedPieceIds(ids => new Set([...ids].filter(id => document.items.some(item => item.instanceId === id)))); setReplacingId(null);
+    const stored = savedLooks.find(look => look.id === document.id);
+    setSaved(Boolean(stored && sameDocument(document, { items: stored.items, id: stored.id, name: stored.name })));
+  }
+
+  function travelHistory(direction: "undo" | "redo") {
+    if (savingOutfit) return;
+    const document = history.current[direction](currentDocument.current);
+    if (document) restoreDocument(document);
+    setHistoryRevision(value => value + 1);
+  }
+
+  function newLook() {
+    if (savingOutfit) return;
+    checkpoint();
+    restoreDocument({ items: [], id: null, name: "Nuevo look" });
+    setClearedLook(null); setShareNotice("");
+    openStudio("looks");
+  }
+
+  function openUpload() {
+    navigateWardrobeRoute("closet");
+    setClosetMode("upload");
+    window.history.pushState({ formeRoute: "closet" }, "", "/closet?view=upload");
+  }
+
+  function togglePanel(panel: "looks" | "layers") {
+    if (panel === "looks") { setSavedLooksOpen(open => !open); setLayersOpen(false); }
+    else { setLayersOpen(open => !open); setSavedLooksOpen(false); }
+  }
+
+  function changeLayer(instanceId: string, direction: "up" | "down") {
+    checkpoint();
+    setCanvasPieces(items => moveCanvasLayer(items, instanceId, direction));
+    setSaved(false);
+  }
+
+  async function addToCanvas(garmentId: string) {
     const garment = garmentById.get(garmentId);
-    if (!garment) return;
-    const selectedPiece = selectedId ? canvasPieces.find((item) => item.instanceId === selectedId) : undefined;
+    if (!garment || savingOutfit) return;
+    const replacementId = replacingId;
+    const generationAtStart = documentGeneration.current;
+    try { await ensureGarmentLayout(garment); }
+    catch { setWardrobeError("No se pudo medir esta prenda. Vuelve a intentarlo."); return; }
+    if (documentGeneration.current !== generationAtStart) return;
+    checkpoint();
+    setClearedLook(null);
+    if (window.innerWidth <= 699) { setLayersOpen(false); setSavedLooksOpen(false); }
+    const selectedPiece = replacementId ? latestCanvasPieces.current.find((item) => item.instanceId === replacementId) : undefined;
+    setReplacingId(null);
     const selectedGarment = selectedPiece ? garmentById.get(selectedPiece.garmentId) : undefined;
 
-    if (selectedPiece && selectedGarment && layerBase(selectedGarment.category) === layerBase(garment.category)) {
-      const previousPlacement = defaultPlacement(selectedGarment);
-      const nextPlacement = defaultPlacement(garment);
-      const relativeScale = selectedPiece.scale / previousPlacement.scale;
+    if (selectedPiece && selectedGarment) {
+      const variant = garment.openImage ? "open" : "closed";
+      const placement = autoPlacedIds.current.has(selectedPiece.instanceId)
+        ? defaultPlacement(garment, variant)
+        : replacementPlacement(selectedPiece, selectedGarment, garment, variant);
       setCanvasPieces((items) => items.map((item) => item.instanceId === selectedPiece.instanceId
         ? {
             ...item,
             garmentId,
-            variant: garment.openImage ? "open" : "closed",
-            scale: clamp(roundedScale(nextPlacement.scale * relativeScale), 0.08, 1.35),
+            variant,
+            ...placement,
           }
         : item));
       setSelectedId(selectedPiece.instanceId);
@@ -2869,13 +2849,10 @@ export function WardrobeApp({
     }
 
     const instanceId = crypto.randomUUID();
+    autoPlacedIds.current.add(instanceId);
     const placement = defaultPlacement(garment);
     setCanvasPieces((items) => {
-      const base = layerBase(garment.category);
-      const top = Math.max(base, ...items.filter((item) => {
-        const itemGarment = garmentById.get(item.garmentId);
-        return itemGarment && layerBase(itemGarment.category) === base;
-      }).map((item) => item.z)) + 1;
+      const top = Math.max(0, ...items.map(item => item.z)) + 1;
       return [...items, {
         instanceId,
         garmentId,
@@ -2892,124 +2869,56 @@ export function WardrobeApp({
     setSaved(false);
   }
 
-  function addAndOpenStudio(garmentId: string) {
-    addToCanvas(garmentId);
-    setActiveOutfitId(null);
-    setActiveLookName("Nuevo look");
+  async function addAndOpenStudio(garmentId: string) {
+    await addToCanvas(garmentId);
     openStudio("closet");
   }
 
-  function startMoving(event: ReactPointerEvent<HTMLDivElement>, instanceId: string) {
-    const canvas = canvasRef.current;
-    const piece = canvasPieces.find((item) => item.instanceId === instanceId);
-    if (!canvas || !piece) return;
-    event.preventDefault();
-    setSelectedGroupIds([]);
-    setMarqueeRect(null);
+  function beginReplacingPiece(instanceId: string) {
+    setReplacingId(instanceId); setStudioLibraryFilter("all"); setLibraryQuery("");
+    setLayersOpen(false); setSavedLooksOpen(false);
+    if (window.matchMedia("(max-width: 900px), (hover: none) and (pointer: coarse)").matches) {
+      requestAnimationFrame(() => document.getElementById("canvas-garment-library")?.scrollIntoView({ block: "nearest" }));
+    }
+  }
+
+  function gesturePoint(event: ReactPointerEvent<HTMLDivElement>): GesturePoint {
+    return { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, touch: event.pointerType === "touch" };
+  }
+
+  function startCanvasGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    const gestures = canvasGestures.current!;
+    if (savingOutfit || event.button !== 0) return;
+    const element = event.target instanceof Element ? event.target.closest<HTMLElement>(".canvas-piece") : null;
+    const piece = currentDocument.current.items.find(item => item.instanceId === element?.dataset.instanceId);
+    const frame = canvasRef.current?.getBoundingClientRect();
+    if (!gestures.active && (!piece || !frame)) return;
+    const handled = gestures.down(gesturePoint(event), piece && frame ? { id: piece.instanceId, geometry: piece, frame } : undefined);
+    if (!handled) return;
+    event.preventDefault(); event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    const rect = canvas.getBoundingClientRect();
-    const track: PointerTrack = {
-      instanceId,
-      startX: event.clientX,
-      startY: event.clientY,
-      x: event.clientX,
-      y: event.clientY,
-      moved: false,
-      startedAt: event.timeStamp,
-    };
-    const otherPointer = Array.from(pointerTracks.current.entries()).find(([, pointer]) => pointer.instanceId === instanceId);
-    pointerTracks.current.set(event.pointerId, track);
-
-    if (otherPointer && !pinchSession.current) {
-      const [otherId, otherTrack] = otherPointer;
-      otherTrack.moved = true;
-      track.moved = true;
-      pinchSession.current = {
-        instanceId,
-        pointerIds: [otherId, event.pointerId],
-        startDistance: Math.hypot(event.clientX - otherTrack.x, event.clientY - otherTrack.y),
-        startScale: piece.scale,
-        startAngle: Math.atan2(event.clientY - otherTrack.y, event.clientX - otherTrack.x),
-        startRotation: piece.rotation,
-      };
-      dragSession.current = null;
-    } else if (!pinchSession.current) {
-      dragSession.current = {
-        instanceId,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        originX: piece.x,
-        originY: piece.y,
-        width: rect.width,
-        height: rect.height,
-      };
-    } else {
-      track.moved = true;
-    }
-    setSelectedId(instanceId);
-    bringToFront(instanceId);
-    setSaved(false);
   }
 
-  function movePiece(event: ReactPointerEvent<HTMLDivElement>) {
-    const track = pointerTracks.current.get(event.pointerId);
-    if (!track) return;
-    track.x = event.clientX;
-    track.y = event.clientY;
-    if (Math.hypot(track.x - track.startX, track.y - track.startY) > 8) track.moved = true;
-
-    const pinch = pinchSession.current;
-    if (pinch?.pointerIds.includes(event.pointerId)) {
-      const first = pointerTracks.current.get(pinch.pointerIds[0]);
-      const second = pointerTracks.current.get(pinch.pointerIds[1]);
-      if (!first || !second || pinch.startDistance < 1) return;
-      event.preventDefault();
-      const distance = Math.hypot(first.x - second.x, first.y - second.y);
-      const scale = clamp(pinch.startScale * (distance / pinch.startDistance), 0.28, 1.35);
-      const angle = Math.atan2(second.y - first.y, second.x - first.x);
-      const rotation = pinch.startRotation + normalizeDegrees((angle - pinch.startAngle) * (180 / Math.PI));
-      setCanvasPieces((items) => items.map((item) => item.instanceId === pinch.instanceId ? { ...item, scale, rotation } : item));
-      setSaved(false);
-      return;
-    }
-
-    const drag = dragSession.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    const x = clamp(drag.originX + ((event.clientX - drag.startX) / drag.width) * 100, 4, 96);
-    const y = clamp(drag.originY + ((event.clientY - drag.startY) / drag.height) * 100, 4, 96);
-    setCanvasPieces((items) => items.map((item) => item.instanceId === drag.instanceId ? { ...item, x, y } : item));
+  function moveCanvasGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!canvasGestures.current?.has(event.pointerId)) return;
+    event.preventDefault(); event.stopPropagation();
+    canvasGestures.current.move(gesturePoint(event));
   }
 
-  function stopMoving(event: ReactPointerEvent<HTMLDivElement>, cancelled = false) {
-    const track = pointerTracks.current.get(event.pointerId);
-    const pinch = pinchSession.current;
-    const wasPinching = Boolean(pinch?.pointerIds.includes(event.pointerId));
-
-    if (wasPinching && pinch) {
-      const remainingId = pinch.pointerIds.find((pointerId) => pointerId !== event.pointerId);
-      const remaining = remainingId === undefined ? undefined : pointerTracks.current.get(remainingId);
-      if (remaining) remaining.moved = true;
-      pinchSession.current = null;
-    }
-    if (dragSession.current?.pointerId === event.pointerId) dragSession.current = null;
-    pointerTracks.current.delete(event.pointerId);
-
-    if (!cancelled && !wasPinching && track && !track.moved) {
-      const held = event.timeStamp - track.startedAt >= 500;
-      const piece = canvasPieces.find((item) => item.instanceId === track.instanceId);
-      const garment = piece ? garmentById.get(piece.garmentId) : undefined;
-      if (held && garment?.openImage) {
-        toggleVariant(track.instanceId);
-      }
-    }
+  function endCanvasGesture(event: ReactPointerEvent<HTMLDivElement>, cancelled = false) {
+    if (!canvasGestures.current?.has(event.pointerId)) return;
+    event.preventDefault(); event.stopPropagation();
+    canvasGestures.current.up(gesturePoint(event), cancelled);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   function startMarqueeSelection(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || event.pointerType === "touch" || window.innerWidth < 760) return;
     const target = event.target;
-    if (target instanceof Element && target.closest(".canvas-piece,button")) return;
+    if (target instanceof Element && target.closest(".canvas-piece,.canvas-piece-ui,button,input,select")) return;
+    if (event.button !== 0) return;
+    setSelectedId("");
+    setSelectedGroupIds([]);
+    if (event.pointerType === "touch" || window.innerWidth <= 900) return;
     const canvasRect = event.currentTarget.getBoundingClientRect();
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -3058,8 +2967,9 @@ export function WardrobeApp({
 
   function startTransformHandle(event: ReactPointerEvent<HTMLButtonElement>, instanceId: string, mode: "scale" | "rotate") {
     const piece = canvasPieces.find((item) => item.instanceId === instanceId);
-    const pieceElement = event.currentTarget.closest(".canvas-piece");
-    if (!piece || !(pieceElement instanceof HTMLElement)) return;
+    const pieceElement = Array.from(canvasRef.current?.querySelectorAll<HTMLElement>(".canvas-piece") ?? [])
+      .find(element => element.dataset.instanceId === instanceId);
+    if (!piece || savingOutfit || !(pieceElement instanceof HTMLElement)) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -3076,15 +2986,21 @@ export function WardrobeApp({
       startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
       startScale: piece.scale,
       startRotation: piece.rotation,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
     };
     setSelectedId(instanceId);
-    bringToFront(instanceId);
-    setSaved(false);
   }
 
   function moveTransformHandle(event: ReactPointerEvent<HTMLButtonElement>) {
     const session = transformHandleSession.current;
-    if (!session || session.pointerId !== event.pointerId) return;
+    if (!session || session.pointerId !== event.pointerId || savingOutfit) return;
+    if (!session.moved) {
+      if (Math.hypot(event.clientX - session.startX, event.clientY - session.startY) < 2) return;
+      checkpoint(); session.moved = true;
+      autoPlacedIds.current.delete(session.instanceId);
+    }
     event.preventDefault();
     event.stopPropagation();
     if (session.mode === "scale") {
@@ -3105,14 +3021,20 @@ export function WardrobeApp({
     if (transformHandleSession.current?.pointerId === event.pointerId) transformHandleSession.current = null;
   }
 
-  function toggleVariant(instanceId: string) {
-    setCanvasPieces((items) => items.map((item) => item.instanceId === instanceId
-      ? { ...item, variant: item.variant === "open" ? "closed" : "open" }
-      : item));
+  function adjustPieceWithKeyboard(instanceId: string, field: "rotation" | "scale", delta: number) {
+    const piece = currentDocument.current.items.find(item => item.instanceId === instanceId);
+    if (!piece || savingOutfit) return;
+    const value = field === "rotation" ? normalizeDegrees(piece.rotation + delta) : clamp(piece.scale + delta, .08, 1.35);
+    if (piece[field] === value) return;
+    checkpoint(); autoPlacedIds.current.delete(instanceId);
+    setCanvasPieces(items => items.map(item => item.instanceId === instanceId ? { ...item, [field]: value } : item));
     setSaved(false);
   }
 
   function removePiece(instanceId: string) {
+    checkpoint();
+    autoPlacedIds.current.delete(instanceId);
+    setLockedPieceIds(ids => new Set([...ids].filter(id => id !== instanceId)));
     setCanvasPieces((items) => items.filter((item) => item.instanceId !== instanceId));
     setSelectedId((current) => current === instanceId ? "" : current);
     setSelectedGroupIds((current) => current.filter((id) => id !== instanceId));
@@ -3120,23 +3042,20 @@ export function WardrobeApp({
   }
 
   function duplicatePiece(instanceId: string) {
+    checkpoint();
     const source = canvasPieces.find((item) => item.instanceId === instanceId);
     if (!source) return;
     const instanceIdCopy = crypto.randomUUID();
     setCanvasPieces((items) => {
-      const garment = garmentById.get(source.garmentId);
-      const base = garment ? layerBase(garment.category) : source.z;
-      const top = Math.max(base, ...items.filter((item) => {
-        const itemGarment = garmentById.get(item.garmentId);
-        return garment && itemGarment && layerBase(itemGarment.category) === base;
-      }).map((item) => item.z)) + 1;
+      const above = items.filter(item => item.z > source.z).sort((a, b) => a.z - b.z)[0];
+      const top = above ? (source.z + above.z) / 2 : source.z + 1;
       return [...items, {
         ...source,
         instanceId: instanceIdCopy,
         x: clamp(source.x + 4, 4, 96),
         y: clamp(source.y + 4, 4, 96),
         z: top,
-      }];
+      }].sort((a, b) => a.z - b.z).map((item, index) => ({ ...item, z: index + 1 }));
     });
     setSelectedId(instanceIdCopy);
     setSelectedGroupIds([]);
@@ -3215,40 +3134,90 @@ export function WardrobeApp({
     navigateWardrobeRoute("asistente");
   }
 
-  function iterateCurrentLook() {
-    const next = buildLookIterations(garments, canvasPieces);
-    if (!next.length) {
-      setWardrobeError("Añade por lo menos un top y un pantalón para crear cinco variaciones.");
-      return;
+  function toggleRandomLock(instanceId: string) {
+    if (randomizingRef.current) return;
+    setLockedPieceIds(ids => {
+      const next = new Set(ids);
+      if (next.has(instanceId)) next.delete(instanceId); else next.add(instanceId);
+      return next;
+    });
+  }
+
+  async function adjustCurrentLookProportions() {
+    if (savingOutfit || randomizingRef.current || !canvasPieces.length) return;
+    const snapshot = canvasPieces;
+    const generationAtStart = documentGeneration.current;
+    try {
+      await Promise.all(snapshot.map(piece => garmentById.get(piece.garmentId)).filter((item): item is Garment => Boolean(item)).map(ensureGarmentLayout));
+      if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
+      const next = snapshot.map(piece => {
+        const garment = garmentById.get(piece.garmentId);
+        return garment ? { ...piece, ...defaultPlacement(garment, piece.variant) } : piece;
+      });
+      checkpoint();
+      autoPlacedIds.current = new Set(next.filter(piece => piece.rotation === 0).map(piece => piece.instanceId));
+      setCanvasPieces(next);
+      setSaved(false);
+      setWardrobeError("");
+    } catch { setWardrobeError("No se pudo ajustar una de las prendas. Vuelve a intentarlo."); }
+  }
+
+  async function randomizeCurrentLook() {
+    if (randomizingRef.current || savingOutfit) return;
+    randomizingRef.current = true;
+    setRandomizing(true);
+    const snapshot = canvasPieces;
+    const generationAtStart = documentGeneration.current;
+    try {
+      if (!snapshot.length) {
+        const chosen = randomLookGarments(garments, Math.random, basicsEnabled);
+        if (!chosen.length) {
+          setWardrobeError("Añade prendas a tu closet para empezar a mezclar.");
+          return;
+        }
+        await Promise.all(chosen.map(ensureGarmentLayout));
+        if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
+        const next = chosen.map(garment => {
+          const variant = garment.openImage ? "open" as const : "closed" as const;
+          return { instanceId: crypto.randomUUID(), garmentId: garment.id, variant, ...defaultPlacement(garment, variant), rotation: 0, z: layerBase(garment.category) + 1 };
+        });
+        checkpoint();
+        autoPlacedIds.current = new Set(next.map(piece => piece.instanceId));
+        setCanvasPieces(next);
+        setSelectedId(""); setSelectedGroupIds([]); setLockedPieceIds(new Set()); setReplacingId(null);
+        setClearedLook(null);
+        setSaved(false);
+        setWardrobeError("");
+        return;
+      }
+      const replacements = randomGarmentReplacements(garments, snapshot, lockedPieceIds, Math.random, basicsEnabled);
+      if (!replacements.size) {
+        setWardrobeError("No hay otras prendas para mezclar. Prueba a liberar alguna de las que mantuviste.");
+        return;
+      }
+      await Promise.all([...replacements.values()].map(ensureGarmentLayout));
+      // A drag, deletion or a newly opened look during measurement wins over
+      // this pending randomization; never overwrite the user's newer changes.
+      if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
+      const next = snapshot.map(piece => {
+        const garment = replacements.get(piece.instanceId);
+        if (!garment || lockedPieceIds.has(piece.instanceId)) return piece;
+        const previous = garmentById.get(piece.garmentId);
+        const variant = garment.openImage ? "open" as const : "closed" as const;
+        const placement = previous && !autoPlacedIds.current.has(piece.instanceId)
+          ? replacementPlacement(piece, previous, garment, variant) : defaultPlacement(garment, variant);
+        return { ...piece, garmentId: garment.id, variant, ...placement };
+      });
+      checkpoint();
+      setCanvasPieces(next);
+      setSaved(false);
+      setWardrobeError("");
+    } catch {
+      setWardrobeError("No se pudo preparar una de las prendas para mezclar.");
+    } finally {
+      randomizingRef.current = false;
+      setRandomizing(false);
     }
-    setLookIterations(next);
-    openLookIteration(next[0], 0);
-    setLibraryOpen(false);
-    setSavedLooksOpen(false);
-    setWardrobeError("");
-  }
-
-  function openLookIteration(iteration: LookIteration, index = lookIterations.findIndex((item) => item.id === iteration.id)) {
-    setCanvasPieces(iteration.items.map((item) => ({ ...item, instanceId: crypto.randomUUID() })));
-    setSelectedId("");
-    setSelectedGroupIds([]);
-    setActiveOutfitId(null);
-    setActiveLookName(iteration.title);
-    setActiveIterationIndex(Math.max(0, index));
-    setSaved(false);
-    setSavedLooksOpen(false);
-    setWardrobeError("");
-  }
-
-  function stepLookIteration(direction: -1 | 1) {
-    if (!lookIterations.length) return;
-    const nextIndex = (activeIterationIndex + direction + lookIterations.length) % lookIterations.length;
-    openLookIteration(lookIterations[nextIndex], nextIndex);
-  }
-
-  function closeLookIterations() {
-    setLookIterations([]);
-    setActiveIterationIndex(-1);
   }
 
   async function saveStylingRecommendation(recommendation: StylingRecommendation) {
@@ -3282,15 +3251,17 @@ export function WardrobeApp({
   }
 
   function openSavedLook(look: SavedLook) {
-    setCanvasPieces(look.items.map((item) => normalizedCanvasPiece({ ...item }, garmentById.get(item.garmentId))));
+    checkpoint();
+    documentGeneration.current += 1;
+    setClearedLook(null);
+    autoPlacedIds.current.clear();
+    setCanvasPieces(snapshotLook(look.items));
     setSelectedId("");
     setSelectedGroupIds([]);
     setActiveOutfitId(look.id);
     setActiveLookName(look.name);
     setSaved(true);
-    setLookIterations([]);
-    setActiveIterationIndex(-1);
-    setLibraryOpen(false);
+    setLockedPieceIds(new Set());
     setSavedLooksOpen(false);
     // A saved look always belongs to the Looks archive. Even when it is opened
     // from the Canvas side panel, returning to the wardrobe should land there.
@@ -3422,11 +3393,17 @@ export function WardrobeApp({
 
   function createLookFromWeek() {
     openStudio("looks");
-    setLibraryOpen(true);
     setSavedLooksOpen(false);
   }
 
-  async function deleteSavedLook(lookId: string) {
+  function deleteSavedLook(lookId: string) {
+    const look = savedLooks.find(item => item.id === lookId);
+    if (look) setPendingDelete({ kind: "look", id: lookId, name: look.name });
+  }
+
+  async function performDeleteSavedLook(lookId: string) {
+    if (deletingLookId || savingOutfit) return;
+    setDeletingLookId(lookId);
     setWardrobeError("");
     try {
       if (!demoMode) {
@@ -3450,6 +3427,8 @@ export function WardrobeApp({
       }
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo eliminar el look.");
+    } finally {
+      setDeletingLookId(null);
     }
   }
 
@@ -3470,7 +3449,7 @@ export function WardrobeApp({
             title: `${look.name} · Formé`,
             text: "Mi look en Formé",
           });
-          setShareNotice("Look listo. Elige Instagram o Stories en el menú de compartir.");
+          setShareNotice("Imagen compartida");
           return;
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") return;
@@ -3482,7 +3461,7 @@ export function WardrobeApp({
       link.download = file.name;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-      setShareNotice("Historia guardada. Ábrela desde Instagram Stories.");
+      setShareNotice("Imagen descargada");
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo compartir el look.");
     } finally {
@@ -3491,66 +3470,21 @@ export function WardrobeApp({
   }
 
   function currentSnapshotItems() {
-    if (typeof window === "undefined" || window.innerWidth < 760) return canvasPieces.map((item) => ({ ...item }));
-    const canvas = canvasRef.current;
-    const frame = snapshotFrameRef.current;
-    if (!canvas || !frame) return canvasPieces.map((item) => ({ ...item }));
-    const frameRect = frame.getBoundingClientRect();
-    if (frameRect.width < 1 || frameRect.height < 1) return canvasPieces.map((item) => ({ ...item }));
-    const elements = new Map(Array.from(canvas.querySelectorAll<HTMLElement>(".canvas-piece")).flatMap((element) => element.dataset.instanceId ? [[element.dataset.instanceId, element] as const] : []));
-    const savingSelection = selectedGroupIds.length > 0;
-    const sourceItems = savingSelection
-      ? canvasPieces.filter((item) => selectedGroupIdSet.has(item.instanceId))
-      : canvasPieces.filter((item) => {
-        const rect = elements.get(item.instanceId)?.getBoundingClientRect();
-        return rect && rect.right >= frameRect.left && rect.left <= frameRect.right && rect.bottom >= frameRect.top && rect.top <= frameRect.bottom;
-      });
-    if (!sourceItems.length) return [];
-
-    if (!savingSelection) {
-      return sourceItems.map((item) => {
-        const rect = elements.get(item.instanceId)?.getBoundingClientRect();
-        if (!rect) return { ...item };
-        return {
-          ...item,
-          x: ((rect.left + rect.width / 2 - frameRect.left) / frameRect.width) * 100,
-          y: ((rect.top + rect.height / 2 - frameRect.top) / frameRect.height) * 100,
-          scale: clamp(item.scale * (elements.get(item.instanceId)?.offsetWidth ?? frameRect.width * .76) / (frameRect.width * .76), .08, 1.35),
-        };
-      });
-    }
-
-    const rects = sourceItems.flatMap((item) => {
-      const rect = elements.get(item.instanceId)?.getBoundingClientRect();
-      return rect ? [{ item, rect }] : [];
-    });
-    if (!rects.length) return sourceItems.map((item) => ({ ...item }));
-    const minX = Math.min(...rects.map(({ rect }) => rect.left));
-    const maxX = Math.max(...rects.map(({ rect }) => rect.right));
-    const minY = Math.min(...rects.map(({ rect }) => rect.top));
-    const maxY = Math.max(...rects.map(({ rect }) => rect.bottom));
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const fit = Math.min(1.15, frameRect.width * .88 / Math.max(1, maxX - minX), frameRect.height * .88 / Math.max(1, maxY - minY));
-    return rects.map(({ item, rect }) => ({
-      ...item,
-      x: 50 + ((rect.left + rect.width / 2 - centerX) * fit / frameRect.width) * 100,
-      y: 50 + ((rect.top + rect.height / 2 - centerY) * fit / frameRect.height) * 100,
-      scale: clamp(item.scale * fit * (elements.get(item.instanceId)?.offsetWidth ?? frameRect.width * .76) / (frameRect.width * .76), .08, 1.35),
-    }));
+    return snapshotLook(canvasPieces);
   }
 
   async function saveCurrentOutfit() {
-    if (canvasPieces.length === 0) return;
+    if (canvasPieces.length === 0 || savingOutfit) return;
     const itemsToSave = currentSnapshotItems();
     if (!itemsToSave.length) {
-      setWardrobeError("Pon el look dentro del marco o selecciónalo arrastrando con el mouse.");
+      setWardrobeError("Añade una prenda al Canvas antes de guardar.");
       return;
     }
-    const savingSelection = selectedGroupIds.length > 0 && typeof window !== "undefined" && window.innerWidth >= 760;
-    const outfitId = savingSelection ? `look-${crypto.randomUUID()}` : activeOutfitId ?? `look-${crypto.randomUUID()}`;
+    const documentAtSave = currentDocument.current;
+    const generationAtSave = documentGeneration.current;
+    const outfitId = activeOutfitId ?? `look-${crypto.randomUUID()}`;
     const fallbackName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
-    const lookName = savingSelection || activeLookName === "Nuevo look" || !activeLookName.trim() ? fallbackName : activeLookName;
+    const lookName = activeLookName === "Nuevo look" || !activeLookName.trim() ? fallbackName : activeLookName.trim();
     setSavingOutfit(true);
     setWardrobeError("");
     try {
@@ -3562,22 +3496,19 @@ export function WardrobeApp({
         });
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo guardar el look.");
       }
-      const nextLook: SavedLook = { id: outfitId, name: lookName, items: itemsToSave.map((item) => ({ ...item })) };
+      const nextLook: SavedLook = { ...savedLooks.find(look => look.id === outfitId), id: outfitId, name: lookName, items: snapshotLook(itemsToSave) };
       setSavedLooks((looks) => {
         const nextLooks = [nextLook, ...looks.filter((look) => look.id !== outfitId)];
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
       });
-      if (savingSelection) {
-        setSelectedGroupIds([]);
-        setSaved(false);
-        setShareNotice(`${lookName} guardado. Selecciona otra prueba para continuar.`);
-      } else {
+      autoPlacedIds.current.clear();
+      if (documentGeneration.current === generationAtSave) {
         setActiveOutfitId(outfitId);
-        setActiveLookName(lookName);
-        setSaved(true);
-        if (studioReturnPanel === "looks") navigateWardrobeRoute("looks");
+        if (currentDocument.current.name === documentAtSave.name) setActiveLookName(lookName);
+        setSaved(sameDocument(documentAtSave, currentDocument.current));
       }
+      if (demoMode) setShareNotice("Look guardado en este navegador");
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el look.");
     } finally {
@@ -3585,11 +3516,10 @@ export function WardrobeApp({
     }
   }
 
-  async function duplicateCurrentOutfit() {
-    if (canvasPieces.length === 0 || savingOutfit) return;
+  async function duplicateLook(sourceItems: CanvasPiece[], lookName: string) {
+    if (sourceItems.length === 0 || savingOutfit || deletingLookId) return;
     const outfitId = `look-${crypto.randomUUID()}`;
-    const lookName = `Look ${String(savedLooks.length + 1).padStart(2, "0")}`;
-    const duplicatedPieces = canvasPieces.map((item) => ({ ...item, instanceId: crypto.randomUUID() }));
+    const duplicatedPieces = sourceItems.map((item) => ({ ...item, instanceId: crypto.randomUUID() }));
     setSavingOutfit(true);
     setWardrobeError("");
     try {
@@ -3607,16 +3537,7 @@ export function WardrobeApp({
         if (demoMode) localStorage.setItem(demoLooksStorageKey, JSON.stringify(nextLooks));
         return nextLooks;
       });
-      setCanvasPieces(duplicatedPieces);
-      setSelectedId("");
-      setSelectedGroupIds([]);
-      setActiveOutfitId(outfitId);
-      setActiveLookName(lookName);
-      setLookIterations([]);
-      setActiveIterationIndex(-1);
-      setSaved(true);
-      setLibraryOpen(false);
-      setSavedLooksOpen(true);
+      openSavedLook(nextLook);
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo duplicar el look.");
     } finally {
@@ -3624,7 +3545,15 @@ export function WardrobeApp({
     }
   }
 
-  async function retryProcessing(item: Garment, quality: "low" | "medium" = "low", outputVariant: "closed" | "open" = "closed") {
+  function duplicateCurrentOutfit() {
+    return duplicateLook(canvasPieces, `Look ${String(savedLooks.length + 1).padStart(2, "0")}`);
+  }
+
+  function duplicateSavedLook(look: SavedLook) {
+    return duplicateLook(look.items, `${look.name} · copia`);
+  }
+
+  async function retryProcessing(item: Garment, quality?: "low" | "medium", outputVariant: "closed" | "open" = "closed") {
     setGarmentSaveError("");
     setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "queued" } : garment));
     try {
@@ -3646,7 +3575,7 @@ export function WardrobeApp({
         if (updatedGarment.status === "cutout_pending") updatedGarment = await finalizePendingCutouts(updatedGarment);
         setGarments((items) => mergeApiGarments(items, [updatedGarment as ApiGarment]));
         if (updatedGarment.status === "ready") return;
-        if (updatedGarment.status === "failed") throw new Error(statusResult.job?.error || "La imagen no pudo prepararse.");
+        if (updatedGarment.status === "failed") throw new Error("No se pudo preparar la imagen. Vuelve a intentarlo.");
       }
     } catch (error) {
       setGarments((items) => items.map((garment) => garment.id === item.id ? { ...garment, status: "failed" } : garment));
@@ -3654,9 +3583,12 @@ export function WardrobeApp({
     }
   }
 
+  const saveLookLabel = savingOutfit ? "Guardando…" : saved ? "Guardado" : "Guardar look";
+  const shareLookLabel = sharingLookId ? "Preparando…" : "Compartir imagen";
+
   return (
     <main className={`site-shell view-${view} route-${activeRoute} forme-app`}>
-      {!demoMode && styleOnboardingOpen && <StyleOnboarding
+      {productFeatures.styleTest && !demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
         dismissible={Boolean(styleProfile?.completed)}
@@ -3673,10 +3605,9 @@ export function WardrobeApp({
         onNavigate={navigateWardrobeRoute}
         onOpenCanvas={() => openStudio(wardrobePanel)}
         onSignIn={beginGoogleSignIn}
-        onOpenPricing={() => window.location.assign("/pricing")}
       />
 
-      {sessionStatus === "checking" && (activeRoute === "perfil" || activeRoute === "ajustes") && (
+      {!accountDataReady && (
         <section className="account-route-loading" aria-label="Abriendo tu cuenta">
           <span />
           <span />
@@ -3687,17 +3618,10 @@ export function WardrobeApp({
       {demoMode && sessionStatus === "guest" && (activeRoute === "perfil" || activeRoute === "ajustes") && (
         <section className="account-page-gate" aria-labelledby="account-gate-title">
           <div>
-            <p>{activeRoute === "perfil" ? "Tu perfil" : "Tus preferencias"}</p>
-            <h1 id="account-gate-title">
-              {activeRoute === "perfil" ? "Tu identidad dentro de Formé." : "Una lectura que se adapta a ti."}
-            </h1>
-            <span>Entra para guardar tu closet, tus looks y las decisiones que afinan las recomendaciones.</span>
+            <h1 id="account-gate-title">Tu cuenta</h1>
+            <span>Entra para guardar tus prendas y looks.</span>
             <button type="button" onClick={beginGoogleSignIn}>Entrar con Google</button>
           </div>
-          <aside aria-hidden="true">
-            <strong>FORMÉ</strong>
-            <span>{activeRoute === "perfil" ? "Perfil, closet y looks públicos." : "Preferencias, restricciones y calibración."}</span>
-          </aside>
         </section>
       )}
 
@@ -3705,19 +3629,18 @@ export function WardrobeApp({
         <section className="settings-page" aria-labelledby="settings-title">
           <header className="settings-page-heading">
             <div>
-              <p>Preferencias</p>
               <h1 id="settings-title">Ajustes</h1>
-              <span>Controla cómo Formé interpreta tu estilo y cuánto quieres explorar.</span>
             </div>
-            <button type="button" onClick={() => navigateWardrobeRoute("perfil")}>Ver perfil</button>
           </header>
 
           <div className="settings-page-grid">
             <section className="settings-identity">
               <span className="profile-drawer-avatar"><img className={profileImageClass} src={profileImage} alt={`Foto de perfil de ${profile.name}`} /></span>
-              <div><h2>{profile.name}</h2><small>{profile.handle}</small></div>
+              <div><h2>{profile.name}</h2><small>{profile.handle}</small><button type="button" className="account-sign-out" onClick={signOut}>Cerrar sesión</button></div>
             </section>
 
+            <section className="settings-account-links"><h2>Cuenta</h2><a href="/perfil">Perfil y privacidad</a><a href="/pricing">Información de la beta</a><a href="/about">Manifiesto</a></section>
+            {productFeatures.styleTest && <>
             <section className="profile-style-summary">
               <p>Tu lectura actual</p>
               <h3>{profileTopStyles.length ? profileTopStyles.map((family) => family.label).join(", ") : "Todavía estamos conociéndote."}</h3>
@@ -3745,9 +3668,10 @@ export function WardrobeApp({
               <p>Controla cuánto se alejan las sugerencias de lo que ya usas.</p>
             </section>
 
-            <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}>
+            </>}
+            {productFeatures.styleTest && <button className="profile-recalibrate" type="button" onClick={() => { setProfileOpen(false); setStyleOnboardingOpen(true); }}>
               <span>{styleProfile?.completed ? "Revisar mi calibración" : "Configurar mi estilo"}</span><b>→</b>
-            </button>
+            </button>}
           </div>
         </section>
       )}
@@ -3770,51 +3694,64 @@ export function WardrobeApp({
             <h1>{profileDraft.name || "Tu nombre"}</h1>
             {profileDraft.bio.trim() ? <p>{profileDraft.bio}</p> : null}
             <nav className="profile-page-links" aria-label="Acciones del perfil">
-              {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>VER PÁGINA PÚBLICA</button>}
-              {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>COMPARTIR</button>}
-              <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTAR ESTILO</button>
-              <button type="button" onClick={() => window.location.assign("/pricing")}>PLANES</button>
+              {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>Ver perfil público</button>}
+              {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>Compartir</button>}
+              <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>Ajustes</button>
+              <button type="button" onClick={signOut}>Cerrar sesión</button>
             </nav>
           </div>
           <dl className="profile-page-stats">
             <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
             <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
-            <div><dt>Días planeados</dt><dd>{weeklyPlan.length}</dd></div>
+            {productFeatures.weeklyPlanner && <div><dt>Días planeados</dt><dd>{weeklyPlan.length}</dd></div>}
           </dl>
         </header>
 
+        {profileShareNotice && <p className="profile-share-notice" role="status">{profileShareNotice}</p>}
         <div className="profile-page-body">
           <section className="profile-page-editor" aria-labelledby="profile-editor-title">
+            <div className="profile-edit-columns">
+            <div className="profile-identity-fields">
             <header>
-              <h2 id="profile-editor-title">Cómo apareces</h2>
-              <p>Decide qué nombre, historia y partes de tu closet quieres compartir.</p>
+              <h2 id="profile-editor-title">Perfil</h2>
             </header>
             <div className="profile-page-fields">
-              <label>NOMBRE PÚBLICO<input value={profileDraft.name} maxLength={60} onChange={(event) => updateProfileDraft("name", event.target.value)} /></label>
-              <label>USUARIO<div className="profile-handle-input"><span>@</span><input value={profileDraft.handle.replace(/^@/, "")} maxLength={30} autoCapitalize="none" spellCheck={false} onChange={(event) => updateProfileDraft("handle", `@${event.target.value.replace(/^@/, "")}`)} /></div></label>
-              <label className="profile-page-bio">BIO<textarea value={profileDraft.bio} maxLength={160} rows={3} placeholder="Cuéntanos algo sobre tu estilo o tu closet." onChange={(event) => updateProfileDraft("bio", event.target.value)} /></label>
+              <label>Nombre<input value={profileDraft.name} maxLength={60} onChange={(event) => updateProfileDraft("name", event.target.value)} /></label>
+              <label>Usuario<div className="profile-handle-input"><span>@</span><input value={profileDraft.handle.replace(/^@/, "")} maxLength={30} autoCapitalize="none" spellCheck={false} onChange={(event) => updateProfileDraft("handle", `@${event.target.value.replace(/^@/, "")}`)} /></div></label>
+              <label className="profile-page-bio">Bio<textarea placeholder="Opcional" value={profileDraft.bio} maxLength={160} rows={3} onChange={(event) => updateProfileDraft("bio", event.target.value)} /></label>
+            </div>
             </div>
 
+            <div className="profile-preferences">
             <div className="profile-page-visibility">
-              <h3>Qué compartes</h3>
-              <label><span><strong>PERFIL PÚBLICO</strong><small>Crea una página que puedas enviar a otras personas.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => setProfileDraft((current) => current ? {
+              <h3>Privacidad</h3>
+              <label><span><strong>Perfil público</strong><small>Cualquier persona con el enlace podrá verlo.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => { setProfileSaved(false); setProfileShareNotice(""); setProfileSaveError(""); setProfileDraft((current) => current ? {
                 ...current,
                 profilePublic: event.target.checked,
                 ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
-              } : current)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>PRENDAS PUBLICADAS</strong><small>{personalGarments.filter((item) => item.isPublic).length} prendas elegidas desde tu closet.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>LOOKS PUBLICADOS</strong><small>{savedLooks.filter((look) => look.isPublic).length} looks elegidos como públicos.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
-              <label className={!profileDraft.profilePublic ? "disabled" : ""}><span><strong>APARECER EN BÚSQUEDAS</strong><small>Permite que otras personas te encuentren dentro de Formé.</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
+              } : current); }} /></label>
+              {profileDraft.profilePublic && <>
+              <label><span><strong>Mostrar prendas elegidas</strong><small>Elígelas desde la ficha de cada prenda con «Mostrar en mi perfil».</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showCloset} onChange={(event) => updateProfileDraft("showCloset", event.target.checked)} /></label>
+              <label><span><strong>Mostrar looks elegidos</strong><small>Elígelos desde el menú de cada look con «Mostrar en mi perfil».</small></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.showLooks} onChange={(event) => updateProfileDraft("showLooks", event.target.checked)} /></label>
+              <label><span><strong>Aparecer en búsquedas</strong></span><input type="checkbox" disabled={!profileDraft.profilePublic} checked={profileDraft.discoverable} onChange={(event) => updateProfileDraft("discoverable", event.target.checked)} /></label>
+              </>}
+            </div>
+
+            <div className="profile-page-visibility">
+              <h3>Prendas</h3>
+              <label><span><strong>Mostrar básicos Formé</strong><small>Disponibles en Mi closet, Canvas y al mezclar.</small></span><input type="checkbox" checked={profileDraft.includeFormeBasics} onChange={(event) => updateProfileDraft("includeFormeBasics", event.target.checked)} /></label>
+            </div>
+            </div>
             </div>
 
             <div className="profile-page-save-row">
-              <div><span>TU PÁGINA</span><strong>forme.gallery/{profileDraft.handle || "@tuusuario"}</strong></div>
-              <button className={profileSaved ? "saved" : ""} type="button" disabled={savingProfile} onClick={() => void saveAccountSettings()}>{savingProfile ? "GUARDANDO…" : profileSaved ? "CAMBIOS GUARDADOS" : "GUARDAR CAMBIOS"}</button>
+              {profileDraft.profilePublic && <div><span>Enlace público</span><strong>forme.gallery/{profileDraft.handle || "@tuusuario"}</strong></div>}
+              <button className={profileSaved ? "saved" : ""} type="button" disabled={savingProfile} onClick={() => void saveAccountSettings()}>{savingProfile ? "Guardando…" : profileSaved ? "Guardado" : "Guardar cambios"}</button>
             </div>
             {profileSaveError && <p className="profile-save-error" role="alert">{profileSaveError}</p>}
           </section>
 
-          <aside className="profile-page-reading" aria-labelledby="profile-reading-title">
+          {productFeatures.styleTest && <aside className="profile-page-reading" aria-labelledby="profile-reading-title">
             <header>
               <h2 id="profile-reading-title">Lo que Formé entiende de ti</h2>
               <p>Esta lectura cambia con los looks que guardas, descartas y usas.</p>
@@ -3828,70 +3765,52 @@ export function WardrobeApp({
               <p>{(styleProfile?.exploration ?? 35) >= 70 ? "Quieres ver opciones que se alejen de lo habitual." : (styleProfile?.exploration ?? 35) >= 40 ? "Buscas equilibrio entre lo conocido y algo nuevo." : "Prefieres variaciones cercanas a lo que ya funciona."}</p>
             </div>
             <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>AJUSTAR PREFERENCIAS</button>
-          </aside>
+          </aside>}
         </div>
       </section>}
 
       {view === "wardrobe" && activeRoute !== "perfil" && activeRoute !== "ajustes" && (
-        <section className="content wardrobe-view">
+        <section className="content wardrobe-view" data-pending={!accountDataReady || undefined} inert={!accountDataReady}>
           {wardrobeError && <div className="app-message error" role="status">{wardrobeError}<button onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
 
           {wardrobePanel === "closet" && closetMode === "browse" ? (
-            <section className="pieces-section">
-              <header className="closet-commandbar">
-                <div>
-                  <ClosetLooksNav active="closet" onNavigate={navigateWardrobeRoute} />
-                  <span aria-label={`${demoMode ? sharedBasics.length : personalGarments.length} prendas`}>
-                    {demoMode ? sharedBasics.length : personalGarments.length}
-                  </span>
+            <section className="pieces-section" data-grid-size={closetGridSize}>
+              <h1 className="sr-only">Mi closet</h1>
+              <div className="catalog-toolbar">
+                <div className="catalog-collection">
+                  {!demoMode && basicsEnabled ? <label><span className="sr-only">Colección</span><select value={showingBasics ? "basics" : "personal"} onChange={event => setCatalogSource(event.target.value as "personal" | "basics")}>
+                    <option value="personal">Mis prendas</option><option value="basics">Básicos Formé</option>
+                  </select></label> : <span>{showingBasics ? "Básicos Formé" : "Prendas"}</span>}
+                  <span className="catalog-count" aria-label={`${catalogItems.length} prendas`}>{catalogItems.length}</span>
                 </div>
-                {demoMode ? (
-                  <button type="button" onClick={beginGoogleSignIn}>Crear mi closet</button>
-                ) : (
-                  <nav aria-label="Acciones del closet">
-                    <button
-                      className={filtersOpen || archiveFilterCount > 0 ? "active" : ""}
-                      aria-expanded={filtersOpen}
-                      onClick={() => setFiltersOpen((open) => !open)}
-                    >
-                      Filtrar{archiveFilterCount > 0 ? ` ${archiveFilterCount}` : ""}
-                    </button>
-                    <button className="closet-add" onClick={() => setClosetMode("upload")}>Agregar</button>
-                  </nav>
-                )}
-              </header>
-              {demoMode ? <div className="guest-closet">
-                <section className="guest-basics forme-group">
-                  <ClosetGarmentGrid garments={sharedBasics} emptyLabel="" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
-                </section>
-              </div> : <div className={`wardrobe-catalog ${filtersOpen ? "filters-open" : ""}`}>
-                <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`}>
-                  <div className="filter-sidebar-header"><strong>Filtros</strong><button onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></div>
-                  <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
-                </aside>
-                <div className="catalog-results">
-                  <section className="closet-group personal-group">
-                    {personalGarments.length > 0
-                      ? <ClosetGarmentGrid garments={visiblePersonalGarments} emptyLabel="NO HAY PRENDAS CON ESTOS FILTROS" onOpen={openGarmentEditor} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
-                      : <div className="closet-empty-personal"><p>Tu closet todavía está vacío.</p><button type="button" onClick={() => setClosetMode("upload")}>AGREGAR PRIMERA PRENDA →</button></div>}
-                  </section>
-                  <section className="closet-group forme-group">
-                    <div className="closet-group-heading"><div><h3>Básicos Formé</h3></div><span>{sharedBasics.length}</span></div>
-                    <ClosetGarmentGrid garments={visibleFormeBasics} emptyLabel="NO HAY BÁSICOS CON ESTOS FILTROS" onOpen={(item) => addAndOpenStudio(item.id)} onAdd={(item) => addAndOpenStudio(item.id)} onFavorite={toggleFavorite} onResetFilters={() => setArchiveFilters(emptyFilters)} />
-                  </section>
+                <label className="catalog-search"><span className="sr-only">Buscar prendas</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" value={catalogQuery} onChange={event => setCatalogQuery(event.target.value)} placeholder="Buscar" /></label>
+                <div className="catalog-tools">
+                  <GarmentViewControls size={closetGridSize} onSizeChange={setClosetGridSize} favorites={favoritesOnly} onFavoritesChange={setFavoritesOnly} />
+                  <button type="button" className={`catalog-filter${archiveFilterCount || catalogSort !== "recent" ? " active" : ""}`} onClick={() => setFiltersOpen(true)} aria-label={`Filtrar y ordenar prendas${archiveFilterCount ? `, ${archiveFilterCount} filtros activos` : ""}`}><ClosetActionIcon filter /><span>Filtros{archiveFilterCount ? ` · ${archiveFilterCount}` : ""}</span></button>
                 </div>
-              </div>}
+                {(demoMode || showingBasics || personalGarments.length > 0) && <button className="closet-add" type="button" onClick={demoMode ? beginGoogleSignIn : openUpload} aria-label={demoMode ? "Crear mi closet" : "Añadir prendas"}><ClosetActionIcon /><span>{demoMode ? "Crear mi closet" : <>Añadir<span className="closet-add-context"> prendas</span></>}</span></button>}
+              </div>
+              {filtersOpen && <FormeDialog labelledBy="filter-title" className="filter-dialog" onClose={() => setFiltersOpen(false)}>
+                <header className="dialog-heading"><h2 id="filter-title">Filtros y orden</h2><button type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></header>
+                <label className="catalog-sort"><span>Ordenar por</span><select aria-label="Ordenar prendas" value={catalogSort} onChange={event => setCatalogSort(event.target.value)}><option value="recent">Más recientes</option><option value="name">Nombre A–Z</option></select></label>
+                <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
+                <button className="primary-action" onClick={() => setFiltersOpen(false)}>Ver {catalogItems.length} prendas</button>
+              </FormeDialog>}
+              <div className="catalog-results">
+                {!showingBasics && personalGarments.length === 0 ? <div className="closet-empty-personal"><h2>Tu closet está vacío</h2><p>Añade tus prendas para empezar a combinarlas.</p><button className="primary-action" type="button" onClick={openUpload}>Añadir prendas</button></div> :
+                  <ClosetGarmentGrid garments={catalogItems} emptyLabel={favoritesOnly ? "No hay favoritas con estos filtros." : "No encontramos prendas con esta búsqueda."} onOpen={(item) => openGarmentEditor(item)} onResetFilters={() => { setArchiveFilters(emptyFilters); setCatalogQuery(""); setFavoritesOnly(false); }} />}
+              </div>
             </section>
           ) : wardrobePanel === "looks" ? (
             <section className="looks-view">
               <header className="closet-commandbar looks-commandbar">
                 <div>
-                  <ClosetLooksNav active="looks" onNavigate={navigateWardrobeRoute} />
-                  <span aria-label={`${savedLooks.length} looks`}>{savedLooks.length}</span>
+                  <h1 className="sr-only">Looks</h1><span className="collection-name">Looks guardados</span>
+                  <span data-empty={savedLooks.length === 0 || undefined} aria-label={`${savedLooks.length} looks`}>{savedLooks.length}</span>
                 </div>
                 <nav aria-label="Acciones de Looks">
-                  <button type="button" onClick={generateLooksQuickly}>Generar</button>
-                  <button type="button" onClick={() => openStudio("looks")}>Crear look</button>
+                  {productFeatures.assistant && <button type="button" onClick={generateLooksQuickly}>Generar</button>}
+                  {savedLooks.length > 0 && <button type="button" aria-label="Crear look" title="Crear look" className="primary-action" onClick={newLook}><ClosetActionIcon /><span className="closet-action-label">Crear look</span></button>}
                 </nav>
               </header>
               {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
@@ -3900,21 +3819,25 @@ export function WardrobeApp({
                   <article className="saved-look-card" key={look.id}>
                     <button className="saved-look-open" type="button" onClick={() => openSavedLook(look)} aria-label={`Abrir ${look.name} en el canvas`}>
                       <LookPreview look={look} garmentById={garmentById} />
-                      <span>ABRIR EN CANVAS ↗</span>
+                      <span>Abrir en Canvas</span>
                     </button>
                     <div className="saved-look-meta">
-                      <div><strong>{look.name}</strong><small>{look.items.length} PIEZAS</small></div>
-                      <div className="saved-look-actions">
-                        <button className={look.isPublic ? "visibility-toggle public" : "visibility-toggle"} type="button" onClick={() => void toggleOutfitVisibility(look)} aria-label={`${look.isPublic ? "Ocultar" : "Mostrar"} ${look.name} en mi perfil`}>{look.isPublic ? "PÚBLICO" : "PRIVADO"}</button>
-                        <button className="share-look" type="button" disabled={Boolean(sharingLookId)} onClick={() => void shareLook(look)} aria-label={`Compartir ${look.name} en Instagram`}>{sharingLookId === look.id ? "PREPARANDO…" : "COMPARTIR ↗"}</button>
-                        <button type="button" onClick={() => deleteSavedLook(look.id)} aria-label={`Eliminar ${look.name}`}>ELIMINAR</button>
-                      </div>
+                      <div><strong>{look.name}</strong><small>{demoMode ? "En este navegador" : look.isPublic && profile.profilePublic && profile.showLooks ? "En tu perfil público" : look.isPublic ? "Elegido para tu perfil" : "Privado"}</small></div>
+                      <FormeMenu label={`Acciones de ${look.name}`}>
+                        {!demoMode && <>
+                        <button type="button" onClick={() => void toggleOutfitVisibility(look)}>{look.isPublic ? "Ocultar del perfil" : "Mostrar en mi perfil"}</button>
+                        {(!profile.profilePublic || !profile.showLooks) && <button type="button" onClick={() => navigateWardrobeRoute("perfil")}>Configurar perfil público</button>}
+                        </>}
+                        <button type="button" disabled={Boolean(sharingLookId)} onClick={() => void shareLook(look)}>{sharingLookId === look.id ? "Preparando…" : "Compartir imagen"}</button>
+                        <button type="button" disabled={savingOutfit} onClick={() => void duplicateSavedLook(look)}>Duplicar look</button>
+                        <button type="button" className="danger-action" onClick={() => void deleteSavedLook(look.id)}>Eliminar look</button>
+                      </FormeMenu>
                     </div>
                   </article>
                 ))}
-                {savedLooks.length === 0 && <div className="looks-empty"><p>Todavía no guardaste ningún look.</p></div>}
+                {savedLooks.length === 0 && <div className="looks-empty"><h2>Aún no has guardado looks</h2><p>Combina prendas en el Canvas y guarda lo que te guste.</p><button type="button" className="primary-action" onClick={newLook}>Crear look</button></div>}
               </div>
-              <WeeklyPlanView
+              {productFeatures.weeklyPlanner && <WeeklyPlanView
                 weekDays={weekDays}
                 entries={weeklyPlan}
                 selectedDate={selectedPlanDate}
@@ -3928,7 +3851,7 @@ export function WardrobeApp({
                 onOpenLook={openSavedLook}
                 onAutoPlan={() => void autoPlanCurrentWeek()}
                 onCreateLook={createLookFromWeek}
-              />
+              />}
             </section>
           ) : wardrobePanel === "assistant" ? (
             <section className="assistant-view">
@@ -4001,53 +3924,39 @@ export function WardrobeApp({
             </section>
           ) : (
             <section className="upload-view">
-              <div className="upload-heading"><div><h2>Añadir al closet</h2></div><button type="button" onClick={() => setClosetMode("browse")}>← VOLVER A PRENDAS</button></div>
-              <div className="upload-layout">
-                <label
-                  className={`dropzone bulk-dropzone ${uploadItems.length ? "has-files" : ""} ${draggingUpload ? "dragging" : ""}`}
-                  onDragEnter={(event: DragEvent) => { event.preventDefault(); setDraggingUpload(true); }}
-                  onDragOver={(event: DragEvent) => event.preventDefault()}
+              <div className="upload-heading"><h1>Añadir prendas</h1><button type="button" onClick={() => navigateWardrobeRoute("closet")}>Volver al closet</button></div>
+              <div className={`upload-layout ${uploadItems.length ? "has-files" : ""}`}>
+                <input ref={fileInput} type="file" accept={uploadFileAccept} multiple disabled={Boolean(uploadIntakeBatchId) || preparingUploads} onChange={(event: ChangeEvent<HTMLInputElement>) => void acceptFiles(event.target.files ?? undefined)} hidden />
+                {!uploadItems.length ? <div
+                  className={`dropzone bulk-dropzone ${draggingUpload ? "dragging" : ""}`}
+                  onDragEnter={event => { event.preventDefault(); setDraggingUpload(true); }}
+                  onDragOver={event => event.preventDefault()}
                   onDragLeave={() => setDraggingUpload(false)}
-                  onDrop={(event) => { event.preventDefault(); setDraggingUpload(false); if (!uploadIntakeBatchId) acceptFiles(event.dataTransfer.files); }}
+                  onDrop={event => { event.preventDefault(); setDraggingUpload(false); void acceptFiles(event.dataTransfer.files); }}
                 >
-                  <input ref={fileInput} type="file" accept="image/*" multiple disabled={Boolean(uploadIntakeBatchId)} onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFiles(event.target.files ?? undefined)} hidden />
-                  {uploadItems.length > 0
-                    ? <div className="upload-preview-grid">{uploadItems.map((item) => <img src={item.preview} alt="" key={item.id} />)}</div>
-                    : <div className="dropzone-empty"><span className="upload-icon" aria-hidden="true">↑</span><h3>Arrastra tus fotos aquí</h3><p>o toca para seleccionar</p><small>20 MB POR PRENDA · LOS LOTES SE PROCESAN EN PARALELO</small></div>}
-                  {uploadItems.length > 0 && !uploadingBatch && !uploadIntakeBatchId && <span className="replace-photo">AÑADIR MÁS · {uploadItems.length} EN EL LOTE</span>}
-                </label>
-                <div className="intake-panel bulk-intake">
-                  <div className="batch-heading"><span>TUS FOTOS</span><strong>{uploadItems.length ? `${uploadItems.length} ${uploadItems.length === 1 ? "PRENDA" : "PRENDAS"}` : "SIN PRENDAS"}</strong></div>
-                  {uploadItems.length > 0
-                    ? <div className="upload-queue">{uploadItems.map((item, index) => {
-                      const editable = !uploadingBatch && !uploadIntakeBatchId && (item.status === "ready" || item.status === "failed" || item.status === "review");
-                      return <article className={`upload-item status-${item.status}`} key={item.id}>
-                        <img className="upload-item-thumb" src={item.preview} alt="" />
-                        <div className="upload-item-fields">
-                          <label>NOMBRE<input disabled={!editable} value={item.name} onChange={(event) => updateUploadItem(item.id, { name: event.target.value })} placeholder={`Prenda ${index + 1}`} /></label>
-                          <label>CATEGORÍA<select disabled={!editable} value={item.category} onChange={(event) => {
-                            const category = event.target.value as Garment["category"];
-                            updateUploadItem(item.id, { category, garmentType: garmentTypesByCategory[category][0] });
-                          }}><option value="Outerwear">Capas</option><option value="Tops">Prendas superiores</option><option value="Bottoms">Pantalones</option><option value="Tailoring">Sastrería</option><option value="Footwear">Calzado</option><option value="Accessories">Accesorios</option></select></label>
-                          <label>TIPO<select disabled={!editable} value={item.garmentType} onChange={(event) => updateUploadItem(item.id, { garmentType: event.target.value as Garment["garmentType"] })}>{garmentTypesByCategory[item.category].map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                          <span className="upload-item-state">{uploadStatusLabels[item.status]}{item.error ? ` · ${item.error}` : ""}</span>
-                        </div>
-                        {editable && <button className="remove-upload-item" type="button" onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name || `prenda ${index + 1}`}`}>×</button>}
-                      </article>;
-                    })}</div>
-                    : <div className="queue-empty"><p>Selecciona varias fotos. Podrás corregir el nombre y el tipo antes de procesarlas.</p></div>}
-                  {uploadError && <p className={`upload-status ${uploadItems.some((item) => item.status === "failed") ? "error" : ""}`}>{uploadError}</p>}
-                  {uploadBatchSummary && <p className={`upload-status batch-summary ${uploadBatchSummary.status === "review" ? "error" : ""}`}>
-                    {uploadBatchSummary.passed}/{uploadBatchSummary.expected} listas
-                    {uploadBatchSummary.processing + uploadBatchSummary.uploaded > 0 ? ` · ${uploadBatchSummary.processing + uploadBatchSummary.uploaded} procesando` : ""}
-                    {uploadBatchSummary.review > 0 ? ` · ${uploadBatchSummary.review} en revisión` : ""}
-                    {uploadBatchSummary.failed > 0 ? ` · ${uploadBatchSummary.failed} fallaron` : ""}
-                    {uploadBatchSummary.pending > 0 ? ` · ${uploadBatchSummary.pending} pendientes` : ""}
-                  </p>}
-                  {uploadAllPassed && !uploadingBatch
-                    ? <button className="primary-action ready" onClick={() => { resetUpload(); setClosetMode("browse"); }}>VER EN MI CLOSET <span>→</span></button>
-                    : uploadItems.length > 0 && <button className="primary-action" disabled={uploadRetryableCount === 0 || uploadingBatch} onClick={ghostGarments}>{uploadingBatch ? `PREPARANDO ${uploadFinishedCount} DE ${uploadItems.length}` : uploadRetryableCount > 0 && uploadItems.some((item) => item.status === "failed" || item.status === "review") ? `REINTENTAR ${uploadRetryableCount}` : uploadRetryableCount > 0 ? `PROCESAR ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "PRENDA" : "PRENDAS"}` : "LOTE EN PROCESO"}<span>→</span></button>}
-                </div>
+                  <div className="dropzone-empty"><p>Una prenda por foto, completa y con buena luz.</p><button type="button" className="primary-action" disabled={preparingUploads} onClick={() => fileInput.current?.click()}>{preparingUploads ? "Comprobando fotos…" : "Seleccionar fotos"}</button><small>Arrastra tus fotos aquí · Hasta 20 MB por foto</small></div>
+                </div> : <>
+                  <div className="upload-queue-heading"><span>{uploadItems.length} {uploadItems.length === 1 ? "foto" : "fotos"}</span>{!uploadIntakeBatchId && <button type="button" disabled={preparingUploads} onClick={() => fileInput.current?.click()}>{preparingUploads ? "Comprobando…" : "+ Añadir fotos"}</button>}</div>
+                  <div className="upload-photo-queue" aria-label="Fotos para añadir al closet">{uploadItems.map(item => {
+                    const recognized = garments.find(garment => garment.id === item.garmentId);
+                    const canEdit = recognized?.metadataStatus === "ready";
+                    const state = uploadStatusLabels[item.status];
+                    return <article className={`upload-photo status-${item.status}`} key={item.id}>
+                      <div className="upload-photo-visual"><img src={recognized?.qaStatus === "passed" ? imageSrc(recognized.image) : item.preview} alt={recognized?.name || item.name} />{!uploadIntakeBatchId && <button type="button" className="upload-remove" disabled={preparingUploads} onClick={() => removeUploadItem(item.id)} aria-label={`Quitar ${item.name}`}>×</button>}</div>
+                      <p className="upload-photo-name" title={recognized?.name || item.name}>{recognized?.name || item.name}</p>
+                      {item.status !== "ready" && <span className="upload-photo-state">{state}</span>}
+                      {item.error && <p className={item.status === "failed" || item.status === "review" ? "upload-photo-error" : "upload-photo-note"}>{item.error}</p>}
+                      {canEdit && <button type="button" className="upload-edit" onClick={() => openGarmentEditor(recognized, true)}>Editar ficha</button>}
+                    </article>;
+                  })}</div>
+                  <div className="upload-footer">
+                    <p role="status">{uploadingBatch && uploadItems.some(item => item.status === "uploading") ? "Subiendo fotos…" : uploadingBatch || uploadItems.some(item => item.status === "processing") ? `${uploadItems.filter(item => item.status === "done").length} de ${uploadItems.length} listas. Puedes volver al closet.` : uploadAllPassed ? "Prendas listas" : ""}</p>
+                    {uploadAllPassed && !uploadingBatch ? <button className="primary-action" onClick={() => { resetUpload(); navigateWardrobeRoute("closet"); }}>Ver prendas</button>
+                      : <button className="primary-action" disabled={!uploadRetryableCount || uploadingBatch || preparingUploads} onClick={ghostGarments}>{uploadingBatch ? "Preparando…" : uploadItems.some(item => item.status === "failed" || item.status === "review") ? `Reintentar ${uploadRetryableCount}` : uploadRetryableCount ? `Añadir ${uploadRetryableCount} ${uploadRetryableCount === 1 ? "prenda" : "prendas"}` : "En proceso"}</button>}
+                  </div>
+                </>}
+                {uploadNotice && <p className="upload-status" role="status">{uploadNotice}</p>}
+                {uploadError && <p className="upload-status upload-error" role="alert">{uploadError}</p>}
               </div>
             </section>
           )}
@@ -4055,24 +3964,46 @@ export function WardrobeApp({
       )}
 
       {view === "studio" && (
-        <section className="content studio-view">
-          <div className="studio-layout">
+        <section className="content studio-view" data-pending={!accountDataReady || undefined} inert={!accountDataReady}>
+          <div className="studio-layout" aria-busy={savingOutfit}>
+            <header className="studio-heading">
+              <div className="studio-document-name"><label className="sr-only" htmlFor="look-name">Nombre del look</label><input id="look-name" disabled={savingOutfit} value={activeLookName} maxLength={80} onFocus={() => { nameCheckpoint.current = false; }} onChange={event => { if (!nameCheckpoint.current) { checkpoint(); nameCheckpoint.current = true; } setActiveLookName(event.target.value); setSaved(false); }} /><span className="sr-only" aria-live="polite">{savingOutfit ? "Guardando…" : saved ? "Guardado en Looks" : demoMode ? "Borrador en este navegador" : "Borrador"}</span></div>
+              <nav className="canvas-panel-nav" aria-label="Paneles del canvas">
+                <button type="button" className={layersOpen ? "active" : ""} onClick={() => togglePanel("layers")} aria-expanded={layersOpen} aria-controls="canvas-layers">Capas</button>
+                <button type="button" className={savedLooksOpen ? "active" : ""} onClick={() => togglePanel("looks")} aria-expanded={savedLooksOpen} aria-controls="canvas-saved-looks">Looks</button>
+              </nav>
+            </header>
             <div className="canvas-column">
-              <div className={`look-canvas ${canvasPieces.length === 0 ? "is-empty" : "has-pieces"} ${libraryOpen ? "library-open" : ""} ${savedLooksOpen ? "saved-looks-open" : ""}`}>
+              <div className={`look-canvas ${canvasPieces.length === 0 ? "is-empty" : "has-pieces"} library-open ${savedLooksOpen ? "saved-looks-open" : ""}`}
+                onPointerDownCapture={startCanvasGesture} onPointerMoveCapture={moveCanvasGesture}
+                onPointerUpCapture={event => endCanvasGesture(event)} onPointerCancelCapture={event => endCanvasGesture(event, true)}
+                onLostPointerCapture={event => { if (canvasGestures.current?.has(event.pointerId)) canvasGestures.current.cancel(); }}
+                onContextMenu={event => { if (canvasGestures.current?.active) event.preventDefault(); }}
+              >
                 <div
                   className="look-artboard"
                   ref={canvasRef}
+                  role="group"
+                  aria-label="Área de trabajo del look"
+                  onKeyDown={event => {
+                    if (event.key === "Escape") {
+                      setSelectedId(""); setSelectedGroupIds([]);
+                      if (window.innerWidth <= 900) { setSavedLooksOpen(false); }
+                    }
+                  }}
                   onPointerDown={startMarqueeSelection}
                   onPointerMove={moveMarqueeSelection}
                   onPointerUp={stopMarqueeSelection}
                   onPointerCancel={stopMarqueeSelection}
                 >
-                  <div className={`snapshot-frame ${selectedGroupIds.length ? "selection-active" : ""}`} ref={snapshotFrameRef} aria-hidden="true">
-                    <span>{selectedGroupIds.length ? `${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA SELECCIONADA" : "PIEZAS SELECCIONADAS"}` : "ÁREA DEL LOOK"}</span>
-                  </div>
                   {canvasPieces.length === 0 && <div className="empty-canvas">
-                    <h2>Empieza con una prenda.</h2>
-                    <p>Elige algo de tu closet y construye desde ahí.</p>
+                    <p>{canRandomize ? "Añade una prenda o prueba Mezclar." : "Añade prendas a tu closet para empezar."}</p>
+                    {!canRandomize && <button type="button" className="canvas-empty-action" onClick={openUpload}>Añadir prendas</button>}
+                    {clearedLook && <button type="button" className="canvas-empty-action" onClick={() => {
+                      setCanvasPieces(clearedLook.items); setActiveOutfitId(clearedLook.id); setActiveLookName(clearedLook.name);
+                      setSaved(clearedLook.saved); setLockedPieceIds(clearedLook.locked); autoPlacedIds.current = clearedLook.automatic;
+                      setClearedLook(null);
+                    }}>Deshacer vaciado</button>}
                   </div>}
                   {marqueeRect && <span className="canvas-marquee" aria-hidden="true" style={{ left: marqueeRect.left, top: marqueeRect.top, width: marqueeRect.width, height: marqueeRect.height }} />}
                   {canvasPieces.map((piece) => {
@@ -4081,6 +4012,9 @@ export function WardrobeApp({
                     const pieceImage = piece.variant === "open" && garment.openImage ? garment.openImage : garment.image;
                     const piecePhotoRole: GarmentPhotoRole = piece.variant === "open" && garment.openImage ? "canvas" : "complete";
                     const canvasImage = cleanCanvasImage(pieceImage);
+                    const layout = garmentLayout(garment, piece.variant);
+                    const layerOrder = [...canvasPieces].sort((a, b) => a.z - b.z);
+                    const layerIndex = layerOrder.findIndex(item => item.instanceId === piece.instanceId);
                     const expandedHitbox = garment.category === "Accessories" && (piece.scale <= 0.2 || garment.id.includes("sunglasses"));
                     const safeScale = Math.max(piece.scale, 0.08);
                     const pieceStyle = {
@@ -4089,238 +4023,269 @@ export function WardrobeApp({
                       zIndex: piece.z,
                       transform: `translate(-50%, -50%) rotate(${piece.rotation}deg) scale(${piece.scale})`,
                       "--piece-outline-width": `${1.5 / safeScale}px`,
-                      "--piece-handle-size": `${44 / safeScale}px`,
-                      "--piece-handle-icon": `${18 / safeScale}px`,
-                      "--piece-handle-half": `${-22 / safeScale}px`,
                       ...(expandedHitbox ? { "--piece-hitbox-inset": `-${24 / Math.max(piece.scale, 0.08)}px` } : {}),
                     } as CSSProperties;
                     return (
+                      <Fragment key={piece.instanceId}>
                       <div
                         className={`canvas-piece ${expandedHitbox ? "expanded-hitbox" : ""} ${selectedId === piece.instanceId ? "selected" : ""} ${selectedGroupIdSet.has(piece.instanceId) ? "group-selected" : ""}`}
-                        key={piece.instanceId}
                         data-instance-id={piece.instanceId}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Seleccionar ${translateGarmentName(garment.name)}`}
+                        aria-pressed={selectedId === piece.instanceId}
+                        onKeyDown={event => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault(); setSelectedId(piece.instanceId); setSelectedGroupIds([]);
+                          } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+                            event.preventDefault(); checkpoint(); autoPlacedIds.current.delete(piece.instanceId);
+                            const step = event.shiftKey ? 5 : 1;
+                            setCanvasPieces(items => items.map(item => item.instanceId === piece.instanceId ? { ...item, x: clamp(item.x + (event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0), 4, 96), y: clamp(item.y + (event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0), 4, 96) } : item));
+                            setSaved(false);
+                          }
+                        }}
+                        data-random-locked={lockedPieceIds.has(piece.instanceId)}
                         data-photo-role={piecePhotoRole}
-                        onPointerDown={(event) => startMoving(event, piece.instanceId)}
-                        onPointerMove={movePiece}
-                        onPointerUp={stopMoving}
-                        onPointerCancel={(event) => stopMoving(event, true)}
+                        data-height-slots={layout.slots}
+                        data-layout-region={layout.region}
+                        data-alpha-bounds={layout.bounds.join(",")}
+                        data-body-height={layout.bodyHeight}
+                        data-anchor-y={layoutAnchorY(layout)}
+                        data-neck-rise={layout.neckRise}
+                        data-sleeve-bottoms={layout.sleeveBottoms.join(",")}
                         style={pieceStyle}
                       >
-                        <img src={imageSrc(canvasImage)} alt={`${translateGarmentName(garment.name)}, foto ${piecePhotoRole === "canvas" ? "para Canvas" : "completa"}`} draggable={false} />
-                        {selectedId === piece.instanceId && <>
-                          <span className="canvas-selection-box" aria-hidden="true" />
-                          <button
-                            type="button"
-                            className="transform-handle duplicate-handle"
-                            aria-label={`Duplicar ${translateGarmentName(garment.name)}`}
-                            title="Duplicar"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => { event.stopPropagation(); duplicatePiece(piece.instanceId); }}
-                          ><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1" /><path d="M16 8V5H5v11h3" /></svg></button>
-                          <button
-                            type="button"
-                            className="transform-handle delete-handle"
-                            aria-label={`Borrar ${translateGarmentName(garment.name)}`}
-                            title="Borrar"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => { event.stopPropagation(); removePiece(piece.instanceId); }}
-                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M8 10v7M12 10v7M16 10v7M7 7l1 14h8l1-14" /></svg></button>
-                          <button
-                            type="button"
-                            className="transform-handle rotate-handle"
-                            aria-label={`Rotar ${translateGarmentName(garment.name)}`}
-                            onPointerDown={(event) => startTransformHandle(event, piece.instanceId, "rotate")}
-                            onPointerMove={moveTransformHandle}
-                            onPointerUp={stopTransformHandle}
-                            onPointerCancel={stopTransformHandle}
-                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V3M5 3h5M5.5 3.5A9 9 0 1 1 3 13" /><path d="m3 13-2-2m2 2 2-2" /></svg></button>
-                          <button
-                            type="button"
-                            className="transform-handle scale-handle"
-                            aria-label={`Escalar ${translateGarmentName(garment.name)}`}
-                            onPointerDown={(event) => startTransformHandle(event, piece.instanceId, "scale")}
-                            onPointerMove={moveTransformHandle}
-                            onPointerUp={stopTransformHandle}
-                            onPointerCancel={stopTransformHandle}
-                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7 17 17M10 17h7v-7" /></svg></button>
-                        </>}
+                        <img src={imageSrc(canvasImage)} alt={translateGarmentName(garment.name)} draggable={false} />
                       </div>
+                      {(selectedId === piece.instanceId || lockedPieceIds.has(piece.instanceId)) && <CanvasPieceOverlay
+                        instanceId={piece.instanceId}
+                        geometryKey={`${piece.x}:${piece.y}:${piece.scale}:${piece.rotation}:${pieceImage}:${layout.bounds.join(",")}`}
+                        selected={selectedId === piece.instanceId}
+                      >
+                        {selectedId === piece.instanceId && <fieldset className="canvas-piece-actions" disabled={savingOutfit} aria-label="Herramientas de la prenda">
+                          <span className="canvas-selection-box" aria-hidden="true" />
+                          <button type="button" className="piece-action piece-duplicate" aria-label="Duplicar prenda" title="Duplicar prenda" onClick={() => duplicatePiece(piece.instanceId)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M15 8V4H4v11h4" /></svg>
+                          </button>
+                          <button type="button" className="piece-action piece-remove" aria-label="Quitar del look" title="Quitar del look" onClick={() => removePiece(piece.instanceId)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                          </button>
+                          <button type="button" className="piece-action piece-layer-up" aria-label="Subir una capa" title="Subir una capa" disabled={layerIndex === layerOrder.length - 1} onClick={() => changeLayer(piece.instanceId, "up")}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7 4-4 4 4M12 3v10M4 15l8 5 8-5M4 11l3 2m10 0 3-2" /></svg>
+                          </button>
+                          <button type="button" className="piece-action piece-layer-down" aria-label="Bajar una capa" title="Bajar una capa" disabled={layerIndex === 0} onClick={() => changeLayer(piece.instanceId, "down")}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4M12 3v11M4 15l8 5 8-5M4 11l3 2m10 0 3-2" /></svg>
+                          </button>
+                          <button type="button" className="piece-action piece-keep" aria-label="Mantener al mezclar" title={lockedPieceIds.has(piece.instanceId) ? "Permitir cambiar al mezclar" : "Mantener al mezclar"} aria-pressed={lockedPieceIds.has(piece.instanceId)} onClick={() => toggleRandomLock(piece.instanceId)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d={lockedPieceIds.has(piece.instanceId) ? "M8 10V7a4 4 0 0 1 8 0v3M12 14v3" : "M8 10V7a4 4 0 0 1 7-2M12 14v3"} /></svg>
+                          </button>
+                          <button type="button" className="piece-action piece-replace" aria-label="Cambiar prenda" title="Cambiar prenda" onClick={() => beginReplacingPiece(piece.instanceId)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" /></svg>
+                          </button>
+                          <button type="button" className="transform-handle rotate-handle" disabled={savingOutfit}
+                            aria-label={`Girar ${translateGarmentName(garment.name)}`} title="Arrastra para girar · ← → con teclado"
+                            onKeyDown={event => { if (["ArrowLeft", "ArrowRight"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); adjustPieceWithKeyboard(piece.instanceId, "rotation", event.key === "ArrowLeft" ? -5 : 5); } }}
+                            onPointerDown={event => startTransformHandle(event, piece.instanceId, "rotate")}
+                            onPointerMove={moveTransformHandle} onPointerUp={stopTransformHandle} onPointerCancel={stopTransformHandle}
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V3M5 3h5M5.5 3.5A9 9 0 1 1 3 13" /></svg></button>
+                          <button type="button" className="transform-handle scale-handle" disabled={savingOutfit}
+                            aria-label={`Cambiar tamaño de ${translateGarmentName(garment.name)}`} title="Arrastra para cambiar tamaño · ↑ ↓ con teclado"
+                            onKeyDown={event => { if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); adjustPieceWithKeyboard(piece.instanceId, "scale", event.key === "ArrowDown" ? -.03 : .03); } }}
+                            onPointerDown={event => startTransformHandle(event, piece.instanceId, "scale")}
+                            onPointerMove={moveTransformHandle} onPointerUp={stopTransformHandle} onPointerCancel={stopTransformHandle}
+                          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10V4h6M4 4l6 6M20 14v6h-6M20 20l-6-6" /></svg></button>
+                        </fieldset>}
+                        {lockedPieceIds.has(piece.instanceId) && <span className="piece-kept" role="status" aria-label="Se mantiene al mezclar" title="Se mantiene al mezclar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg></span>}
+                      </CanvasPieceOverlay>}
+
+                      </Fragment>
                     );
                   })}
                 </div>
-                {activeLookIteration && (
-                  <section className="mix-canvas-navigator" aria-label="Navegar cinco variaciones del look" aria-live="polite">
-                    <button type="button" className="mix-step previous" onClick={() => stepLookIteration(-1)} aria-label="Ver mezcla anterior">←</button>
-                    <div className="mix-current-look">
-                      <div className="mix-current-heading"><span>MEZCLA {String(activeIterationIndex + 1).padStart(2, "0")} / {String(lookIterations.length).padStart(2, "0")}</span><button type="button" onClick={closeLookIterations} aria-label="Cerrar mezclas">×</button></div>
-                      <strong>{activeLookIteration.title}</strong>
-                      <small>{activeLookIteration.detail}</small>
-                      <div className="mix-progress" aria-hidden="true">{lookIterations.map((iteration, index) => <i className={index === activeIterationIndex ? "active" : ""} key={iteration.id} />)}</div>
-                    </div>
-                    <button type="button" className="mix-step next" onClick={() => stepLookIteration(1)} aria-label="Ver siguiente mezcla">→</button>
-                  </section>
-                )}
+
               </div>
             </div>
 
-            <button className={`floating-panel-toggle library-panel-toggle ${libraryOpen ? "active" : ""}`} onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen} aria-label="Abrir panel de prendas">
-              <span>PRENDAS</span><b>{libraryOpen ? "×" : "＋"}</b>
-            </button>
-
-            <aside className={`look-controls garment-library-panel ${libraryOpen ? "panel-open" : "panel-closed"}`} aria-label="Prendas y categorías">
-              <div className="floating-panel-header"><span>{demoMode ? "BÁSICOS FORMÉ" : "PRENDAS"} / {String(studioGarments.length).padStart(2, "0")}</span><button onClick={() => setLibraryOpen(false)} aria-label="Cerrar panel de prendas">×</button></div>
-              <div className="studio-library-filters" aria-label="Filtrar biblioteca del canvas">
-                {([
-                  ["all", "Todo"],
-                  ["outerwear", "Abrigos"],
-                  ["tops", "Tops"],
-                  ["bottoms", "Pantalones"],
-                  ["footwear", "Calzado"],
-                  ["accessories", "Accesorios"],
-                ] as [StudioLibraryFilter, string][]).map(([value, label]) => <button type="button" className={studioLibraryFilter === value ? "active" : ""} onClick={() => setStudioLibraryFilter(value)} key={value}>{label}</button>)}
+              <div className="studio-document-actions" role="group" aria-label="Crear y probar looks">
+                <button type="button" className="canvas-core-action new-look-action" aria-label="Nuevo look" onClick={newLook} disabled={savingOutfit} title="Nuevo look"><LookActionIcon action="new" /><span className="canvas-action-label">Nuevo</span></button>
+                <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
+                <button type="button" className="history-action" aria-label="Deshacer" title="Deshacer · ⌘Z" disabled={!history.current.past.length || savingOutfit} onClick={() => travelHistory("undo")}><LookActionIcon action="undo" /></button>
+                <button type="button" className="history-action" aria-label="Rehacer" title="Rehacer · ⇧⌘Z" disabled={!history.current.future.length || savingOutfit} onClick={() => travelHistory("redo")}><LookActionIcon action="redo" /></button>
+                <div className="canvas-utility-actions" role="group" aria-label="Acciones del look">
+                  <button type="button" className="canvas-icon-action" aria-label="Ajustar proporciones" title="Ajustar proporciones" onClick={() => void adjustCurrentLookProportions()} disabled={savingOutfit || randomizing || !canvasPieces.length}><LookActionIcon action="fit" /></button>
+                  <button type="button" className="canvas-icon-action" aria-label="Guardar una copia" title="Guardar una copia" onClick={() => void duplicateCurrentOutfit()} disabled={savingOutfit || !canvasPieces.length}><LookActionIcon action="copy" /></button>
+                  <button type="button" className="canvas-icon-action" aria-label={shareLookLabel} title={shareLookLabel} aria-busy={Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName || "Mi look", items: currentSnapshotItems() })} disabled={Boolean(sharingLookId) || !canvasPieces.length}><LookActionIcon action="share" /></button>
+                  <button type="button" className="canvas-icon-action danger-action" aria-label="Vaciar canvas" title="Vaciar canvas" disabled={savingOutfit || !canvasPieces.length} onClick={() => { canvasGestures.current?.cancel(); checkpoint(); setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setSaved(false); }}><LookActionIcon action="clear" /></button>
+                </div>
+                <button type="button" className={`primary-action save-look-action ${saved ? "saved" : ""}`} aria-label={saveLookLabel} title={saveLookLabel} aria-busy={savingOutfit} disabled={savingOutfit || !canvasPieces.length || saved} onClick={() => void saveCurrentOutfit()}><LookActionIcon action="save" /><span className="canvas-action-label">{saved && !savingOutfit ? "Guardado" : "Guardar"}</span></button>
               </div>
+            <div className="studio-library-column">
+            <aside className="look-controls garment-library-panel panel-open" id="canvas-garment-library" aria-label="Prendas y categorías" data-grid-size={canvasGridSize}>
+              <h2>Prendas</h2>
+              <div className="library-tools">
+              <div className="library-options">
+                {!demoMode && basicsEnabled && <label><span className="sr-only">Colección del canvas</span><select aria-label="Colección del canvas" value={librarySource} onChange={event => setLibrarySource(event.target.value as "personal" | "basics")}>
+                  <option value="personal">Mis prendas</option><option value="basics">Básicos Formé</option>
+                </select></label>}
+                <label><span className="sr-only">Categoría de prendas</span><select aria-label="Categoría de prendas" value={studioLibraryFilter} onChange={event => setStudioLibraryFilter(event.target.value as StudioLibraryFilter)}>
+                  <option value="all">Todas</option><option value="outerwear">Casacas y abrigos</option><option value="tops">Tops</option><option value="bottoms">Pantalones y faldas</option><option value="one-pieces">Vestidos y enterizos</option><option value="footwear">Calzado</option><option value="accessories">Accesorios</option>
+                </select></label>
+              </div>
+              <GarmentViewControls size={canvasGridSize} onSizeChange={setCanvasGridSize} favorites={libraryFavoritesOnly} onFavoritesChange={setLibraryFavoritesOnly} compact />
+              </div>
+              <label className="library-search"><span className="sr-only">Buscar en la biblioteca</span><input type="search" placeholder="Buscar" value={libraryQuery} onChange={event => setLibraryQuery(event.target.value)} /></label>
+              {replacingId && <div className="replacement-notice">Elige la nueva prenda.<button type="button" onClick={() => setReplacingId(null)}>Cancelar</button></div>}
               <div className="sticker-tray-groups">
-                {!demoMode && <section className="sticker-tray-section">
-                  <div className="tray-heading"><h3>MIS PRENDAS</h3><p>{studioPersonalGarments.length}</p></div>
-                  {studioPersonalGarments.length > 0
-                    ? <div className="sticker-tray">{studioPersonalGarments.map((item) => {
+                {!showingLibraryBasics && studioPersonalGarments.length > 0 && <section className="sticker-tray-section" aria-label="Mis prendas">
+                  <div className="sticker-tray">{studioPersonalGarments.map((item) => {
                       const photo = garmentPhotoFor(item, "complete");
-                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${replacingId ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${replacingId ? "" : " al canvas"}`}>
                         <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
-                        <span>{translateGarmentName(item.name)}</span>
+                        <span className="canvas-thumbnail-label">{translateGarmentName(item.name)}</span>
                       </button>;
                     })}</div>
-                    : <p className="sticker-tray-empty">No tienes prendas en esta categoría.</p>}
                 </section>}
-                <section className="sticker-tray-section forme-basics-section">
-                  <div className="tray-heading"><h3>BÁSICOS FORMÉ</h3><p>{studioBasicGarments.length}</p></div>
-                  {studioBasicGarments.length > 0
-                    ? <div className="sticker-tray">{studioBasicGarments.map((item) => {
+                {showingLibraryBasics && studioBasicGarments.length > 0 && <section className="sticker-tray-section forme-basics-section" aria-label="Básicos Formé">
+                  <div className="sticker-tray">{studioBasicGarments.map((item) => {
                       const photo = garmentPhotoFor(item, "complete");
-                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`Añadir ${translateGarmentName(item.name)} al canvas`}>
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${replacingId ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${replacingId ? "" : " al canvas"}`}>
                         <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
-                        <span>{translateGarmentName(item.name)}</span>
+                        <span className="canvas-thumbnail-label">{translateGarmentName(item.name)}</span>
                       </button>;
                     })}</div>
-                    : <p className="sticker-tray-empty">No hay básicos en esta categoría.</p>}
-                </section>
+                </section>}
+                {(showingLibraryBasics ? studioBasicGarments : studioPersonalGarments).length === 0 && <div className="canvas-library-empty">
+                  {(showingLibraryBasics || personalGarments.length > 0) && <p>{libraryFavoritesOnly ? "No hay favoritas con estos filtros." : "No encontramos prendas."}</p>}
+                  <button type="button" onClick={() => {
+                    if (!showingLibraryBasics && !personalGarments.length) { openUpload(); return; }
+                    setStudioLibraryFilter("all"); setLibraryQuery(""); setLibraryFavoritesOnly(false);
+                  }}>{!showingLibraryBasics && !personalGarments.length ? "Añadir prendas" : libraryFavoritesOnly ? "Ver todas las prendas" : "Limpiar búsqueda"}</button>
+                </div>}
               </div>
-
-              {canvasPieces.length > 0 && <div className="library-utilities">
-                <button className="clear-look" onClick={() => { setCanvasPieces([]); setSelectedId(""); setSelectedGroupIds([]); setActiveOutfitId(null); setActiveLookName("Nuevo look"); setSaved(false); closeLookIterations(); }}>VACIAR CANVAS</button>
-              </div>}
             </aside>
 
-            <button className={`floating-panel-toggle saved-panel-toggle ${savedLooksOpen ? "active" : ""}`} onClick={() => setSavedLooksOpen((open) => !open)} aria-expanded={savedLooksOpen} aria-label="Abrir looks">
-              <span>LOOKS</span><b>{savedLooksOpen ? "×" : String(savedLooks.length).padStart(2, "0")}</b>
-            </button>
-
-            <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} aria-label="Looks">
-              <div className="floating-panel-header"><span>LOOKS / {String(savedLooks.length).padStart(2, "0")}</span><button onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks">×</button></div>
+            {savedLooksOpen && <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} id="canvas-saved-looks" aria-label="Looks">
+              <h2>Looks guardados</h2>
+              <button type="button" className="canvas-panel-close" onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button>
               {savedLooks.length > 0
                 ? <div className="saved-look-panel-list">{savedLooks.map((look) => (
-                  <button type="button" className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} onClick={() => openSavedLook(look)} key={look.id}>
-                    <LookPreview look={look} garmentById={garmentById} />
-                    <span><strong>{look.name}</strong><small>{look.items.length} {look.items.length === 1 ? "PIEZA" : "PIEZAS"}</small></span>
-                  </button>
+                  <article className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} key={look.id} aria-label={look.name}>
+                    <button type="button" className="saved-look-panel-open" onClick={() => openSavedLook(look)} aria-label={`Abrir ${look.name}`} title={look.name} aria-pressed={activeOutfitId === look.id} disabled={savingOutfit || Boolean(deletingLookId)}>
+                      <LookPreview look={look} garmentById={garmentById} />
+                    </button>
+                    <span className="saved-look-panel-name">{look.name}</span>
+                  </article>
                 ))}</div>
-                : <div className="saved-look-panel-empty"><p>Todavía no guardaste ningún look.</p><small>Arma uno en el canvas y toca Guardar.</small></div>}
-            </aside>
+                : <div className="saved-look-panel-empty"><p>Guarda tu primer look.</p></div>}
+            </aside>}
+            {layersOpen && <aside className="canvas-layers-panel" id="canvas-layers" aria-label="Capas del look">
+              <h2>Capas <span>{canvasPieces.length}</span></h2>{canvasPieces.length > 1 && <p>Las de arriba quedan delante.</p>}
+              <button type="button" className="canvas-panel-close" onClick={() => setLayersOpen(false)} aria-label="Cerrar capas">×</button>
+              <ol>{orderedLayers.map((piece, index) => { const garment = garmentById.get(piece.garmentId); if (!garment) return null; return <li key={piece.instanceId} className={selectedId === piece.instanceId ? "active" : ""}>
+                <button type="button" className="layer-select" aria-pressed={selectedId === piece.instanceId} onClick={() => { setSelectedId(piece.instanceId); setSelectedGroupIds([]); if (window.innerWidth <= 699) setLayersOpen(false); }}><img src={imageSrc(garment.image)} alt="" /><span>{translateGarmentName(garment.name)}{lockedPieceIds.has(piece.instanceId) && <small>Se mantiene al mezclar</small>}</span></button>
+                <button type="button" aria-label={`Subir ${translateGarmentName(garment.name)} una capa`} disabled={index === 0} onClick={() => changeLayer(piece.instanceId, "up")}>↑</button>
+                <button type="button" aria-label={`Bajar ${translateGarmentName(garment.name)} una capa`} disabled={index === orderedLayers.length - 1} onClick={() => changeLayer(piece.instanceId, "down")}>↓</button>
+              </li>; })}</ol>
+              {!canvasPieces.length && <p>Añade prendas para ordenarlas aquí.</p>}
+            </aside>}
+
+            </div>
 
             {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
-            {canvasPieces.length > 0 && <nav className="canvas-action-bar" aria-label="Acciones del look">
-              <button className={`save-look-action ${saved && selectedGroupIds.length === 0 ? "saved" : ""}`} disabled={canvasPieces.length === 0 || savingOutfit || (saved && selectedGroupIds.length === 0)} onClick={saveCurrentOutfit}><span>{savingOutfit ? "GUARDANDO…" : selectedGroupIds.length ? `GUARDAR ${selectedGroupIds.length} ${selectedGroupIds.length === 1 ? "PIEZA" : "PIEZAS"}` : saved ? "GUARDADO" : activeLookIteration ? "GUARDAR SELECCIÓN" : "GUARDAR LOOK"}</span><b>{saved && selectedGroupIds.length === 0 ? "✓" : "＋"}</b></button>
-              <button disabled={canvasPieces.length === 0 || savingOutfit} onClick={duplicateCurrentOutfit}><span>DUPLICAR</span><b>＋</b></button>
-              <button className="mix-look-action" onClick={iterateCurrentLook} disabled={!canIterate || savingOutfit}><span>MEZCLAR</span><b>5</b></button>
-              <button className="share-look-action" disabled={canvasPieces.length === 0 || Boolean(sharingLookId)} onClick={() => void shareLook({ id: activeOutfitId ?? "current-share", name: activeLookName === "Nuevo look" ? "Mi look" : activeLookName, items: canvasPieces })}><span>{sharingLookId ? "PREPARANDO…" : "COMPARTIR"}</span><b>↗</b></button>
-            </nav>}
           </div>
         </section>
       )}
 
       {garmentDraft && editingGarment && (
-        <div className="garment-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setGarmentDraft(null); }}>
-          <section className="garment-editor" role="dialog" aria-modal="true" aria-labelledby="garment-editor-title">
+        <FormeDialog labelledBy="garment-editor-title" className={`garment-editor ${garmentEditing ? "is-editing" : ""}`} onClose={() => { if (!savingGarment) setGarmentDraft(null); }}>
             <header className="garment-editor-header">
-              <span>EDITAR PRENDA</span>
-              <button type="button" onClick={() => setGarmentDraft(null)} aria-label="Cerrar ficha">×</button>
+              <h2 id="garment-editor-title">{garmentEditing ? "Editar prenda" : garmentDraft.name || "Prenda"}</h2>
+              <button type="button" disabled={savingGarment} onClick={() => setGarmentDraft(null)} aria-label="Cerrar ficha">×</button>
             </header>
             <div className="garment-editor-body">
               <div className="garment-editor-visual">
-                <div className="garment-photo-switch" role="tablist" aria-label="Tipo de foto">
-                  <button className={editorPhotoRole === "complete" ? "active" : ""} type="button" role="tab" aria-selected={editorPhotoRole === "complete"} onClick={() => setEditorPhotoRole("complete")}>PRINCIPAL</button>
-                  {editingGarment.openImage && <button className={editorPhotoRole === "canvas" ? "active" : ""} type="button" role="tab" aria-selected={editorPhotoRole === "canvas"} onClick={() => setEditorPhotoRole("canvas")}>PARA CAPAS</button>}
-                </div>
-                {editorPhoto && <div className="garment-editor-image"><img src={imageSrc(editorPhoto.image)} alt={`${garmentDraft.name}, foto ${editorPhoto.role === "canvas" ? "para capas" : "principal"}`} data-photo-role={editorPhoto.role} /></div>}
-                <div className="garment-tag-preview" aria-label="Etiquetas actuales">
-                  {[garmentDraft.garmentType, garmentDraft.tone, garmentDraft.material, garmentDraft.finish, garmentDraft.silhouette].map((tag) => <span key={tag}>{translateValue(tag)}</span>)}
-                  {garmentDraft.tags.map((tag) => <span key={tag}>#{tag}</span>)}
-                </div>
-                <button className="editor-canvas-add" type="button" onClick={() => { addAndOpenStudio(editingGarment.id); setGarmentDraft(null); }}>AÑADIR AL CANVAS <span>＋</span></button>
+                {editorPhoto && <div className="garment-editor-image"><img src={imageSrc(editorPhoto.image)} alt={garmentDraft.name} data-photo-role={editorPhoto.role} /></div>}
               </div>
-
-              <form className="garment-editor-form" onSubmit={(event) => { event.preventDefault(); saveGarmentDraft(); }}>
-                <div className="garment-editor-intro">
-                  <h2 id="garment-editor-title">{garmentDraft.name || "Prenda sin nombre"}</h2>
-                  <span>Edita lo que necesites y guarda los cambios.</span>
-                </div>
+              {!garmentEditing ? <div className="garment-detail-copy">
+                <p className="detail-eyebrow">{translateValue(garmentDraft.garmentType)}{garmentDraft.brand ? ` · ${garmentDraft.brand}` : ""}</p>
+                {garmentDraft.description.trim() && garmentDraft.description.trim() !== garmentDraft.name.trim() && <p>{garmentDraft.description}</p>}
+                <dl><div><dt>Color</dt><dd>{translateValue(garmentDraft.colorFamily)}</dd></div><div><dt>Material</dt><dd>{translateValue(garmentDraft.material)}</dd></div></dl>
+                <button className="primary-action" type="button" disabled={savingGarment} onClick={() => { void addAndOpenStudio(editingGarment.id); setGarmentDraft(null); }}>Añadir al Canvas</button>
+                {editingGarment.collection !== "forme" && <div className="garment-detail-actions">
+                  <button type="button" disabled={savingGarment} aria-pressed={Boolean(editingGarment.favorite)} onClick={() => void toggleFavorite(editingGarment)}>{editingGarment.favorite ? "Quitar de favoritas" : "Añadir a favoritas"}</button>
+                  <button type="button" disabled={savingGarment} onClick={() => setGarmentEditing(true)}>Editar ficha</button>
+                </div>}
+                {editingGarment.collection !== "forme" && <div className="garment-sharing" aria-busy={savingGarment}>
+                  <label className="item-public-toggle">
+                    <span><strong>Mostrar en mi perfil</strong><small id="garment-visibility-help">{savingGarment ? "Guardando…" : !profile.profilePublic ? "Oculta mientras tu perfil sea privado." : !profile.showCloset ? "Oculta hasta activar «Mostrar prendas elegidas» en tu perfil." : editingGarment.isPublic ? "Visible en tu perfil público." : "Solo tú puedes verla."}</small></span>
+                    <input type="checkbox" aria-label="Mostrar en mi perfil" aria-describedby="garment-visibility-help" checked={Boolean(editingGarment.isPublic)} disabled={savingGarment} onChange={(event) => void setGarmentVisibility(editingGarment, event.target.checked)} />
+                  </label>
+                  {(!profile.profilePublic || !profile.showCloset) && <button className="garment-profile-link" type="button" disabled={savingGarment} onClick={() => { setGarmentDraft(null); navigateWardrobeRoute("perfil"); }}>Configurar perfil público</button>}
+                  {garmentSaveError && <p className="garment-save-error" role="alert">{garmentSaveError}</p>}
+                </div>}
+              </div> :
+              <form className="garment-editor-form" aria-busy={savingGarment} onSubmit={(event) => { event.preventDefault(); void saveGarmentDraft(); }}><fieldset disabled={savingGarment}>
                 <div className="garment-editor-fields">
-                  <label className="field-wide">NOMBRE<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
-                  <label>MARCA<input list="forme-brand-options" value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} onBlur={() => normalizeGarmentMetadata("brand", brandOptions)} placeholder="Escribe o elige una marca" autoCapitalize="words" autoComplete="off" spellCheck={false} /></label>
-                  <label>CATEGORÍA<select value={garmentDraft.category} onChange={(event) => {
-                    const category = event.target.value as Garment["category"];
-                    setGarmentDraft((current) => current ? { ...current, category, garmentType: garmentTypesByCategory[category][0] } : current);
-                    setGarmentSaved(false);
-                    setGarmentSaveError("");
-                  }}>{filterOptions.category.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>TIPO<select value={garmentDraft.garmentType} onChange={(event) => updateGarmentDraft("garmentType", event.target.value as Garment["garmentType"])}>{editorGarmentTypes.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>COLOR<input list="forme-color-options" value={translateValue(garmentDraft.colorFamily)} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} placeholder="Escribe o elige un color" autoComplete="off" /></label>
-                  <label>TONO<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>MATERIAL<input list="forme-material-options" value={translateValue(garmentDraft.material)} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} placeholder="Escribe o elige un material" autoComplete="off" /></label>
-                  <label>ACABADO<select value={garmentDraft.finish} onChange={(event) => updateGarmentDraft("finish", event.target.value)}>{filterOptions.finish.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
-                  <label>CORTE<select value={garmentDraft.silhouette} onChange={(event) => updateGarmentDraft("silhouette", event.target.value)}>{filterOptions.silhouette.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label className="field-wide">Nombre<input value={garmentDraft.name} onChange={(event) => updateGarmentDraft("name", event.target.value)} /></label>
+
+                  <label className="field-wide">Marca<input list="forme-brand-options" value={garmentDraft.brand} onChange={(event) => updateGarmentDraft("brand", event.target.value)} onBlur={() => normalizeGarmentMetadata("brand", brandOptions)} placeholder="Opcional" autoCapitalize="words" autoComplete="off" spellCheck={false} /></label>
+                  <label>Tipo<select value={garmentDraft.garmentType} onChange={(event) => {
+                    const garmentType = event.target.value as Garment["garmentType"];
+                    const category = (Object.keys(garmentTypesByCategory) as Garment["category"][]).find(key => garmentTypesByCategory[key].includes(garmentType))!;
+                    setGarmentDraft(current => current ? { ...current, category, garmentType, lengthOverride: current.category === category ? current.lengthOverride : null } : current);
+                    setGarmentSaved(false); setGarmentSaveError("");
+                  }}>{Object.entries(garmentTypesByCategory).map(([category, types]) => <optgroup label={translateValue(category)} key={category}>{types.map(type => <option value={type} key={type}>{translateValue(type)}</option>)}</optgroup>)}</select></label>
+                  <label>Color<input list="forme-color-options" value={translateValue(garmentDraft.colorFamily)} onChange={(event) => updateGarmentDraft("colorFamily", event.target.value)} onBlur={() => normalizeGarmentMetadata("colorFamily", colorOptions, "Other")} autoComplete="off" /></label>
+                </div>
+                <details className="garment-edit-advanced"><summary>Detalles</summary><div className="garment-editor-fields">
+                  <label className="field-wide">Descripción<textarea value={garmentDraft.description} maxLength={1000} rows={3} onChange={(event) => updateGarmentDraft("description", event.target.value)} /></label>
+                  <label>Tono<select value={garmentDraft.tone} onChange={(event) => updateGarmentDraft("tone", event.target.value)}>{editorTones.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  <label>Material<input list="forme-material-options" value={translateValue(garmentDraft.material)} onChange={(event) => updateGarmentDraft("material", event.target.value)} onBlur={() => normalizeGarmentMetadata("material", materialOptions, "Other")} autoComplete="off" /></label>
+                  <label>Acabado<select value={garmentDraft.finish} onChange={(event) => updateGarmentDraft("finish", event.target.value)}>{filterOptions.finish.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
+                  {editorLengths.length > 0 && <label>Largo en el Canvas<select value={garmentDraft.lengthOverride ?? ""} onChange={event => updateGarmentDraft("lengthOverride", event.target.value ? event.target.value as LengthOverride : null)}>
+                    <option value="">{detectedLengthLabel ? `Automático · ${detectedLengthLabel}` : "Automático"}</option>
+                    {editorLengths.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                  </select></label>}
+                  <label>Corte<select value={garmentDraft.silhouette} onChange={(event) => updateGarmentDraft("silhouette", event.target.value)}>{filterOptions.silhouette.map((option) => <option value={option} key={option}>{translateValue(option)}</option>)}</select></label>
                 </div>
                 <datalist id="forme-brand-options">{brandOptions.map((option) => <option value={option} key={option} />)}</datalist>
                 <datalist id="forme-color-options">{colorOptions.map((option) => <option value={translateValue(option)} key={option} />)}</datalist>
                 <datalist id="forme-material-options">{materialOptions.map((option) => <option value={translateValue(option)} key={option} />)}</datalist>
 
                 <div className="custom-tag-editor">
-                  <div><span>ETIQUETAS</span><small>Agrega tu propia forma de organizarla.</small></div>
-                  {garmentDraft.tags.length > 0 && <div className="custom-tag-list">{garmentDraft.tags.map((tag) => <button type="button" key={tag} onClick={() => updateGarmentDraft("tags", garmentDraft.tags.filter((item) => item !== tag))}>#{tag}<span>×</span></button>)}</div>}
-                  <div className="tag-input-row"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={handleTagKeyDown} placeholder="viaje, noche, favorito…" /><button type="button" onClick={addDraftTag} disabled={!tagInput.trim()}>AÑADIR ＋</button></div>
+                  <div><span>Etiquetas</span></div>
+                  {garmentDraft.tags.length > 0 && <div className="custom-tag-list">{garmentDraft.tags.map((tag) => <button type="button" key={tag} aria-label={`Quitar etiqueta ${tag}`} onClick={() => updateGarmentDraft("tags", garmentDraft.tags.filter((item) => item !== tag))}>{tag}<span>×</span></button>)}</div>}
+                  <div className="tag-input-row"><input aria-label="Nueva etiqueta" value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={handleTagKeyDown} placeholder="Ej.: viaje, oficina" /><button type="button" onClick={addDraftTag} disabled={!tagInput.trim()}>Añadir</button></div>
                 </div>
 
-                <label className="item-public-toggle">
-                  <span><strong>MOSTRAR EN MI PERFIL</strong><small>Solo aparecerá si también activas la sección de prendas en tu perfil público.</small></span>
-                  <input type="checkbox" checked={garmentDraft.isPublic} onChange={(event) => updateGarmentDraft("isPublic", event.target.checked)} />
-                </label>
-
-                {editingGarment.originalImage && <details className="processing-options">
-                  <summary>MEJORAR IMAGEN</summary>
+                </details>
+                {editingGarment.originalImage && ["ready", "uploaded", "failed", "review"].includes(editingGarment.status) && <details className="processing-options">
+                  <summary>Mejorar imagen</summary>
                   <div>
-                    <p>Si la imagen no se parece a tu prenda, puedes generarla otra vez.</p>
+                    <p>Se creará otra imagen a partir de tu foto original.</p>
                     <div className="processing-option-actions">
-                      <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "closed")}>GENERAR DE NUEVO</button>
-                      {editingGarment.category === "Outerwear" && !editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "low", "open")}>CREAR VERSIÓN ABIERTA</button>}
-                      {editingGarment.category === "Outerwear" && editingGarment.openImage && <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "open")}>GENERAR ABIERTA DE NUEVO</button>}
+                      <button type="button" onClick={() => retryProcessing(editingGarment, "medium", "closed")}>Generar de nuevo</button>
                     </div>
                   </div>
                 </details>}
 
                 <div className="garment-editor-actions">
-                  <button type="button" className="delete-garment" onClick={() => deleteGarment(editingGarment)}>ELIMINAR</button>
-                  {(editingGarment.status === "failed" || editingGarment.status === "uploaded") && <button type="button" onClick={() => retryProcessing(editingGarment)}>REPROCESAR</button>}
+                  <button type="button" className="delete-garment" onClick={() => deleteGarment(editingGarment)}>Eliminar</button>
                   {garmentSaveError && <span className="garment-save-error">{garmentSaveError}</span>}
-                  <button type="button" onClick={() => setGarmentDraft(null)}>CANCELAR</button>
-                  <button type="submit" className={garmentSaved ? "saved" : ""}>{garmentSaved ? "GUARDADO ✓" : "GUARDAR CAMBIOS"}</button>
+                  <button type="button" onClick={() => setGarmentDraft(null)}>Cancelar</button>
+                  <button type="submit" className={garmentSaved ? "saved" : ""}>{savingGarment ? "Guardando…" : garmentSaved ? "Guardado" : "Guardar cambios"}</button>
                 </div>
-              </form>
+              </fieldset></form>}
             </div>
-          </section>
-        </div>
+        </FormeDialog>
       )}
 
+      {pendingDelete && <FormeDialog labelledBy="delete-title" className="confirmation-dialog" onClose={() => setPendingDelete(null)}>
+        <h2 id="delete-title">¿Eliminar {pendingDelete.name}?</h2>
+        <p>{pendingDelete.kind === "look" ? "Se eliminará de tus looks guardados. Tus prendas seguirán en el closet." : "La prenda se quitará de tu closet."}</p>
+        <div className="confirmation-actions"><button type="button" className="secondary-action" autoFocus onClick={() => setPendingDelete(null)}>Cancelar</button><button type="button" className="primary-action" onClick={() => { const item = pendingDelete; setPendingDelete(null); if (item.kind === "look") void performDeleteSavedLook(item.id); else { const garment = garmentById.get(item.id); if (garment) void performDeleteGarment(garment); } }}>Eliminar</button></div>
+      </FormeDialog>}
       <FormeMobileNav
         activeRoute={activeRoute}
         view={view}

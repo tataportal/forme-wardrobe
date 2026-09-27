@@ -1,4 +1,5 @@
 import { importedGarments20260718 } from "./imported-garments-2026-07-18";
+import type { GarmentAnatomy } from "../shared/garment-anatomy";
 
 export type GarmentAttributes = {
   garmentType: GarmentType;
@@ -9,7 +10,7 @@ export type GarmentAttributes = {
   silhouette: string;
 };
 
-export type GarmentCategory = "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories";
+export type GarmentCategory = "Outerwear" | "Tops" | "Bottoms" | "Tailoring" | "Footwear" | "Accessories" | "One-pieces";
 export type GarmentPhotoRole = "complete" | "canvas";
 export type GarmentPhoto = {
   role: GarmentPhotoRole;
@@ -21,7 +22,8 @@ export type GarmentType =
   | "Suit Jacket" | "Blazer"
   | "Jeans" | "Trousers" | "Chinos" | "Skirt" | "Shorts"
   | "Sneakers" | "Shoes" | "Boots" | "Heels" | "Sandals"
-  | "Bag" | "Hat" | "Glasses" | "Accessory";
+  | "Bag" | "Hat" | "Glasses" | "Belt" | "Scarf" | "Accessory"
+  | "Dress" | "Jumpsuit" | "Overalls";
 
 export const garmentTypesByCategory: Record<GarmentCategory, GarmentType[]> = {
   Tops: ["T-shirt", "Shirt", "Sweater", "Sweatshirt", "Hoodie", "Top"],
@@ -29,12 +31,20 @@ export const garmentTypesByCategory: Record<GarmentCategory, GarmentType[]> = {
   Tailoring: ["Suit Jacket", "Blazer"],
   Bottoms: ["Jeans", "Trousers", "Chinos", "Skirt", "Shorts"],
   Footwear: ["Sneakers", "Shoes", "Boots", "Heels", "Sandals"],
-  Accessories: ["Bag", "Hat", "Glasses", "Accessory"],
+  Accessories: ["Bag", "Hat", "Glasses", "Belt", "Scarf", "Accessory"],
+  "One-pieces": ["Dress", "Jumpsuit", "Overalls"],
 };
 
 export type Garment = GarmentAttributes & {
   id: string;
   name: string;
+  description?: string;
+  recognitionStatus?: "legacy" | "pending" | "ready" | "failed";
+  metadataStatus?: "pending" | "ready" | "failed";
+  bodyLength?: "cropped" | "regular" | "long" | "maxi";
+  neckline?: "standard" | "high" | "hood" | "wide-hood";
+  anatomy?: GarmentAnatomy | null;
+  lengthOverride?: import("../shared/garment-proportions").LengthOverride | null;
   brand?: string;
   tags?: string[];
   category: GarmentCategory;
@@ -133,6 +143,9 @@ function silhouetteFor(name: string): string {
 }
 
 export function inferGarmentType(name: string, category: GarmentCategory): GarmentType {
+  if (category === "One-pieces") return /overalls|overol/i.test(name) ? "Overalls" : /jumpsuit|enterizo|mono/i.test(name) ? "Jumpsuit" : "Dress";
+  if (category === "Accessories" && /belt|cintur[oó]n/i.test(name)) return "Belt";
+  if (category === "Accessories" && /scarf|bufanda|pa[nñ]uelo/i.test(name)) return "Scarf";
   if (/blazer/i.test(name)) return "Blazer";
   if (/hoodie/i.test(name) || (category === "Tops" && /hooded/i.test(name))) return "Hoodie";
   if (/crewneck|sweatshirt/i.test(name)) return "Sweatshirt";
@@ -208,7 +221,7 @@ const archive: ArchiveEntry[] = [
   { file: "022_DSC01810.webp", openFile: "022_DSC01810-open.webp", name: "Tiger Fleece", category: "Outerwear", color: "Orange" },
   { file: "023_DSC01814.webp", openFile: "023_DSC01814-open.webp", name: "Graphic Varsity Jacket", category: "Outerwear", color: "Black / Green" },
   { file: "024_DSC01816.webp", name: "Essentials Crewneck", category: "Tops", color: "Black", favorite: true },
-  { file: "025_DSC01819.webp", openFile: "025_DSC01819-open.webp", name: "Fur-Trim Leather Bomber", category: "Outerwear", color: "Black" },
+  { file: "025_DSC01819.webp", openFile: "025_DSC01819-open.webp", name: "Fur-Trim Leather Bomber", bodyLength: "cropped", neckline: "wide-hood", category: "Outerwear", color: "Black" },
   { file: "026_DSC01822.webp", openFile: "026_DSC01822-open.webp", name: "Tan Coach Jacket", category: "Outerwear", color: "Tan" },
   { file: "027_DSC01824.webp", openFile: "027_DSC01824-open.webp", name: "Hooded Field Parka", category: "Outerwear", color: "Black" },
   { file: "028_DSC01826.webp", name: "Open-Knit Sweater", category: "Tops", color: "Black" },
@@ -224,7 +237,7 @@ const archive: ArchiveEntry[] = [
   { file: "038_DSC01857.webp", name: "Cape Coat", category: "Outerwear", color: "Black" },
   { file: "039_DSC01859.webp", openFile: "039_DSC01859-open.webp", name: "Ivory Collarless Jacket", category: "Outerwear", color: "Ivory" },
   { file: "040_DSC01861.webp", openFile: "040_DSC01861-open.webp", name: "Light Denim Jacket", category: "Outerwear", color: "Denim" },
-  { file: "041_DSC01863.webp", name: "Draped Wool Poncho", category: "Outerwear", color: "Black" },
+  { file: "041_DSC01863.webp", name: "Draped Wool Poncho", bodyLength: "maxi", category: "Outerwear", color: "Black" },
   { file: "042_DSC01867.webp", openFile: "042_DSC01867-open.webp", name: "Frog-Closure Jacket", category: "Outerwear", color: "Greige" },
   { file: "043_DSC01871.webp", name: "Contrast-Piped Shirt", category: "Tops", color: "Black" },
   { file: "044_DSC01873.webp", name: "Draped Black Shirt", category: "Tops", color: "Black" },
@@ -258,7 +271,7 @@ const basics: BasicEntry[] = [
 const demoWomenBasics: BasicEntry[] = [
   { id: "demo-w-001", name: "Chocolate Suede Bomber", category: "Outerwear", color: "Chocolate", status: "ready" },
   { id: "demo-w-002", name: "Navy Technical Trench", category: "Outerwear", color: "Navy", status: "ready" },
-  { id: "demo-w-003", name: "Cream Boucle Jacket", category: "Outerwear", color: "Cream", status: "ready" },
+  { id: "demo-w-003", name: "Cream Boucle Jacket", bodyLength: "cropped", category: "Outerwear", color: "Cream", status: "ready" },
   { id: "demo-w-004", name: "Burgundy Moto Jacket", category: "Outerwear", color: "Burgundy", status: "ready" },
   { id: "demo-w-005", name: "Pale Blue Denim Jacket", category: "Outerwear", color: "Pale Blue", status: "ready" },
   { id: "demo-w-006", name: "Black Tailored Coat", category: "Outerwear", color: "Black", status: "ready" },

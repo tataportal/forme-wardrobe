@@ -135,7 +135,17 @@ function authUnavailable(): Response {
 }
 
 function redirectUri(request: Request): string {
-  return new URL("/auth/google/callback", request.url).toString();
+  const url = new URL("/auth/google/callback", request.url);
+  if (url.hostname === "forme.gallery") url.protocol = "https:";
+  return url.toString();
+}
+
+export function enforceProductionHttps(request: Request): Response | null {
+  const url = new URL(request.url);
+  if (url.protocol !== "http:" || !["forme.gallery", "admin.forme.gallery"].includes(url.hostname)) return null;
+  url.protocol = "https:";
+  // Redirect before OAuth state cookies are issued: Secure cookies cannot be set over HTTP.
+  return Response.redirect(url.toString(), 308);
 }
 
 async function startGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<Response> {

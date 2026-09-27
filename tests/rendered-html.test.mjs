@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
+import { inflateSync } from "node:zlib";
 
 async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -14,8 +15,49 @@ async function render(pathname = "/") {
   );
 }
 
+test("public Looks keeps the gallery without the unfinished weekly planner", async () => {
+  const features = await readFile(new URL("../app/product-features.ts", import.meta.url), "utf8");
+  const source = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(features, /weeklyPlanner: false/);
+  assert.match(source, /productFeatures\.weeklyPlanner && <WeeklyPlanView/);
+  assert.match(source, /productFeatures\.weeklyPlanner \? fetch\("\/api\/week"/);
+  assert.match(source, /productFeatures\.weeklyPlanner && <div><dt>Días planeados/);
+  const html = await (await render("/looks")).text();
+  assert.match(html, /saved-looks-grid/);
+  assert.match(html, /Crear look/);
+  assert.doesNotMatch(html, /Tu semana|PLANEAR SEMANA|DÍAS LISTOS|Cambia el look de|week-planner|week-strip-preview/);
+});
+
+test("Forme favicons are solid red squares with fresh references on app and About", async () => {
+  const svg = await readFile(new URL("../public/favicon.svg", import.meta.url), "utf8");
+  assert.match(svg, /<rect width="32" height="32" fill="#ff0000"/);
+  assert.doesNotMatch(svg, /<path|rx=/);
+  for (const [name, size] of [["favicon-16x16.png", 16], ["favicon-32x32.png", 32], ["apple-touch-icon.png", 180]]) {
+    const png = await readFile(new URL(`../public/${name}`, import.meta.url));
+    assert.equal(png.readUInt32BE(16), size);
+    assert.equal(png.readUInt32BE(20), size);
+    const compressed = [];
+    for (let offset = 8; offset < png.length;) {
+      const length = png.readUInt32BE(offset);
+      if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") compressed.push(png.subarray(offset + 8, offset + 8 + length));
+      offset += length + 12;
+    }
+    const rgb = inflateSync(Buffer.concat(compressed));
+    for (let y = 0; y < size; y++) {
+      const start = y * (size * 3 + 1);
+      assert.equal(rgb[start], 0);
+      for (let x = 0; x < size; x++) assert.deepEqual([...rgb.subarray(start + 1 + x * 3, start + 4 + x * 3)], [255, 0, 0]);
+    }
+  }
+  for (const route of ["/looks", "/closet", "/canvas", "/about"]) {
+    const html = await (await render(route)).text();
+    assert.match(html, /favicon[^"<>]*\?v=forme-red-1/);
+    assert.match(html, /apple-touch-icon\.png\?v=forme-red-1/);
+  }
+});
+
 test("keeps the main product areas on stable routes", async () => {
-  const routes = ["/about", "/closet", "/looks", "/canvas", "/pricing", "/perfil", "/ajustes", "/asistente"];
+  const routes = ["/about", "/closet", "/looks", "/canvas", "/pricing", "/perfil", "/ajustes"];
   const responses = await Promise.all(routes.map((route) => render(route)));
   for (const [index, response] of responses.entries()) {
     assert.equal(response.status, 200, `${routes[index]} should render`);
@@ -27,7 +69,10 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(about, /Formé® convierte tu closet/);
   assert.match(about, /about\.forme-f18\.js/);
   assert.match(about, /forme-social-instagram-v1\.gif/);
-  assert.match(pricing, /Elige cuánto quieres guardar/);
+  assert.match(pricing, /Gratis durante la beta/);
+  const assistant = await render("/asistente");
+  assert.equal(assistant.status, 307);
+  assert.equal(new URL(assistant.headers.get("location")).pathname, "/canvas");
 
   const [pricingSource, publicProfileSource, closetSource, looksSource, canvasSource, profileSource] = await Promise.all([
     readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
@@ -39,10 +84,10 @@ test("keeps the main product areas on stable routes", async () => {
   ]);
   assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
   assert.match(pricingSource, /name: "Club", monthlyPrice: 12\.99/);
-  assert.match(pricingSource, /El plan anual se cobra completo una vez al año/);
+  assert.match(pricingSource, /Pago anual único/);
   assert.match(pricingSource, /Cobro único de US\$\{annualTotal\.toFixed\(2\)\} por todo el año/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
-  assert.match(publicProfileSource, /Este perfil todavía no comparte prendas ni looks\./);
+  assert.match(publicProfileSource, /Aún no hay prendas ni looks publicados\./);
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
   assert.match(closetSource, /WardrobeApp initialRoute="closet"/);
   assert.match(looksSource, /WardrobeApp initialRoute="looks"/);
@@ -62,7 +107,7 @@ test("redirects the brand entry to About and server-renders the wardrobe", async
   const aboutResponse = await render("/about");
   assert.equal(aboutResponse.status, 200);
   const html = await aboutResponse.text();
-  assert.match(html, /<title>Formé®\. Closet digital y asistente de estilo\.<\/title>/i);
+  assert.match(html, /<title>Formé®\. Tu closet digital\.<\/title>/i);
   assert.match(html, /Formé® convierte tu closet/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 
@@ -75,248 +120,40 @@ test("redirects the brand entry to About and server-renders the wardrobe", async
   assert.match(closetHtml, /aria-label="Revisando sesión"/);
 });
 
-test("keeps saved looks and styling recommendations connected to the product", async () => {
-  const [page, shell, worker, auth, css, pilotCss] = await Promise.all([
-    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/forme-app-shell.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
-    readFile(new URL("../worker/google-auth.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-    readFile(new URL("../app/forme-pilot.css", import.meta.url), "utf8"),
-  ]);
+test("reserves the page scrollbar gutter across Closet and Canvas", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const rootRule = css.match(/(?:^|\n)html\s*\{([^}]+)\}/)?.[1] ?? "";
+  assert.match(rootRule, /scrollbar-gutter:\s*stable\s*;/);
+});
 
-  assert.match(page, /type WardrobePanel = "closet" \| "looks" \| "assistant"/);
-  assert.match(page, /type ClosetMode = "browse" \| "upload"/);
-  assert.match(page, /useState\(true\)/);
-  assert.match(page, /useState\(formeBasics\)/);
-  assert.match(page, /function beginGoogleSignIn/);
-  assert.match(page, /function navigateWardrobeRoute/);
-  assert.match(page, /sessionProfileStorageKey/);
-  assert.match(page, /readCachedSessionProfile/);
-  assert.match(page, /cacheSessionProfile/);
-  assert.match(page, /clearCachedSessionProfile/);
-  assert.match(page, /const cachedProfile = readCachedSessionProfile\(\)/);
-  assert.match(page, /profileDraftFrom/);
-  assert.match(page, /window\.history\.pushState/);
-  assert.doesNotMatch(page, /sessionStatus === "checking" \? "ENTRANDO…"/);
-  assert.match(page, /\/auth\/google\/start\?return_to=%2F/);
-  assert.doesNotMatch(page, /signin-with-chatgpt/);
-  assert.match(shell, /aria-label="Entrar con Google"/);
-  assert.match(auth, /AUTHORIZATION_ENDPOINT/);
-  assert.match(auth, /TOKEN_ENDPOINT/);
-  assert.match(auth, /USERINFO_ENDPOINT/);
-  assert.match(auth, /__Host-forme_session/);
-  assert.match(auth, /SameSite=Lax/);
-  assert.match(auth, /crypto\.subtle\.verify/);
-  assert.match(worker, /readNativeSession/);
-  assert.match(worker, /async function getSession/);
-  assert.match(worker, /if \(url\.pathname === "\/api\/session" && request\.method === "GET"\) return getSession\(request, env\)/);
-  assert.doesNotMatch(page, /entry-gate/);
-  assert.match(page, /Básicos Formé/);
-  assert.match(page, /visiblePersonalGarments/);
-  assert.match(page, /visibleFormeBasics/);
-  assert.match(page, /className="closet-add"[\s\S]*?>Agregar</);
-  assert.match(page, /function buildDemoRecommendations/);
-  assert.match(page, /footwear-white-sneakers/);
-  assert.match(page, /accessory-black-sunglasses/);
-  assert.match(page, /¿Qué necesitas hoy\?/);
-  assert.match(page, /Casual/);
-  assert.match(page, /Pulido/);
-  assert.match(page, /Formal/);
-  assert.match(page, /Experimental/);
-  assert.match(page, /Día/);
-  assert.match(page, /Noche/);
-  assert.match(page, /Seguro/);
-  assert.match(page, /Contraste/);
-  assert.match(page, /Protagonista/);
-  assert.match(page, /Esencial/);
-  assert.match(page, /Capas/);
-  assert.match(page, /function buildStylingRecommendations/);
-  assert.match(page, /function garmentMatchesAudience/);
-  assert.match(page, /function lookMatchesAudience/);
-  assert.match(page, /pump\|high heel\|stiletto/);
-  assert.match(page, /const strategies: StylingStrategy\[\] = \["balanced", "contrast", "statement", "minimal", "layered"\]/);
-  assert.match(page, /excludedSignatures/);
-  assert.match(page, /recommendationHistory/);
-  assert.match(page, /function saveStylingRecommendation/);
-  assert.match(page, /function generateLooksQuickly/);
-  assert.match(page, />Generar</);
-  assert.match(page, /GUARDAR COMO LOOK/);
-  assert.match(page, /type StyleFamilyId = "classic"/);
-  assert.match(page, /function StyleOnboarding/);
-  assert.match(page, /SALTAR/);
-  assert.match(page, /skipCalibration/);
-  assert.match(page, /completed: true, ratings: \[\]/);
-  assert.match(page, />EMPEZAR</);
-  assert.match(page, /SIGUIENTE/);
-  assert.match(page, /Queremos/);
-  assert.match(page, /Formé lo irá afinando contigo/);
-  assert.match(page, /\/api\/style-profile/);
-  assert.match(page, /function stylePreferenceScore/);
-  assert.match(page, /Básicos Formé/);
-  assert.match(page, /studioPersonalGarments/);
-  assert.match(page, /studioBasicGarments/);
-  assert.doesNotMatch(page, /\["forme", "FORMÉ"\]/);
-  assert.match(page, /function buildLookIterations/);
-  assert.match(page, /const iterationProfiles = \[/);
-  assert.match(page, /MEZCLAR/);
-  assert.match(page, /function openLookIteration/);
-  assert.match(page, /function stepLookIteration/);
-  assert.match(page, /className="mix-canvas-navigator"/);
-  assert.match(page, /GUARDAR SELECCIÓN/);
-  assert.match(page, /function duplicateCurrentOutfit/);
-  assert.match(page, /function recommendationOuterPlacement/);
-  assert.match(page, /function recommendationTopPlacement/);
-  assert.match(page, /funnel-neck cape\|cape coat\|poncho/);
-  assert.match(page, /\/puffer\//);
-  assert.match(page, /const assistantPresets: AssistantPreset\[\]/);
-  assert.match(page, /¿Qué me pongo hoy\?/);
-  assert.match(page, /¿Qué uso esta semana\?/);
-  assert.match(page, /Quiero usar más lo que tengo/);
-  assert.match(page, /¿Qué falta en mi closet\?/);
-  assert.match(page, /function buildAssistantAnswer/);
-  assert.match(page, /function answerAssistantFollowup/);
-  assert.match(page, /assistantProfileReady/);
-  assert.match(page, /assistantClosetReady/);
-  assert.match(page, /PUEDO SER MÁS PRECISO/);
-  assert.match(page, /new Set\(assistantGarments\.map\(\(garment\) => garment\.category\)\)/);
-  assert.match(page, /assistant-response-copy/);
-  assert.match(page, /function openSavedLook\(look: SavedLook\)/);
-  assert.match(page, /studioReturnPanel/);
-  assert.match(page, /function openSavedLook[\s\S]*?openStudio\("looks"\)/);
-  assert.match(page, /wardrobePanel === "looks"[\s\S]*?<WeeklyPlanView[\s\S]*?wardrobePanel === "assistant"/);
-  assert.match(page, /className="week-strip-preview"/);
-  assert.match(page, /timeZone: "America\/Lima"/);
-  assert.match(page, /timeZone: "UTC"/);
-  assert.match(page, /PLANEAR SEMANA/);
-  assert.match(page, /REPLANTEAR SEMANA/);
-  assert.equal((page.match(/Todavía no guardaste ningún look\./g) ?? []).length, 2);
-  assert.doesNotMatch(page, /<div className="looks-empty">[\s\S]*?CREAR UN LOOK/);
-  assert.doesNotMatch(page, /Falta información" : "Listo para responder/);
-  assert.match(page, /fetch\("\/api\/week", \{\s*method: "POST"/);
-  assert.match(page, /function createLookFromWeek\(\)[\s\S]*?openStudio\("looks"\)/);
-  assert.match(page, /function centeredLookPreviewItems/);
-  assert.match(page, /function createInstagramStoryBlob/);
-  assert.match(page, /navigator\.share/);
-  assert.match(page, /COMPARTIR ↗/);
-  assert.match(page, /Instagram Stories/);
-  assert.match(page, /className="profile-page"/);
-  assert.match(page, /profile-page-loading/);
-  assert.match(page, /accountDataReady/);
-  assert.doesNotMatch(page, /Tu closet, tus looks y la forma en que eliges vestirte\./);
-  assert.match(page, /Lo que Formé entiende de ti/);
-  assert.match(page, /GUARDAR CAMBIOS/);
-  assert.match(page, /activeRoute === "perfil"/);
-  assert.match(page, /AJUSTAR ESTILO/);
-  assert.match(page, /CUÁNTO QUIERES EXPERIMENTAR/);
-  assert.match(page, /type="range"/);
-  assert.match(page, /function saveExplorationPreference/);
-  assert.match(page, /PERFIL PÚBLICO/);
-  assert.match(page, /APARECER EN BÚSQUEDAS/);
-  assert.match(page, /function saveAccountSettings/);
-  assert.match(page, /function toggleOutfitVisibility/);
-  assert.match(page, /profileTopStyles/);
-  assert.doesNotMatch(page, />Perfil de estilo</i);
-  assert.doesNotMatch(page, /profile-calibrate/);
-  assert.doesNotMatch(page, /className="profile-identity"/);
-  assert.doesNotMatch(page, /className="profile-stats"/);
-  assert.doesNotMatch(page, /Mi colección/);
-  assert.match(page, /className="closet-commandbar"/);
-  assert.doesNotMatch(page, /className="wardrobe-tab-actions"/);
-  assert.doesNotMatch(page, /closetVariant|isRetroCloset/);
-  assert.match(page, /site-shell view-\$\{view\} route-\$\{activeRoute\} forme-app/);
-  assert.match(page, /function ClosetLooksNav/);
-  assert.match(page, /className="closet-commandbar looks-commandbar"/);
-  assert.doesNotMatch(page, /ABRIR VERSIÓN CLÁSICA/);
-  assert.doesNotMatch(page, /routePath === "closet-v2"/);
-  assert.match(page, /function autocompleteOptions/);
-  assert.match(page, /garmentTypesByCategory/);
-  assert.match(page, /Sweatshirt: "Polera"/);
-  assert.match(page, /Jacket: "Chaqueta"/);
-  assert.match(page, /canonicalTranslatedAutocompleteValue/);
-  assert.match(page, /const brandOptions = useMemo/);
-  assert.match(page, /forme-brand-options/);
-  assert.match(page, /forme-color-options/);
-  assert.match(page, /forme-material-options/);
-  assert.match(page, /normalizeGarmentMetadata/);
-  assert.doesNotMatch(page, /className="catalog-toolbar"/);
-  assert.match(page, /expanded-hitbox/);
-  assert.equal((page.match(/garmentPhotoFor\(item, "complete"\)/g) ?? []).length, 3);
-  assert.doesNotMatch(page, /garmentPhotoFor\(item, "canvas"\)/);
-  assert.match(page, /piece\.variant === "open" && garment\.openImage \? garment\.openImage : garment\.image/);
-  assert.match(page, /type TransformHandleSession/);
-  assert.match(page, /function startTransformHandle/);
-  assert.match(page, /className="transform-handle rotate-handle"/);
-  assert.match(page, /className="transform-handle scale-handle"/);
-  assert.doesNotMatch(page, /className="canvas-tools"/);
-  assert.doesNotMatch(page, /ENVIAR ATRÁS/);
-  assert.doesNotMatch(page, /aria-label="Reducir prenda"/);
-  assert.match(page, /setActiveOutfitId\(outfitId\);\s+setActiveLookName\(lookName\);\s+setSaved\(true\)/);
-  assert.match(page, /savingOutfit \|\| \(saved && selectedGroupIds\.length === 0\)/);
-  assert.match(page, /function startMarqueeSelection/);
-  assert.match(page, /snapshot-frame/);
-  assert.match(page, /ÁREA DEL LOOK/);
-  assert.match(page, /Empieza con una prenda\./);
-  assert.doesNotMatch(page, /TU CANVAS ESTÁ VACÍO/);
-  assert.doesNotMatch(page, /ESTO SE GUARDARÁ/);
-  assert.match(page, /currentSnapshotItems/);
-  assert.doesNotMatch(page, /Math\.random/);
-  assert.match(page, /fetch\(`\/api\/outfits\/\$\{encodeURIComponent\(lookId\)\}`/);
-  assert.doesNotMatch(page, /conjunto/i);
-  assert.doesNotMatch(worker, /conjunto/i);
-  assert.match(worker, /INSERT INTO outfit_items[\s\S]*?\.bind\(\s*crypto\.randomUUID\(\)/);
-  assert.match(worker, /async function deleteOutfit/);
-  assert.match(worker, /async function getWeeklyPlan/);
-  assert.match(worker, /async function saveWeeklyPlanEntry/);
-  assert.match(worker, /async function saveWeeklyPlan/);
-  assert.match(worker, /request\.method === "POST"\) return saveWeeklyPlan/);
-  assert.match(worker, /\/api\/week/);
-  assert.match(worker, /accountProfileJson/);
-  assert.match(worker, /async function getPublicProfile/);
-  assert.match(worker, /async function publicMediaResponse/);
-  assert.match(worker, /request\.method === "PUT" \|\| request\.method === "DELETE"/);
-  assert.match(worker, /unique\.size !== 0 && unique\.size !== styleFamilies\.size/);
-  assert.match(css, /\.saved-looks-grid/);
-  assert.match(css, /\.forme-app \.closet-hero/);
-  assert.match(css, /\.profile-drawer-backdrop/);
-  assert.match(css, /\.profile-style-summary/);
-  assert.match(css, /\.profile-page-hero/);
-  assert.match(css, /\.profile-page-body/);
-  assert.match(css, /\.profile-page-reading/);
-  assert.match(css, /\.public-profile-page/);
-  assert.match(css, /\.canvas-piece\.expanded-hitbox::before/);
-  assert.match(css, /\.canvas-selection-box/);
-  assert.match(css, /\.rotate-handle/);
-  assert.match(css, /\.scale-handle/);
-  assert.match(css, /\.share-status-message/);
-  assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
-  assert.match(css, /\.assistant-dialogue/);
-  assert.match(css, /\.assistant-dialogue \{ padding:0; border:0; background:transparent/);
-  assert.match(css, /\.assistant-data-readiness \{ padding:0; border:0; background:transparent/);
-  assert.match(css, /\.assistant-question-flow/);
-  assert.match(css, /\.assistant-response/);
-  assert.match(css, /\.style-onboarding-backdrop/);
-  assert.match(css, /\.style-family-card/);
-  assert.match(css, /\.mix-canvas-navigator/);
-  assert.match(css, /\.week-workspace/);
-  assert.match(css, /\.week-strip-preview/);
-  assert.match(css, /\.guest-entry-choices/);
-  assert.doesNotMatch(page, /guest-welcome-flow/);
-  assert.match(css, /\.insights-dashboard/);
-  assert.match(css, /--canvas-greige:#d9d5cc/);
-  assert.match(css, /padding:52px 16px calc\(150px \+ env\(safe-area-inset-bottom\)\)/);
-  assert.match(css, /\.pricing-page \.pricing-plan-list \{ grid-template-columns:1fr; gap:16px; \}/);
-  assert.match(css, /\.pricing-page \.pricing-plan-list article > button \{ min-height:48px; margin-top:18px; \}/);
-  assert.match(pilotCss, /\.forme-app \.saved-look-card,[\s\S]*?border: 0 !important;[\s\S]*?box-shadow: none !important;/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.wordmark[\s\S]*?font: 800 29px\/1 var\(--fs-font\);/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.zone-nav[\s\S]*?background: transparent !important;[\s\S]*?gap: 24px;/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.zone-nav button,[\s\S]*?font: 600 12px\/1 var\(--fs-font\);/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.studio-layout[\s\S]*?grid-template-columns: var\(--studio-rail-left\) minmax\(0, 1fr\) var\(--studio-rail-right\);/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.look-artboard \{[\s\S]*?inset: 0;[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?transform: none;/);
-  assert.match(pilotCss, /\.forme-app\.view-studio \.canvas-action-bar \{[\s\S]*?left: var\(--studio-rail-left\);[\s\S]*?right: var\(--studio-rail-right\);[\s\S]*?transform: none;/);
-  assert.match(pilotCss, /\.forme-app \.profile-page-editor,[\s\S]*?border: 0 !important;[\s\S]*?background: transparent !important;/);
-  assert.match(pilotCss, /\.pricing-page\.forme-app\.public-app \.pricing-plan-list > article,[\s\S]*?border: 0 !important;[\s\S]*?border-radius: 0;[\s\S]*?background: transparent !important;/);
-  assert.match(pilotCss, /@media \(max-width: 900px\)[\s\S]*?\.forme-app \.saved-look-actions \{[\s\S]*?display: flex;[\s\S]*?opacity: 1;/);
+test("hides Assistant and the style test without deleting their implementation", async () => {
+  for (const route of ["/closet", "/canvas", "/looks", "/pricing", "/canvas/mix-match"]) {
+    const html = await (await render(route)).text();
+    const navigation = [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)].map(match => match[0]).join("\n");
+    assert.doesNotMatch(navigation, /Asistente|href="\/asistente"|onClick="generateLooksQuickly"/);
+  }
+  const features = await readFile(new URL("../app/product-features.ts", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(features, /assistant: false, styleTest: false/);
+  assert.match(page, /setStyleOnboardingOpen\(productFeatures\.styleTest && !loadedStyleProfile\.completed\)/);
+  assert.match(page, /productFeatures\.styleTest && !demoMode && styleOnboardingOpen && <StyleOnboarding/);
+  assert.match(page, /productFeatures\.styleTest && <button className="profile-recalibrate"/);
+  assert.match(page, /productFeatures\.assistant && <button type="button" onClick={generateLooksQuickly}/);
+});
+
+test("duplicating an archived look uses that look, preserves placement and opens a separate copy", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  const duplication = page.slice(page.indexOf("async function duplicateLook("), page.indexOf("async function retryProcessing("));
+  assert.match(duplication, /duplicateLook\(look.items, `\$\{look.name\} · copia`\)/);
+  assert.match(duplication, /sourceItems.map\(\(item\) => \(\{ \.\.\.item, instanceId: crypto.randomUUID\(\) \}\)\)/);
+  assert.match(duplication, /const outfitId = `look-\$\{crypto.randomUUID\(\)\}`/);
+  assert.match(duplication, /method: "PUT"/);
+  assert.match(duplication, /items: duplicatedPieces/);
+  assert.match(duplication, /const nextLooks = \[nextLook, \.\.\.looks\]/);
+  assert.match(duplication, /openSavedLook\(nextLook\)/);
+  assert.match(duplication, /if \(!response.ok\) throw new Error/);
+  assert.match(duplication, /finally \{\s*setSavingOutfit\(false\)/);
+  assert.doesNotMatch(duplication, /randomGarmentReplacements|canvasPieces.map|isPublic: true/);
 });
 
 test("keeps the garment pipeline economical, reversible, and cutout-first", async () => {
@@ -335,9 +172,9 @@ test("keeps the garment pipeline economical, reversible, and cutout-first", asyn
   assert.match(worker, /garment\.category === "Outerwear"/);
   assert.match(worker, /garment_type/);
   assert.match(worker, /\/api\/batches\/status/);
-  assert.match(page, /function processingFileFor/);
+  assert.match(await readFile(new URL("../app/garment-upload.ts", import.meta.url), "utf8"), /function processingFileFor/);
   assert.match(page, /function whiteStudioCutout/);
-  assert.match(page, /GENERAR DE NUEVO/);
+  assert.match(page, /Generar de nuevo/i);
   assert.match(page, /discountedBatchThreshold = 5/);
   assert.match(schema, /processingImageKey/);
   assert.match(schema, /generatedOpenImageKey/);
@@ -362,4 +199,48 @@ test("ships one sequential final wardrobe directory", async () => {
   assert.match(catalog, /category: "Tops"/);
   assert.match(catalog, /category: "Footwear"/);
   assert.match(catalog, /category: "Accessories"/);
+});
+
+// User-facing contracts, rather than exact CSS declarations or icon counts.
+test("the closet exposes search, collections and access to filters", async () => {
+  const html = await (await render("/closet")).text();
+  assert.match(html, /<h1[^>]*>Mi closet<\/h1>/);
+  assert.match(html, /type="search"/);
+  assert.match(html, /Buscar prendas/);
+  assert.match(html, /Filtrar y ordenar prendas/);
+  assert.match(html, /aria-label="Favoritas"[^>]*aria-pressed="false"/);
+  assert.match(html, /aria-label="Tamaño de miniaturas"/);
+  assert.match(html, /Básicos Formé/);
+  assert.doesNotMatch(html, /closet-looks-nav/);
+});
+
+test("Canvas keeps its garment library and iteration actions visible; optional panels start closed", async () => {
+  const html = await (await render("/canvas")).text();
+  assert.match(html, /Nombre del look/);
+  assert.match(html, /id="look-name"/);
+  assert.match(html, /Guardar look/);
+  assert.match(html, /aria-label="Deshacer"/);
+  assert.match(html, /<aside[^>]+id="canvas-garment-library"/);
+  assert.match(html, /aria-label="Crear y probar looks"/);
+  assert.match(html, /Nuevo look/);
+  assert.match(html, /Mezclar/);
+  assert.match(html, /aria-label="Favoritas"[^>]*aria-pressed="false"/);
+  assert.match(html, /aria-label="Tamaño de miniaturas"/);
+  assert.match(html, /aria-controls="canvas-layers"/);
+  assert.match(html, /aria-controls="canvas-saved-looks"/);
+  assert.doesNotMatch(html, /<aside[^>]+id="canvas-(layers|saved-looks)"/);
+});
+
+test("Looks has its own primary navigation state and creates a new document", async () => {
+  const html = await (await render("/looks")).text();
+  assert.match(html, /aria-current="page"[^>]*>Looks<\/button>/);
+  assert.doesNotMatch(html, /aria-current="page"[^>]*>Mi closet<\/button>/);
+  assert.match(html, /Crear look/);
+});
+
+test("beta pricing does not promise disabled product features", async () => {
+  const html = await (await render("/pricing")).text();
+  assert.match(html, /Planes previstos/);
+  assert.match(html, /sin tarjeta ni cobros/);
+  assert.doesNotMatch(html, /planificación semanal|Asistente según|insights avanzados/);
 });

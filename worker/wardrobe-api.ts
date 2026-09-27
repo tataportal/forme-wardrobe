@@ -1,5 +1,11 @@
+import layoutCatalog from "../app/garment-layout-data.json";
+import { garmentWebp } from "./garment-webp";
+import { uploadFileError } from "../app/garment-upload";
+import { validLengthOverride, type LengthOverride } from "../shared/garment-proportions";
 import { readNativeSession } from "./google-auth";
 import { garmentTypesByCategory, inferGarmentType, starterGarments } from "../app/garments";
+import { anatomyInstruction, anatomySchema, anatomySelectionSchema, resolveAnatomySelection, InvalidAnatomyError, publicGarmentAnatomy, readStoredAnatomy, type GarmentMeasurements, type AnatomyCandidate } from "../shared/garment-anatomy";
+import { parseRecognition, promptVersion, readRecognition, recognitionInstruction, recognitionPrompt, recognitionSchema, type StoredRecognition } from "./garment-recognition";
 
 export interface WardrobeEnv {
   DB?: D1Database;
@@ -18,6 +24,7 @@ export interface WardrobeEnv {
   OPENAI_IMAGE_MODEL?: string;
   OPENAI_IMAGE_QUALITY?: string;
   OPENAI_QA_MODEL?: string;
+  OPENAI_RECOGNITION_MODEL?: string;
   FORME_OPS_TOKEN?: string;
   FORME_OWNER_EMAIL?: string;
   GOOGLE_CLIENT_ID?: string;
@@ -36,7 +43,8 @@ export type GarmentQueueMessage = {
   quality: ImageQuality;
   presentation: GarmentPresentation;
   outputVariant: GarmentOutputVariant;
-  stage?: "generate" | "postprocess";
+  stage?: "recognize" | "metadata" | "batch" | "generate" | "postprocess";
+  recognitionSourceKey?: string;
   generatedKey?: string;
   maskAttempt?: number;
 };
@@ -62,6 +70,11 @@ type GarmentRow = {
   owner_id: string;
   client_id: string;
   name: string;
+  description: string;
+  recognition_status: string;
+  recognition_json: string | null;
+  metadata_status: string;
+  metadata_revision: number;
   brand: string;
   category: string;
   garment_type: string;
@@ -80,6 +93,8 @@ type GarmentRow = {
   generated_open_image_key: string | null;
   image_key: string | null;
   open_image_key: string | null;
+  layout_json: string | null;
+  length_override: LengthOverride | null;
   quality: string;
   qa_status: string;
   qa_notes: string | null;
@@ -100,6 +115,8 @@ type ProcessingJobRow = {
   mode: string;
   batch_id: string | null;
   openai_file_id: string | null;
+  stage: "recognize" | "generate" | "postprocess";
+  generated_key: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -119,7 +136,9 @@ type IntakeBatchSummary = {
 };
 
 type GarmentPayload = {
+  lengthOverride?: LengthOverride | null;
   name: string;
+  description?: string;
   brand: string;
   category: string;
   garmentType: string;
@@ -156,7 +175,8 @@ function isGarmentQueueMessage(value: unknown): value is GarmentQueueMessage {
     && ["low", "medium", "high"].includes(message.quality || "")
     && ["auto", "closed", "open"].includes(message.presentation || "")
     && ["closed", "open"].includes(message.outputVariant || "")
-    && (!message.stage || ["generate", "postprocess"].includes(message.stage))
+    && (!message.stage || ["recognize", "metadata", "batch", "generate", "postprocess"].includes(message.stage))
+    && (message.stage !== "metadata" || typeof message.recognitionSourceKey === "string")
     && (message.stage !== "postprocess" || typeof message.generatedKey === "string")
     && (message.maskAttempt === undefined || (Number.isInteger(message.maskAttempt) && message.maskAttempt >= 0 && message.maskAttempt <= 2));
 }
@@ -181,6 +201,7 @@ type UserProfileRow = {
   discoverable: number;
   show_closet: number;
   show_looks: number;
+  include_forme_basics: number;
 };
 
 type ImageQuality = "low" | "medium";
@@ -197,7 +218,7 @@ type StyleFamilyRatingPayload = {
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
-const categories = new Set(["Outerwear", "Tops", "Bottoms", "Tailoring", "Footwear", "Accessories"]);
+const categories = new Set(Object.keys(garmentTypesByCategory));
 const garmentTypes = new Set(Object.values(garmentTypesByCategory).flat());
 const styleFamilies = new Set([
   "classic",
@@ -215,15 +236,17 @@ const styleFamilies = new Set([
 ]);
 const styleFeedbackReasons = new Set(["color", "silhouette", "combination", "formality", "expression", "fit", "footwear", "specific"]);
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+const staticLayoutBounds = new Map(Object.entries(layoutCatalog.images).map(([source, layout]) => [source, layout.bounds]));
 const staticGarmentMedia = new Map(starterGarments.map((garment) => [garment.id, {
   image: garment.image,
   openImage: garment.openImage,
 }]));
 
 const garmentColumns = `
-  id, owner_id, client_id, name, brand, category, garment_type, color_family, tone, material,
+  id, owner_id, client_id, name, description, recognition_status, recognition_json, metadata_status, metadata_revision,
+  brand, category, garment_type, color_family, tone, material,
   finish, silhouette, favorite, is_public, deleted, status, source_image_key, processing_image_key,
-  generated_image_key, generated_open_image_key, image_key, open_image_key, quality,
+  generated_image_key, generated_open_image_key, image_key, open_image_key, layout_json, length_override, quality,
   qa_status, qa_notes, revision, created_at, updated_at
 `;
 
@@ -329,7 +352,7 @@ async function createIntakeBatch(request: Request, db: D1Database, identity: Ide
   } | null;
   const clientId = safeClientId(textValue(value?.clientId));
   const rawItems = Array.isArray(value?.items) ? value.items : [];
-  if (!clientId || !rawItems.length) return apiError("El lote de fotos no es válido.", 400);
+  if (!clientId || !rawItems.length) return apiError("No se pudieron registrar las fotos. Vuelve a seleccionarlas.", 400);
   const items = rawItems.map((item) => ({
     clientItemId: safeClientId(textValue(item.clientItemId)),
     filename: textValue(item.filename, "foto").slice(0, 160),
@@ -337,7 +360,7 @@ async function createIntakeBatch(request: Request, db: D1Database, identity: Ide
   }));
   if (items.some((item) => !item.clientItemId || !item.fingerprint)) return apiError("Una de las fotos no se pudo registrar.", 400);
   if (new Set(items.map((item) => item.clientItemId)).size !== items.length || new Set(items.map((item) => item.fingerprint)).size !== items.length) {
-    return apiError("El lote contiene fotos duplicadas.", 409);
+    return apiError("Hay fotos repetidas. Quita las copias antes de continuar.", 409);
   }
   const existing = await intakeBatchSummary(db, identity.id, clientId);
   if (existing) return json({ batch: existing });
@@ -408,8 +431,12 @@ function payloadFrom(value: unknown, fallback?: Partial<GarmentPayload>): Garmen
   const garmentType = garmentTypes.has(requestedType) && allowedTypes.some((type) => type === requestedType)
     ? requestedType
     : inferGarmentType(name, category as keyof typeof garmentTypesByCategory);
+  if (body.lengthOverride !== undefined && body.lengthOverride !== null && body.lengthOverride !== ""
+    && !validLengthOverride({ category: category as keyof typeof garmentTypesByCategory, garmentType }, body.lengthOverride)) return null;
   return {
     name,
+    lengthOverride: body.lengthOverride === undefined ? undefined : body.lengthOverride === null || body.lengthOverride === "" ? null : body.lengthOverride as LengthOverride,
+    description: typeof body.description === "string" ? body.description.trim().slice(0, 1000) : fallback?.description,
     brand: textValue(body.brand, fallback?.brand ?? ""),
     category,
     garmentType,
@@ -494,7 +521,7 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
 }
 
 async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: D1Database; identity: Identity } | Response> {
-  if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+  if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
   const identity = await identify(request, env);
   if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
   await ensureUser(env.DB, identity);
@@ -513,6 +540,7 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
     discoverable: Boolean(row.discoverable),
     showCloset: Boolean(row.show_closet),
     showLooks: Boolean(row.show_looks),
+    includeFormeBasics: Boolean(row.include_forme_basics),
     isOwner,
   };
 }
@@ -520,7 +548,7 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
 async function readAccountProfile(db: D1Database, ownerId: string): Promise<UserProfileRow> {
   const row = await db.prepare(`
     SELECT id, email, display_name, handle, bio, avatar_url,
-      profile_public, discoverable, show_closet, show_looks
+      profile_public, discoverable, show_closet, show_looks, include_forme_basics
     FROM users WHERE id = ? LIMIT 1
   `).bind(ownerId).first<UserProfileRow>();
   if (!row) throw new Error("No se pudo abrir tu perfil.");
@@ -528,12 +556,12 @@ async function readAccountProfile(db: D1Database, ownerId: string): Promise<User
 }
 
 async function getSession(request: Request, env: WardrobeEnv): Promise<Response> {
-  if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+  if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
   const identity = await identify(request, env);
   if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
   let row = await env.DB.prepare(`
     SELECT id, email, display_name, handle, bio, avatar_url,
-      profile_public, discoverable, show_closet, show_looks
+      profile_public, discoverable, show_closet, show_looks, include_forme_basics
     FROM users WHERE id = ? LIMIT 1
   `).bind(identity.id).first<UserProfileRow>();
   if (!row) {
@@ -562,7 +590,8 @@ async function saveAccountProfile(request: Request, db: D1Database, identity: Id
   const showLooks = profilePublic && booleanValue(value.showLooks);
   await db.prepare(`
     UPDATE users SET display_name = ?, handle = ?, bio = ?, profile_public = ?,
-      discoverable = ?, show_closet = ?, show_looks = ?, updated_at = CURRENT_TIMESTAMP
+      discoverable = ?, show_closet = ?, show_looks = ?,
+      include_forme_basics = COALESCE(?, include_forme_basics), updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
     name,
@@ -572,6 +601,7 @@ async function saveAccountProfile(request: Request, db: D1Database, identity: Id
     discoverable ? 1 : 0,
     showCloset ? 1 : 0,
     showLooks ? 1 : 0,
+    typeof value.includeFormeBasics === "boolean" ? (value.includeFormeBasics ? 1 : 0) : null,
     identity.id,
   ).run();
   return json({ profile: accountProfileJson(await readAccountProfile(db, identity.id), isOwner) });
@@ -583,6 +613,10 @@ function garmentJson(row: GarmentRow, tags: string[] = []) {
     serverId: row.id,
     id: row.client_id,
     name: row.name,
+    description: row.description || "",
+    recognitionStatus: row.recognition_status,
+    metadataStatus: row.metadata_status,
+    lengthOverride: row.length_override ?? null,
     brand: row.brand,
     category: row.category,
     garmentType: row.garment_type || inferGarmentType(row.name, row.category as keyof typeof garmentTypesByCategory),
@@ -599,6 +633,7 @@ function garmentJson(row: GarmentRow, tags: string[] = []) {
     quality: imageQuality(row.quality),
     qaStatus: row.qa_status,
     qaNotes: row.qa_notes ?? undefined,
+    anatomy: publicGarmentAnatomy(row.layout_json, row.image_key, row.open_image_key),
     image: row.image_key ? `/api/media/${encodeURIComponent(row.client_id)}/cutout?v=${revision}` : undefined,
     generatedImage: row.generated_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/generated?v=${revision}` : undefined,
     generatedOpenImage: row.generated_open_image_key ? `/api/media/${encodeURIComponent(row.client_id)}/generated-open?v=${revision}` : undefined,
@@ -642,14 +677,19 @@ async function getWardrobe(db: D1Database, ownerId: string): Promise<Response> {
 async function saveGarment(db: D1Database, ownerId: string, clientId: string, payload: GarmentPayload): Promise<GarmentRow> {
   const existing = await findGarment(db, ownerId, clientId);
   const garmentId = existing?.id ?? crypto.randomUUID();
+  const kind = { category: payload.category as keyof typeof garmentTypesByCategory, garmentType: payload.garmentType as import("../app/garments").GarmentType };
+  const requestedLength = payload.lengthOverride === undefined ? existing?.length_override : payload.lengthOverride;
+  const lengthOverride = validLengthOverride(kind, requestedLength) ? requestedLength : null;
   const statements = [
     db.prepare(`
       INSERT INTO garments (
-        id, owner_id, client_id, name, brand, category, garment_type, color_family, tone,
-        material, finish, silhouette, favorite, is_public, deleted, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
+        id, owner_id, client_id, name, description, brand, category, garment_type, color_family, tone,
+        material, finish, silhouette, favorite, is_public, length_override, deleted, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready')
       ON CONFLICT(owner_id, client_id) DO UPDATE SET
         name = excluded.name,
+        description = CASE WHEN ? THEN excluded.description ELSE garments.description END,
+        metadata_revision = garments.metadata_revision + 1,
         brand = excluded.brand,
         category = excluded.category,
         garment_type = excluded.garment_type,
@@ -660,6 +700,7 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
         silhouette = excluded.silhouette,
         favorite = excluded.favorite,
         is_public = excluded.is_public,
+        length_override = excluded.length_override,
         deleted = 0,
         revision = garments.revision + 1,
         updated_at = CURRENT_TIMESTAMP
@@ -668,6 +709,7 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
       ownerId,
       clientId,
       payload.name,
+      payload.description ?? "",
       payload.brand,
       payload.category,
       payload.garmentType,
@@ -678,6 +720,8 @@ async function saveGarment(db: D1Database, ownerId: string, clientId: string, pa
       payload.silhouette,
       payload.favorite ? 1 : 0,
       payload.isPublic ? 1 : 0,
+      lengthOverride,
+      payload.description !== undefined ? 1 : 0,
     ),
     db.prepare("DELETE FROM garment_tags WHERE garment_id = ?").bind(garmentId),
     ...payload.tags.map((tag) => db.prepare("INSERT INTO garment_tags (garment_id, tag) VALUES (?, ?)").bind(garmentId, tag)),
@@ -698,32 +742,6 @@ function extensionFor(file: File): string {
     "image/heif": "heif",
   };
   return byType[file.type.toLocaleLowerCase()] ?? "img";
-}
-
-function formPayload(form: FormData): GarmentPayload | null {
-  let tags: unknown = [];
-  const rawTags = form.get("tags");
-  if (typeof rawTags === "string" && rawTags) {
-    try {
-      tags = JSON.parse(rawTags);
-    } catch {
-      tags = rawTags.split(",");
-    }
-  }
-  return payloadFrom({
-    name: form.get("name"),
-    brand: form.get("brand"),
-    category: form.get("category"),
-    garmentType: form.get("garmentType"),
-    colorFamily: form.get("colorFamily"),
-    tone: form.get("tone"),
-    material: form.get("material"),
-    finish: form.get("finish"),
-    silhouette: form.get("silhouette"),
-    favorite: form.get("favorite"),
-    isPublic: form.get("isPublic"),
-    tags,
-  });
 }
 
 async function createProcessingJob(
@@ -757,20 +775,24 @@ async function uploadGarment(
   db: D1Database,
   identity: Identity,
 ): Promise<Response> {
-  if (!env.WARDROBE_MEDIA) return apiError("El almacenamiento de imágenes todavía no está conectado.", 503);
+  if (!env.WARDROBE_MEDIA) return apiError("No se pueden subir fotos en este momento. Vuelve a intentarlo más tarde.", 503);
   const form = await request.formData();
   const file = form.get("file");
-  if (!(file instanceof File) || !file.type.startsWith("image/")) return apiError("Selecciona una foto válida.", 400);
+  if (!(file instanceof File) || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) return apiError("No se pudo convertir la foto. Usa JPG, PNG o WebP.", 400);
   if (file.size > MAX_IMAGE_BYTES) return apiError("La foto pesa demasiado. El máximo es 20 MB.", 413);
   const original = form.get("original");
-  if (original instanceof File && (!original.type.startsWith("image/") || original.size > MAX_IMAGE_BYTES)) {
+  if (original instanceof File && uploadFileError(original)) {
     return apiError("La foto original no es válida o supera 20 MB.", 413);
   }
-  const payload = formPayload(form);
-  if (!payload) return apiError("Revisa el tipo y los datos de la prenda.", 400);
+  // The photograph, not the filename or form defaults, defines the garment.
+  const payload: GarmentPayload = {
+    name: "Reconociendo prenda", brand: "", category: "", garmentType: "",
+    colorFamily: "", tone: "", material: "", finish: "", silhouette: "",
+    tags: [], favorite: false, isPublic: false,
+  };
   const intakeBatchClientId = safeClientId(textValue(form.get("intakeBatchId")));
   const intakeItemClientId = safeClientId(textValue(form.get("intakeItemId")));
-  if (!intakeBatchClientId || !intakeItemClientId) return apiError("La foto no pertenece a un lote registrado.", 400);
+  if (!intakeBatchClientId || !intakeItemClientId) return apiError("No se pudo registrar la foto. Vuelve a seleccionarla.", 400);
   const intakeItem = await db.prepare(`
     SELECT intake_batch_items.id, intake_batch_items.batch_id
     FROM intake_batch_items
@@ -779,7 +801,7 @@ async function uploadGarment(
       AND intake_batch_items.client_item_id = ? AND intake_batch_items.garment_id IS NULL
     LIMIT 1
   `).bind(identity.id, intakeBatchClientId, intakeItemClientId).first<{ id: string; batch_id: string }>();
-  if (!intakeItem) return apiError("La foto no está registrada en este lote o ya fue cargada.", 409);
+  if (!intakeItem) return apiError("Esta foto ya se subió o no está disponible. Revisa tu closet antes de volver a añadirla.", 409);
 
   const clientId = crypto.randomUUID();
   const garmentId = crypto.randomUUID();
@@ -804,8 +826,9 @@ async function uploadGarment(
       db.prepare(`
         INSERT INTO garments (
           id, owner_id, client_id, name, brand, category, garment_type, color_family, tone,
-          material, finish, silhouette, favorite, is_public, status, source_image_key, processing_image_key, quality
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?)
+          material, finish, silhouette, favorite, is_public, status, source_image_key, processing_image_key, quality,
+          recognition_status, metadata_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?, ?, 'pending', 'pending')
       `).bind(
         garmentId,
         identity.id,
@@ -841,10 +864,14 @@ async function uploadGarment(
   const enabled = processingEnabled(env);
   const quality = imageQuality(env.OPENAI_IMAGE_QUALITY);
   const mode = form.get("processingMode") === "batch" ? "batch" : "immediate";
-  const presentation: GarmentPresentation = payload.category === "Outerwear" || payload.category === "Tops" ? "open" : "closed";
+  const presentation: GarmentPresentation = "auto";
   const job = await createProcessingJob(db, identity.id, garmentId, enabled, quality, presentation, "closed", mode);
   await syncIntakeItem(db, garmentId, enabled ? "processing" : "uploaded");
-  if (enabled && mode === "immediate") {
+  if (enabled) {
+    // Recognize immediately in either mode; only generation waits for batch.
+    await db.prepare("UPDATE processing_jobs SET status = 'queued', stage = 'recognize' WHERE id = ?").bind(job.id).run();
+    await db.prepare("UPDATE garments SET status = 'queued' WHERE id = ?").bind(garmentId).run();
+    job.status = "queued";
     await enqueueGarmentJob(env, {
       ownerId: identity.id,
       garmentId,
@@ -852,6 +879,7 @@ async function uploadGarment(
       quality,
       presentation,
       outputVariant: "closed",
+      stage: "recognize",
     });
   }
   const row = await findGarment(db, identity.id, clientId);
@@ -859,7 +887,109 @@ async function uploadGarment(
   return json({ garment: garmentJson(row, payload.tags), job }, 202);
 }
 
+function sourceRecognition(garment: GarmentRow): StoredRecognition | null {
+  return readRecognition(garment.recognition_json, garment.processing_image_key || garment.source_image_key);
+}
+
+function generationGarment(garment: GarmentRow): GarmentRow {
+  const recognition = sourceRecognition(garment)?.result;
+  return recognition ? { ...garment, category: recognition.category, garment_type: recognition.garmentType } : garment;
+}
+
+function needsLayeringCutout(garment: GarmentRow): boolean {
+  return sourceRecognition(garment)?.result.frontOpening ?? garment.category === "Outerwear";
+}
+
+async function recognizeGarment(env: WardrobeEnv, db: D1Database, garment: GarmentRow): Promise<StoredRecognition> {
+  const cached = sourceRecognition(garment);
+  if (cached) return cached;
+  const sourceKey = garment.processing_image_key || garment.source_image_key;
+  const source = sourceKey && await env.WARDROBE_MEDIA?.get(sourceKey);
+  if (!source || !sourceKey) throw new Error("No se encontró la foto para reconocer la prenda.");
+  const bytes = await source.arrayBuffer();
+  const contentType = source.httpMetadata?.contentType || "image/jpeg";
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(contentType)) {
+    throw new Error("No se pudo convertir la foto. Sube una imagen JPG, PNG o WebP.");
+  }
+  const model = env.OPENAI_RECOGNITION_MODEL || env.OPENAI_QA_MODEL || "gpt-5-mini";
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
+      body: JSON.stringify({
+        model, store: false,
+        input: [{ role: "user", content: [
+          { type: "input_text", text: recognitionInstruction },
+          { type: "input_image", image_url: `data:${contentType};base64,${encodeBase64(bytes)}`, detail: "high" },
+        ] }],
+        text: { format: { type: "json_schema", name: "garment_recognition", strict: true, schema: recognitionSchema } },
+      }),
+    });
+  } catch { throw new RetryableProcessingError("Se interrumpió el reconocimiento de la foto."); }
+  if (response.status === 429 || response.status >= 500) throw new RetryableProcessingError(`Reconocimiento temporalmente no disponible (${response.status}).`);
+  const body = await response.json() as { status?: string; output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
+  if (!response.ok || body.status === "incomplete") throw new Error("No se pudo completar el reconocimiento de la foto.");
+  const raw = body.output_text || body.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
+  const result = parseRecognition(JSON.parse(raw));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const record: StoredRecognition = {
+    version: 1, sourceKey, sourceSha256: [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join(""),
+    model, requestId: response.headers.get("x-request-id"), recognizedAt: new Date().toISOString(),
+    metadataRevision: garment.metadata_revision || 0, result, prompt: recognitionPrompt(result), promptVersion,
+  };
+  // Durable common checkpoint. Neither branch needs the other's output.
+  const saved = await db.prepare(`UPDATE garments SET recognition_json = ?, recognition_status = 'ready',
+    metadata_status = 'pending', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND owner_id = ? AND deleted = 0 AND COALESCE(processing_image_key, source_image_key) = ?`)
+    .bind(JSON.stringify(record), garment.id, garment.owner_id, sourceKey).run();
+  if (Number(saved.meta.changes) !== 1) throw new Error("La foto cambió durante el reconocimiento.");
+  return record;
+}
+
+async function persistRecognizedMetadata(db: D1Database, garment: GarmentRow, sourceKey: string): Promise<void> {
+  const record = sourceRecognition(garment);
+  if (!record || record.sourceKey !== sourceKey || garment.deleted || garment.metadata_status === "ready") return;
+  const item = record.result;
+  const guard = "id = ? AND owner_id = ? AND recognition_json = ? AND metadata_revision = ? AND metadata_status <> 'ready' AND deleted = 0";
+  const args = [garment.id, garment.owner_id, garment.recognition_json, record.metadataRevision];
+  await db.batch([
+    db.prepare(`DELETE FROM garment_tags WHERE garment_id = ? AND EXISTS (SELECT 1 FROM garments WHERE ${guard})`).bind(garment.id, ...args),
+    ...item.tags.map(tag => db.prepare(`INSERT OR IGNORE INTO garment_tags (garment_id, tag)
+      SELECT id, ? FROM garments WHERE ${guard}`).bind(tag, ...args)),
+    db.prepare(`UPDATE garments SET name = ?, description = ?, brand = ?, category = ?, garment_type = ?,
+      color_family = ?, tone = ?, material = ?, finish = ?, silhouette = ?,
+      revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE ${guard}`)
+      .bind(item.name, item.description, item.brand, item.category, item.garmentType, item.colorFamily,
+        item.tone, item.material, item.finish, item.silhouette, ...args),
+    // A later human edit wins in full, including deliberately empty tags.
+    db.prepare(`UPDATE garments SET metadata_status = 'ready' WHERE id = ? AND owner_id = ? AND recognition_json = ? AND deleted = 0`)
+      .bind(garment.id, garment.owner_id, garment.recognition_json),
+  ]);
+}
+
+async function prepareRecognizedGarment(env: WardrobeEnv, db: D1Database, garment: GarmentRow, jobId: string, mode: string, quality: ImageQuality): Promise<void> {
+  const record = await recognizeGarment(env, db, garment);
+  const presentation = record.result.frontOpening ? "open" : "closed";
+  await db.batch([
+    db.prepare("UPDATE processing_jobs SET status = ?, stage = 'generate', presentation = ?, prompt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+      .bind(mode === "batch" ? "batch_staged" : "queued", presentation, record.prompt, jobId, garment.owner_id),
+    db.prepare("UPDATE garments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+      .bind(mode === "batch" ? "batch_staged" : "queued", garment.id, garment.owner_id),
+  ]);
+  const common = { ownerId: garment.owner_id, garmentId: garment.id, jobId, quality, presentation, outputVariant: "closed" } as const;
+  // Separate durable messages. Slow/failed metadata cannot block generation,
+  // and metadata retries never claim or reset the image job.
+  const branches = [enqueueGarmentJob(env, { ...common, stage: "metadata", recognitionSourceKey: record.sourceKey })];
+  if (mode !== "batch") branches.push(enqueueGarmentJob(env, { ...common, stage: "generate" }));
+  else branches.push(enqueueGarmentJob(env, { ...common, stage: "batch" }));
+  const results = await Promise.allSettled(branches);
+  if (results.some(result => result.status === "rejected")) throw new RetryableProcessingError("No se pudieron despachar todas las ramas; se reintentará sin volver a analizar.");
+}
+
 function ghostPrompt(garment: GarmentRow, presentation: GarmentPresentation = "auto"): string {
+  const recognized = sourceRecognition(garment);
+  if (recognized) return recognized.prompt;
   const isLayerable = garment.category === "Outerwear" || garment.category === "Tailoring";
   const construction = presentation === "open"
     ? `PRESENTATION — OPEN STATE REQUIRED
@@ -932,6 +1062,8 @@ function encodeBase64(value: ArrayBuffer | Uint8Array): string {
   return btoa(binary);
 }
 
+type GeneratedReview = { passed: boolean; retryable: boolean; score: number; notes: string; layeringPolygon: Array<{ x: number; y: number }>; anatomy: unknown };
+
 async function reviewGeneratedGarment(
   env: WardrobeEnv,
   garment: GarmentRow,
@@ -939,15 +1071,15 @@ async function reviewGeneratedGarment(
   sourceContentType: string,
   generated: Uint8Array,
   maskAttempt = 0,
-): Promise<{ passed: boolean; retryable: boolean; score: number; notes: string; layeringPolygon: Array<{ x: number; y: number }> }> {
+): Promise<GeneratedReview> {
   if (!env.OPENAI_API_KEY) {
-    return { passed: false, retryable: true, score: 0, notes: "El control visual no está disponible.", layeringPolygon: [] };
+    return { passed: false, retryable: true, score: 0, notes: "El control visual no está disponible.", layeringPolygon: [], anatomy: null };
   }
   try {
     const retryInstruction = maskAttempt > 0
       ? "A previous mask was rejected for cutting garment fabric. Make this retry more conservative and keep every boundary farther inside the lining."
       : "";
-    const layeringInstruction = garment.category === "Outerwear"
+    const layeringInstruction = needsLayeringCutout(garment)
       ? `This is outerwear and must support layering. In layering_mask, provide 8 to 24 clockwise points that tightly trace only the true central lining/opening between the two open front panels. Use the real curved inner edges of the garment, not a rectangle, triangle, trapezoid, or other geometric approximation. Start below the complete back collar/neck band, trace inside both lapel/front-panel edges, and reach the natural opening at the bottom without removing hem fabric. Every point must remain safely inside the lining: never include collar, lapels, outer panels, graphics, buttons, sleeves, or hem fabric. Coordinates are normalized integers from 0 to 1000 across the OUTPUT image. Set applicable=true only when this exact opening is clearly visible. ${retryInstruction}`
       : "This category does not need an interior layering mask. Set layering_mask applicable=false, confidence=100 and points=[].";
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -964,6 +1096,7 @@ async function reviewGeneratedGarment(
               type: "input_text",
               text: `You are the final visual quality gate for a fashion digitization service. Compare SOURCE (first image) against OUTPUT (second image). The output must depict the exact same ${garment.garment_type || garment.category} as a ghost-mannequin catalog image. Reject if any silhouette, proportion, color, material, finish, seam, pocket, closure, hardware, graphic, print, embroidery, patch, logo, visible exterior text, distressing, or construction detail is missing, changed, moved, invented or obscured. Reject any hanger, person, mannequin body, visible interior brand/care/size label, solid black neck oval or geometric void, background contamination, cropped garment, malformed edge, or invented styling item. A natural empty neck opening is allowed only when it follows the construction and shows plausible matching lining. Be strict: uncertainty means review. ${layeringInstruction} Return only the requested JSON.`,
             },
+            { type: "input_text", text: anatomyInstruction },
             { type: "input_image", image_url: `data:${sourceContentType};base64,${encodeBase64(sourceBytes)}`, detail: "high" },
             { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
           ],
@@ -981,6 +1114,7 @@ async function reviewGeneratedGarment(
                 score: { type: "integer", minimum: 0, maximum: 100 },
                 summary: { type: "string" },
                 issues: { type: "array", items: { type: "string" }, maxItems: 8 },
+                anatomy: anatomySchema,
                 layering_mask: {
                   type: "object",
                   additionalProperties: false,
@@ -1005,7 +1139,7 @@ async function reviewGeneratedGarment(
                   required: ["applicable", "confidence", "points"],
                 },
               },
-              required: ["passed", "score", "summary", "issues", "layering_mask"],
+              required: ["passed", "score", "summary", "issues", "layering_mask", "anatomy"],
             },
           },
         },
@@ -1019,6 +1153,7 @@ async function reviewGeneratedGarment(
     if (!response.ok) throw new Error(result.error?.message || `Control visual ${response.status}`);
     const raw = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "";
     const parsed = JSON.parse(raw) as {
+      anatomy?: unknown;
       passed?: boolean;
       score?: number;
       summary?: string;
@@ -1035,7 +1170,7 @@ async function reviewGeneratedGarment(
         .map((point) => ({ x: Number(point.x), y: Number(point.y) }))
         .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
       : [];
-    const layeringReady = garment.category !== "Outerwear"
+    const layeringReady = !needsLayeringCutout(garment)
       || (
         parsed.layering_mask?.applicable === true
         && Number(parsed.layering_mask.confidence) >= 85
@@ -1051,7 +1186,8 @@ async function reviewGeneratedGarment(
       retryable: false,
       score,
       notes: notes || "El resultado necesita revisión visual.",
-      layeringPolygon: garment.category === "Outerwear" && layeringReady ? points : [],
+      layeringPolygon: needsLayeringCutout(garment) && layeringReady ? points : [],
+      anatomy: parsed.anatomy ?? null,
     };
   } catch (error) {
     return {
@@ -1060,8 +1196,79 @@ async function reviewGeneratedGarment(
       score: 0,
       notes: `No se pudo completar el control visual: ${error instanceof Error ? error.message : "error desconocido"}`.slice(0, 500),
       layeringPolygon: [],
+      anatomy: null,
     };
   }
+}
+
+async function reviewAnatomyOnly(env: WardrobeEnv, generated: Uint8Array, reason: string, contourGuide = "", candidates: AnatomyCandidate[] = []): Promise<unknown> {
+  if (!candidates.length) throw new InvalidAnatomyError("No hay puntos de contorno suficientes para repetir la medición.");
+  const { coordinateGuidePng } = await import("./coordinate-guide");
+  const guide = await coordinateGuidePng(generated);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+    signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
+    body: JSON.stringify({
+      model: env.OPENAI_QA_MODEL || "gpt-5-mini", store: false,
+      input: [{ role: "user", content: [
+        { type: "input_text", text: `This OUTPUT is already approved. Remeasure anatomy only; do not regenerate or reassess fidelity. Previous measurement failed: ${reason}. ${anatomyInstruction} ${contourGuide}` },
+        { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
+        { type: "input_text", text: "Same OUTPUT with a coordinate grid for measurement only. Blue labels across the top give x; labels down the left give y. Ignore the overlay as garment detail. Use the numbered grid and silhouette table, not estimated garment-relative coordinates." },
+        { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(guide)}`, detail: "high" },
+      ] }],
+      text: { format: { type: "json_schema", name: "garment_anatomy", strict: true, schema: anatomySelectionSchema(candidates) } },
+    }),
+  });
+  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } };
+  if (!response.ok) throw new InvalidAnatomyError(result.error?.message || `No se pudo repetir la medición (${response.status}).`);
+  const raw = result.output_text || result.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
+  try { return resolveAnatomySelection(JSON.parse(raw), candidates); } catch { throw new InvalidAnatomyError("La segunda medición no eligió puntos válidos del contorno."); }
+}
+
+async function reviewLayeringMaskOnly(env: WardrobeEnv, generated: Uint8Array, previous: GeneratedReview): Promise<GeneratedReview> {
+  const { coordinateGuidePng } = await import("./coordinate-guide");
+  const { contourCutoutPng } = await import("./contour-cutout");
+  const [guide, rejected] = await Promise.all([coordinateGuidePng(generated), contourCutoutPng(generated, previous.layeringPolygon, previous.anatomy)]);
+  if (!rejected.layout) throw new InvalidAnatomyError("La máscara necesita primero una anatomía válida.");
+  const { bounds, shoulderY } = rejected.layout;
+  const top = Math.max(shoulderY, bounds[1] + bounds[3] * 0.06) * 1000;
+  const bottom = (bounds[1] + bounds[3]) * 1000;
+  const rows = Array.from({ length: 12 }, (_, i) => Math.round(top + (bottom - top) * i / 11));
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+    signal: AbortSignal.timeout(90 * 1000),
+    body: JSON.stringify({
+      model: env.OPENAI_QA_MODEL || "gpt-5-mini", store: false,
+      input: [{ role: "user", content: [
+        { type: "input_text", text: "The master is already approved; repair ONLY its interior layering mask. IMAGE 1 is the master; IMAGE 2 adds a numbered 0..1000 grid (x along top, y down left). IMAGE 3, when present, shows the REJECTED mask in magenta. Follow the actual inner panel edges, safely inside the lining. Preserve the complete back-neck collar band, lapels, buttons, graphics and outer panels. At the hem join the already-empty central gap without widening into fabric. Coordinates cover the WHOLE image, not the garment bounding box. Confidence is a percentage 0..100: 95, NOT 9.5 or 9. Preserve the approved anatomy." },
+        { type: "input_text", text: `Return the opening as exactly 12 horizontal sections, in top-to-bottom order, at these FIXED normalized y positions: ${JSON.stringify(rows)}. For each section return ONLY left_x and right_x (0..1000 over whole image width). Do NOT return or convert y coordinates. The first section is below the back collar and the last is at the hem. Follow the actual inner panel edges; the opening usually narrows downwards. Sections are converted to a polygon by code, so no point list is needed.` },
+        { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
+        { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(guide)}`, detail: "high" },
+        ...(rejected.canvasQaPng ? [{ type: "input_image", image_url: `data:image/png;base64,${encodeBase64(rejected.canvasQaPng)}`, detail: "high" }] : []),
+      ] }],
+      text: { format: { type: "json_schema", name: "layering_mask_repair", strict: true, schema: {
+        type: "object", additionalProperties: false,
+        properties: {
+          confidence: { type: "integer", minimum: 0, maximum: 100, description: "Confidence percentage 0..100, not a score out of ten." },
+          sections: { type: "array", minItems: 12, maxItems: 12, items: { type: "object", additionalProperties: false,
+            properties: { left_x: { type: "integer", minimum: 0, maximum: 1000 }, right_x: { type: "integer", minimum: 0, maximum: 1000 } }, required: ["left_x", "right_x"] } },
+        }, required: ["confidence", "sections"],
+      } } },
+    }),
+  }).catch(() => { throw new RetryableProcessingError("Se interrumpió la corrección de la máscara; se conservará la maestra y se reintentará el calado."); });
+  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } };
+  if (!response.ok) throw new RetryableProcessingError(result.error?.message || `No se pudo recalcular la máscara (${response.status}).`);
+  const raw = result.output_text || result.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
+  const parsed = JSON.parse(raw) as { confidence: number; sections?: Array<{ left_x: number; right_x: number }> };
+  const sections = parsed.sections;
+  const valid = parsed.confidence >= 85 && sections?.length === rows.length && sections.every(s =>
+    Number.isInteger(s.left_x) && Number.isInteger(s.right_x) && s.left_x >= 0 && s.left_x < s.right_x && s.right_x <= 1000);
+  const points = valid ? [
+    ...sections!.map((s, i) => ({ x: s.right_x, y: rows[i] })),
+    ...sections!.map((s, i) => ({ x: s.left_x, y: rows[i] })).reverse(),
+  ] : [];
+  return { ...previous, layeringPolygon: points };
 }
 
 async function reviewLayeringCutout(
@@ -1085,7 +1292,7 @@ async function reviewLayeringCutout(
           content: [
             {
               type: "input_text",
-              text: "You are the final cutout gate for an open outerwear garment. IMAGE 1 is the approved master. IMAGE 2 shows every transparent pixel as bright magenta. Pass only when magenta appears outside the garment and inside the true central opening between its front panels. The complete top/back collar band must remain for depth. Reject if the opening cuts any collar, lapel, front panel, graphic, button, sleeve, or hem; if it follows straight geometric diagonals instead of the real inner edges; or if any garment fabric visible in IMAGE 1 is missing in IMAGE 2. Be strict: uncertainty means reject. Return only the requested JSON.",
+              text: "You are the final cutout gate for an open outerwear garment. IMAGE 1 is the approved master. IMAGE 2 shows transparency as bright magenta. The requested layering cutout intentionally REMOVES the back-body lining seen THROUGH the central opening; that removal is correct, not missing front fabric. Keep the complete top/back collar band for depth (a horizontal lower edge beneath that band is allowed). Pass only if the opening stays inside the real front-panel boundaries and joins the naturally empty hem gap. Reject any missing collar band, lapel, FRONT panel, graphic, button, sleeve or front hem. Reject geometric diagonals that cross actual garment boundaries, not merely a naturally straight seam or collar-band edge. A narrow retained lining margin protecting seams is allowed. Be strict about exterior/front construction: uncertainty means reject. Return only the requested JSON.",
             },
             { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
             { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(canvasQaPng)}`, detail: "high" },
@@ -1140,6 +1347,7 @@ async function reviewLayeringCutout(
 type StoredCutouts = {
   closetKey: string;
   canvasKey: string | null;
+  layout: GarmentMeasurements;
 };
 
 async function storeGeneratedCutouts(
@@ -1148,21 +1356,29 @@ async function storeGeneratedCutouts(
   generated: Uint8Array,
   quality: ImageQuality,
   layeringPolygon: Array<{ x: number; y: number }>,
+  anatomy: unknown,
 ): Promise<StoredCutouts> {
   if (!env.WARDROBE_MEDIA) throw new Error("El almacenamiento de imágenes no está conectado.");
   const baseKey = `users/${garment.owner_id}/garments/${garment.client_id}`;
   const timestamp = Date.now();
   const { contourCutoutPng } = await import("./contour-cutout");
-  const contour = await contourCutoutPng(generated, layeringPolygon);
+  const contour = await contourCutoutPng(generated, layeringPolygon, anatomy ?? null);
   if (!contour.passed) throw new Error(contour.notes);
+  if (!contour.layout) throw new InvalidAnatomyError("La prenda no tiene medidas verificadas.");
+  const regions = garment.category === "Accessories" ? ["accessory"]
+    : garment.category === "Footwear" ? ["feet"]
+    : garment.category === "One-pieces" ? ["full"]
+    : garment.category === "Bottoms" ? ["lower", "full"] : ["upper", "full"];
+  if (!regions.includes(contour.layout.region)) throw new InvalidAnatomyError("La anatomía no corresponde al tipo de prenda.");
 
-  const closetKey = `${baseKey}/cutout-closet-${quality}-${timestamp}.png`;
-  if (garment.category !== "Outerwear") {
-    await env.WARDROBE_MEDIA.put(closetKey, contour.png, {
-      httpMetadata: { contentType: "image/png" },
+  const closetKey = `${baseKey}/cutout-closet-${quality}-${timestamp}.webp`;
+  if (!needsLayeringCutout(garment)) {
+    const webp = await garmentWebp(env, contour.png);
+    await env.WARDROBE_MEDIA.put(closetKey, webp, {
+      httpMetadata: { contentType: "image/webp" },
       customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-closet" },
     });
-    return { closetKey, canvasKey: null };
+    return { closetKey, canvasKey: null, layout: contour.layout };
   }
   if (!contour.canvasPassed || !contour.canvasPng || !contour.canvasQaPng) {
     throw new Error(contour.canvasNotes);
@@ -1173,18 +1389,19 @@ async function storeGeneratedCutouts(
     if (cutoutQa.retryable) throw new RetryableProcessingError(cutoutQa.notes);
     throw new Error(cutoutQa.notes);
   }
-  const canvasKey = `${baseKey}/cutout-canvas-${quality}-${timestamp}.png`;
+  const canvasKey = `${baseKey}/cutout-canvas-${quality}-${timestamp}.webp`;
+  const [closetWebp, canvasWebp] = await Promise.all([garmentWebp(env, contour.png), garmentWebp(env, contour.canvasPng)]);
   await Promise.all([
-    env.WARDROBE_MEDIA.put(closetKey, contour.png, {
-      httpMetadata: { contentType: "image/png" },
+    env.WARDROBE_MEDIA.put(closetKey, closetWebp, {
+      httpMetadata: { contentType: "image/webp" },
       customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-closet" },
     }),
-    env.WARDROBE_MEDIA.put(canvasKey, contour.canvasPng, {
-      httpMetadata: { contentType: "image/png" },
+    env.WARDROBE_MEDIA.put(canvasKey, canvasWebp, {
+      httpMetadata: { contentType: "image/webp" },
       customMetadata: { owner: garment.owner_id, garment: garment.client_id, kind: "cutout-canvas" },
     }),
   ]);
-  return { closetKey, canvasKey };
+  return { closetKey, canvasKey, layout: contour.layout };
 }
 
 async function retryOrRejectGenerated(
@@ -1211,7 +1428,7 @@ async function retryOrRejectGenerated(
       `).bind(`Reintentando automáticamente: ${notes}`.slice(0, 500), garment.id, garment.owner_id),
       db.prepare(`
         UPDATE processing_jobs
-        SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP
+        SET status = 'queued', stage = 'generate', generated_key = NULL, error = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
       `).bind(notes.slice(0, 500), jobId, garment.owner_id),
     ]);
@@ -1264,7 +1481,7 @@ async function retryOrRejectCutouts(
       `).bind(`Recalculando la máscara automáticamente: ${notes}`.slice(0, 500), garment.id, garment.owner_id),
       db.prepare(`
         UPDATE processing_jobs
-        SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP
+        SET status = 'queued', stage = 'postprocess', error = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
       `).bind(notes.slice(0, 500), jobId, garment.owner_id),
     ]);
@@ -1311,9 +1528,21 @@ async function finalizeGeneratedGarment(
   sourceContentType: string,
   maskAttempt = 0,
 ): Promise<void> {
-  const visualQa = await reviewGeneratedGarment(env, garment, sourceBytes, sourceContentType, generated, maskAttempt);
+  // Keep approval with this exact immutable master across queue retries. A bad
+  // landmark or interior mask must never send an approved image to generation.
+  const reviewKey = `${generatedKey}.qa-anatomy-v1.json`;
+  const cachedObject = await env.WARDROBE_MEDIA?.get(reviewKey);
+  const cached = cachedObject ? await cachedObject.json<GeneratedReview>().catch(() => null) : null;
+  const approved = cached?.passed === true && cached.score >= 85 ? cached : null;
+  const visualQa = approved
+    ? maskAttempt > 0 && needsLayeringCutout(garment) ? await reviewLayeringMaskOnly(env, generated, approved) : approved
+    : await reviewGeneratedGarment(env, garment, sourceBytes, sourceContentType, generated, maskAttempt);
   if (!visualQa.passed) {
     if (visualQa.retryable) throw new RetryableProcessingError(visualQa.notes);
+    if (approved) {
+      await retryOrRejectCutouts(env, db, garment, jobId, generatedKey, quality, presentation, outputVariant, 1, visualQa.notes);
+      return;
+    }
     await retryOrRejectGenerated(
       env,
       db,
@@ -1327,10 +1556,28 @@ async function finalizeGeneratedGarment(
     );
     return;
   }
+  await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+
+  // Publish the approved master while cutout/anatomy finishing continues.
+  await db.prepare(`UPDATE garments SET qa_status = 'passed', qa_notes = 'Preparando calados.', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND owner_id = ? AND (generated_image_key = ? OR generated_open_image_key = ?)`)
+    .bind(garment.id, garment.owner_id, generatedKey, generatedKey).run();
 
   let cutouts: StoredCutouts;
   try {
-    cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon);
+    try {
+      cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
+    } catch (error) {
+      if (!(error instanceof InvalidAnatomyError)) throw error;
+      // One bounded measurement-only retry. No second generation, no human gate.
+      try {
+        visualQa.anatomy = await reviewAnatomyOnly(env, generated, error.message, error.contourGuide, error.candidates);
+      } catch (retryError) {
+        throw new InvalidAnatomyError(retryError instanceof Error ? retryError.message : "No se pudo repetir la medición.");
+      }
+      await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+      cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
+    }
   } catch (error) {
     if (error instanceof RetryableProcessingError) throw error;
     await retryOrRejectCutouts(
@@ -1342,18 +1589,26 @@ async function finalizeGeneratedGarment(
       quality,
       presentation,
       outputVariant,
-      maskAttempt,
+      error instanceof InvalidAnatomyError ? 1 : maskAttempt,
       error instanceof Error ? error.message : "El control automático del calado falló.",
     );
     return;
   }
 
-  const isOuterwearSource = garment.category === "Outerwear" && outputVariant === "closed";
+  const isOuterwearSource = needsLayeringCutout(garment) && outputVariant === "closed";
+  const anatomy = readStoredAnatomy(garment.layout_json, garment.image_key, garment.open_image_key);
+  const measurement = { imageKey: cutouts.closetKey, measurement: cutouts.layout };
+  if (outputVariant === "open") anatomy.open = measurement;
+  else {
+    anatomy.closed = measurement;
+    anatomy.open = isOuterwearSource && cutouts.canvasKey ? { imageKey: cutouts.canvasKey, measurement: cutouts.layout } : null;
+  }
+  const layoutJson = JSON.stringify(anatomy);
   const garmentUpdate = isOuterwearSource
     ? db.prepare(`
       UPDATE garments
       SET status = 'ready', generated_image_key = ?, generated_open_image_key = ?,
-        image_key = ?, open_image_key = ?, quality = ?, qa_status = 'passed',
+        image_key = ?, open_image_key = ?, layout_json = ?, quality = ?, qa_status = 'passed',
         qa_notes = NULL, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND owner_id = ?
     `).bind(
@@ -1361,6 +1616,7 @@ async function finalizeGeneratedGarment(
       generatedKey,
       cutouts.closetKey,
       cutouts.canvasKey,
+      layoutJson,
       quality,
       garment.id,
       garment.owner_id,
@@ -1368,18 +1624,19 @@ async function finalizeGeneratedGarment(
     : outputVariant === "open"
       ? db.prepare(`
         UPDATE garments
-        SET status = 'ready', generated_open_image_key = ?, open_image_key = ?,
+        SET status = 'ready', generated_open_image_key = ?, open_image_key = ?, layout_json = ?,
           quality = ?, qa_status = 'passed', qa_notes = NULL,
           revision = revision + 1, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(generatedKey, cutouts.closetKey, quality, garment.id, garment.owner_id)
+      `).bind(generatedKey, cutouts.closetKey, layoutJson, quality, garment.id, garment.owner_id)
       : db.prepare(`
         UPDATE garments
-        SET status = 'ready', generated_image_key = ?, image_key = ?,
+        SET status = 'ready', generated_image_key = ?, image_key = ?, layout_json = ?,
+          open_image_key = NULL, generated_open_image_key = NULL,
           quality = ?, qa_status = 'passed', qa_notes = NULL,
           revision = revision + 1, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_id = ?
-      `).bind(generatedKey, cutouts.closetKey, quality, garment.id, garment.owner_id);
+      `).bind(generatedKey, cutouts.closetKey, layoutJson, quality, garment.id, garment.owner_id);
 
   await db.batch([
     garmentUpdate,
@@ -1496,9 +1753,9 @@ async function processGarment(
       generatedUpdate,
       db.prepare(`
         UPDATE processing_jobs
-        SET status = 'queued', updated_at = CURRENT_TIMESTAMP, error = NULL
+        SET status = 'queued', stage = 'postprocess', generated_key = ?, updated_at = CURRENT_TIMESTAMP, error = NULL
         WHERE id = ? AND owner_id = ?
-      `).bind(jobId, ownerId),
+      `).bind(generatedKey, jobId, ownerId),
     ]);
     await enqueueGarmentJob(env, {
       ownerId,
@@ -1579,11 +1836,52 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
       message.retry({ delaySeconds: 60 });
       return;
     }
+    if (payload.stage === "batch") {
+      try {
+        const rows = await db.prepare(`SELECT g.client_id FROM intake_batch_items i
+          JOIN garments g ON g.id = i.garment_id
+          WHERE i.batch_id = (SELECT batch_id FROM intake_batch_items WHERE garment_id = ? LIMIT 1)
+            AND g.owner_id = ? AND g.deleted = 0`).bind(payload.garmentId, payload.ownerId).all<{ client_id: string }>();
+        const pending = await db.prepare(`SELECT COUNT(*) AS count FROM intake_batch_items
+          WHERE batch_id = (SELECT batch_id FROM intake_batch_items WHERE garment_id = ? LIMIT 1) AND status = 'pending'`)
+          .bind(payload.garmentId).first<{ count: number }>();
+        if (pending?.count) { message.retry({ delaySeconds: 30 }); return; }
+        if (!rows.results.length) { message.ack(); return; }
+        const deferred: Promise<unknown>[] = [];
+        const response = await createGarmentBatch(new Request("https://forme.gallery/api/batches", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ garmentIds: rows.results.map(row => row.client_id) }),
+        }), env, { waitUntil(promise) { deferred.push(promise); } }, db,
+        { id: payload.ownerId, email: "", displayName: "", avatarUrl: null });
+        await Promise.allSettled(deferred);
+        const result = await response.json() as { recognizing?: boolean };
+        if (!response.ok || result.recognizing) message.retry({ delaySeconds: 30 });
+        else message.ack();
+      } catch { message.retry({ delaySeconds: 30 }); }
+      return;
+    }
+    if (payload.stage === "metadata") {
+      try {
+        const garment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ?`)
+          .bind(payload.garmentId, payload.ownerId).first<GarmentRow>();
+        if (garment) await persistRecognizedMetadata(db, garment, payload.recognitionSourceKey!);
+        message.ack();
+      } catch {
+        if (message.attempts < 6) message.retry({ delaySeconds: 10 });
+        else {
+          await db.prepare("UPDATE garments SET metadata_status = 'failed' WHERE id = ? AND owner_id = ? AND metadata_status <> 'ready'")
+            .bind(payload.garmentId, payload.ownerId).run();
+          message.ack();
+        }
+      }
+      return;
+    }
+    let claimed = false;
     try {
       const job = await db.prepare(`
-        SELECT id, garment_id, owner_id, status, quality, presentation, output_variant,
+        SELECT id, garment_id, owner_id, status, quality, presentation, output_variant, mode, stage, generated_key,
           CASE
-            WHEN status = 'processing' AND updated_at > datetime('now', '-14 minutes') THEN 1
+            WHEN status = 'processing' AND updated_at > datetime('now', CASE WHEN stage = 'postprocess' THEN '-3 minutes' ELSE '-14 minutes' END) THEN 1
             ELSE 0
           END AS active
         FROM processing_jobs
@@ -1597,22 +1895,27 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
         quality: string;
         presentation: string;
         output_variant: string;
+        mode: string;
+        stage: string;
+        generated_key: string | null;
         active: number;
       }>();
       if (!job || ["succeeded", "review", "failed", "awaiting_cutout", "batch_processing", "batch_staged", "retrying"].includes(job.status)) {
         message.ack();
         return;
       }
+      if ((payload.stage || "generate") !== job.stage || (payload.stage === "postprocess" && job.generated_key && payload.generatedKey !== job.generated_key)) {
+        // Obsolete/delivered-twice messages cannot restart another stage.
+        if (job.status === "queued") await enqueueGarmentJob(env, {
+          ...payload, stage: job.stage as "recognize" | "generate" | "postprocess",
+          ...(job.generated_key ? { generatedKey: job.generated_key } : {}),
+        });
+        message.ack();
+        return;
+      }
       if (job.status === "processing" && Number(job.active) === 1) {
-        if (message.attempts <= 1) {
-          message.retry({ delaySeconds: 15 });
-          return;
-        }
-        await db.prepare(`
-          UPDATE processing_jobs
-          SET status = 'queued', error = 'Reintentando una llamada externa interrumpida.', updated_at = CURRENT_TIMESTAMP
-          WHERE id = ? AND owner_id = ?
-        `).bind(job.id, job.owner_id).run();
+        message.retry({ delaySeconds: 60 });
+        return;
       }
       if (job.status === "processing" || job.status === "waiting_for_key") {
         await db.prepare(`
@@ -1625,10 +1928,30 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
         UPDATE processing_jobs
         SET status = 'processing', started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
           updated_at = CURRENT_TIMESTAMP, error = NULL
-        WHERE id = ? AND owner_id = ? AND status = 'queued'
-      `).bind(job.id, job.owner_id).run();
+        WHERE id = ? AND owner_id = ? AND status = 'queued' AND stage = ?
+      `).bind(job.id, job.owner_id, job.stage).run();
       if (Number(claim.meta.changes || 0) !== 1) {
         message.retry({ delaySeconds: 120 });
+        return;
+      }
+      claimed = true;
+      const currentGarment = await db.prepare(`SELECT ${garmentColumns} FROM garments WHERE id = ? AND owner_id = ?`)
+        .bind(job.garment_id, job.owner_id).first<GarmentRow>();
+      if (!currentGarment || currentGarment.deleted) {
+        await db.prepare("UPDATE processing_jobs SET status = 'failed', error = 'Prenda eliminada.' WHERE id = ?").bind(job.id).run();
+        message.ack();
+        return;
+      }
+      if (payload.stage === "recognize" || (currentGarment.recognition_status !== "legacy" && !sourceRecognition(currentGarment))) {
+        try {
+          await prepareRecognizedGarment(env, db, currentGarment, job.id, job.mode, imageQuality(job.quality));
+        } catch (error) {
+          await db.prepare("UPDATE processing_jobs SET status = 'queued' WHERE id = ? AND status = 'processing'").bind(job.id).run();
+          if (error instanceof RetryableProcessingError) throw error;
+          await db.prepare("UPDATE garments SET recognition_status = 'failed' WHERE id = ? AND recognition_json IS NULL").bind(currentGarment.id).run();
+          await failQueuedGarment(db, job.owner_id, job.garment_id, job.id, error);
+        }
+        message.ack();
         return;
       }
       if (payload.stage === "postprocess" && payload.generatedKey) {
@@ -1645,7 +1968,7 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
         await finalizeGeneratedGarment(
           env,
           db,
-          garment,
+          generationGarment(garment),
           job.id,
           imageQuality(job.quality),
           garmentPresentation(job.presentation),
@@ -1676,6 +1999,12 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
         await failQueuedGarment(db, payload.ownerId, payload.garmentId, payload.jobId, error);
         message.ack();
       } else {
+        // A caught failure ends this invocation's lease. Otherwise the next
+        // delivery mistakes the crashed request for an active worker and waits
+        // fourteen minutes. Only the invocation that claimed it may release it.
+        if (claimed) await db.prepare(`UPDATE processing_jobs SET status = 'queued', error = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND owner_id = ? AND status = 'processing'`)
+          .bind((error instanceof Error ? error.message : "Interrupción temporal.").slice(0, 500), payload.jobId, payload.ownerId).run();
         message.retry({ delaySeconds: error instanceof RetryableProcessingError ? 10 : 60 });
       }
     }
@@ -1691,16 +2020,52 @@ async function retryGarment(
   clientId: string,
 ): Promise<Response> {
   const garment = await findGarment(db, identity.id, clientId);
-  if (!garment) return apiError("Prenda no encontrada.", 404);
-  if (!garment.source_image_key) return apiError("Esta prenda no tiene una foto original para reprocesar.", 400);
+  if (!garment || garment.deleted) return apiError("Prenda no encontrada.", 404);
+  if (!garment.source_image_key) return apiError("Esta prenda no tiene una foto original para generar otra imagen.", 400);
   const enabled = processingEnabled(env);
   const body = await request.json().catch(() => null) as { quality?: unknown; presentation?: unknown; outputVariant?: unknown } | null;
-  const quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
+  let quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
   const requestedVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
-  const outputVariant: GarmentOutputVariant = garment.category === "Outerwear" ? "closed" : requestedVariant;
-  const presentation: GarmentPresentation = garment.category === "Outerwear" || garment.category === "Tops"
-    ? "open"
-    : outputVariant === "open" ? "open" : garmentPresentation(body?.presentation ?? "closed");
+  const recognized = sourceRecognition(garment);
+  const outputVariant: GarmentOutputVariant = recognized || garment.category === "Outerwear" ? "closed" : requestedVariant;
+  const presentation: GarmentPresentation = recognized ? (recognized.result.frontOpening ? "open" : "closed")
+    : garment.category === "Outerwear" ? "open" : outputVariant === "open" ? "open" : garmentPresentation(body?.presentation ?? "closed");
+  const previous = await db.prepare(`SELECT id, status, stage, generated_key, quality, presentation, output_variant
+    FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`)
+    .bind(garment.id, identity.id).first<{
+      id: string; status: string; stage: string; generated_key: string | null;
+      quality: string; presentation: string; output_variant: string;
+    }>();
+  if (body?.quality === undefined && previous?.status === "failed") quality = imageQuality(previous.quality);
+  // A repeated click must not enqueue a second paid image. The existing job's
+  // stage guard and claim are also used for postprocess-only resumption.
+  if (previous && ["queued", "processing", "batch_staged", "batch_submitting", "batch_processing", "retrying"].includes(previous.status)) {
+    return json({ job: { id: previous.id, status: previous.status } }, 202);
+  }
+  const expectedMaster = outputVariant === "open" ? garment.generated_open_image_key : garment.generated_image_key;
+  if (previous?.stage === "postprocess" && previous.status === "failed" && previous.generated_key
+    && previous.quality === quality && previous.output_variant === outputVariant) {
+    // Fail closed if a checkpoint is missing or belongs to a replaced master.
+    // Recovery must never silently turn a cutout retry into new generation.
+    if (previous.generated_key !== expectedMaster || !env.WARDROBE_MEDIA || !await env.WARDROBE_MEDIA.get(expectedMaster!)) {
+      return apiError("Falta la imagen maestra del procesamiento. No se generó ni cobró otra imagen.", 409);
+    }
+    if (!enabled) return apiError("El procesamiento no está disponible. La imagen maestra sigue guardada.", 503);
+    const claim = await db.prepare(`UPDATE processing_jobs SET status = 'queued', error = NULL,
+      finished_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ? AND status = 'failed'`)
+      .bind(previous.id, identity.id).run();
+    if (Number(claim.meta.changes || 0) === 1) {
+      await db.prepare("UPDATE garments SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
+        .bind(garment.id, identity.id).run();
+      await syncIntakeItem(db, garment.id, "processing");
+      await enqueueGarmentJob(env, {
+        ownerId: identity.id, garmentId: garment.id, jobId: previous.id, quality,
+        presentation: garmentPresentation(previous.presentation), outputVariant,
+        stage: "postprocess", generatedKey: previous.generated_key,
+      });
+    }
+    return json({ job: { id: previous.id, status: "queued" }, resumed: "postprocess" }, 202);
+  }
   const job = await createProcessingJob(db, identity.id, garment.id, enabled, quality, presentation, outputVariant);
   await syncIntakeItem(db, garment.id, enabled ? "processing" : "uploaded");
   if (enabled) {
@@ -1724,7 +2089,7 @@ async function attachCutout(
   identity: Identity,
   clientId: string,
 ): Promise<Response> {
-  if (!env.WARDROBE_MEDIA) return apiError("El almacenamiento de imágenes todavía no está conectado.", 503);
+  if (!env.WARDROBE_MEDIA) return apiError("No se pueden subir fotos en este momento. Vuelve a intentarlo más tarde.", 503);
   const garment = await findGarment(db, identity.id, clientId);
   if (!garment) return apiError("Prenda no encontrada.", 404);
   const form = await request.formData();
@@ -1780,9 +2145,9 @@ async function garmentStatus(env: WardrobeEnv, db: D1Database, ownerId: string, 
   if (!garment) return apiError("Prenda no encontrada.", 404);
   const job = await db.prepare(`
     SELECT id, garment_id, status, provider, attempt, quality, presentation, output_variant,
-      mode, batch_id, openai_file_id, error, created_at, updated_at,
+      mode, batch_id, openai_file_id, stage, generated_key, error, created_at, updated_at,
       CASE
-        WHEN status = 'processing' AND updated_at <= datetime('now', '-14 minutes') THEN 1
+        WHEN status = 'processing' AND updated_at <= datetime('now', CASE WHEN stage = 'postprocess' THEN '-3 minutes' ELSE '-14 minutes' END) THEN 1
         ELSE 0
       END AS stale
     FROM processing_jobs
@@ -1804,13 +2169,24 @@ async function garmentStatus(env: WardrobeEnv, db: D1Database, ownerId: string, 
         quality: imageQuality(job.quality),
         presentation: garmentPresentation(job.presentation),
         outputVariant: job.output_variant === "open" ? "open" : "closed",
+        stage: job.stage,
+        ...(job.generated_key ? { generatedKey: job.generated_key } : {}),
       });
       job.status = "queued";
       job.error = "Reanudando procesamiento interrumpido.";
     }
   }
   const tags = await garmentTagsFor(db, garment.id);
-  return json({ garment: garmentJson(garment, tags), job });
+  if (job && processingEnabled(env) && garment.recognition_status === "ready" && garment.metadata_status !== "ready") {
+    const recognized = sourceRecognition(garment);
+    if (recognized) await enqueueGarmentJob(env, {
+      ownerId, garmentId: garment.id, jobId: job.id, quality: imageQuality(job.quality),
+      presentation: garmentPresentation(job.presentation), outputVariant: "closed", stage: "metadata",
+      recognitionSourceKey: recognized.sourceKey,
+    });
+  }
+  const publicJob = job ? { ...job, generated_key: undefined } : null;
+  return json({ garment: garmentJson(garment, tags), job: publicJob });
 }
 
 async function mediaResponse(env: WardrobeEnv, db: D1Database, ownerId: string, clientId: string, variant: string): Promise<Response> {
@@ -1933,6 +2309,9 @@ async function internalGarmentOperation(
   const presentation = garmentPresentation(form.get("presentation"));
   const existing = await findGarment(env.DB, identity.id, clientId);
   const garmentId = existing?.id ?? crypto.randomUUID();
+  const kind = { category: payload.category as keyof typeof garmentTypesByCategory, garmentType: payload.garmentType as import("../app/garments").GarmentType };
+  const requestedLength = payload.lengthOverride === undefined ? existing?.length_override : payload.lengthOverride;
+  const lengthOverride = validLengthOverride(kind, requestedLength) ? requestedLength : null;
   const sourceKey = `users/${identity.id}/garments/${clientId}/original-${Date.now()}.${extensionFor(file)}`;
   await env.WARDROBE_MEDIA.put(sourceKey, file.stream(), {
     httpMetadata: { contentType: file.type || "application/octet-stream" },
@@ -1956,6 +2335,11 @@ async function internalGarmentOperation(
       deleted = 0,
       status = 'uploaded',
       source_image_key = excluded.source_image_key,
+      processing_image_key = excluded.source_image_key,
+      image_key = NULL, open_image_key = NULL, generated_image_key = NULL,
+      generated_open_image_key = NULL, layout_json = NULL, qa_status = 'pending',
+      recognition_json = NULL, recognition_status = 'legacy', metadata_status = 'ready',
+      revision = garments.revision + 1,
       updated_at = CURRENT_TIMESTAMP
   `).bind(
     garmentId,
@@ -2021,37 +2405,52 @@ async function createGarmentBatch(
   db: D1Database,
   identity: Identity,
 ): Promise<Response> {
-  if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("El procesamiento todavía no está conectado.", 503);
+  if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return apiError("No se pueden preparar imágenes en este momento. Vuelve a intentarlo más tarde.", 503);
   const body = await request.json().catch(() => null) as { garmentIds?: unknown } | null;
   const garmentIds = Array.isArray(body?.garmentIds)
     ? [...new Set(body.garmentIds.map((item) => safeClientId(textValue(item))).filter((item): item is string => Boolean(item)))]
     : [];
-  if (garmentIds.length < 2) return apiError("El lote necesita al menos dos prendas.", 400);
+  if (!garmentIds.length) return apiError("Selecciona al menos una foto.", 400);
+
+  const candidates = await Promise.all(garmentIds.map(id => findGarment(db, identity.id, id)));
+  if (candidates.some(item => item && item.recognition_status !== "legacy" && item.recognition_status !== "failed" && !sourceRecognition(item))) {
+    return json({ recognizing: true }, 202);
+  }
+  const candidateJobs = await Promise.all(candidates.filter((item): item is GarmentRow => Boolean(item) && !item?.deleted).map(item =>
+    db.prepare("SELECT id, status, batch_id FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+      .bind(item.id, identity.id).first<{ id: string; status: string; batch_id: string | null }>()));
+  if (candidateJobs.some(job => job && ["queued", "processing"].includes(job.status))) return json({ recognizing: true }, 202);
+  const submitted = candidateJobs.find(job => job?.batch_id);
+  if (submitted && candidateJobs.every(job => job?.batch_id === submitted.batch_id)) return json({ batch: { id: submitted.batch_id, status: submitted.status } }, 202);
 
   const batchItems: Array<{ garment: GarmentRow; job: { id: string; quality: ImageQuality; presentation: GarmentPresentation; outputVariant: GarmentOutputVariant }; fileId: string }> = [];
   const sourceFileIds = new Set<string>();
   let batchInputFileId = "";
   try {
     for (const clientId of garmentIds) {
-      const garment = await findGarment(db, identity.id, clientId);
+      const row = await findGarment(db, identity.id, clientId);
+      const garment = row && generationGarment(row);
+      if (garment?.recognition_status === "failed") continue;
       const processingKey = garment?.processing_image_key || garment?.source_image_key;
       if (!garment || !processingKey) continue;
+      const closedJob = await db.prepare(`
+        SELECT id FROM processing_jobs WHERE garment_id = ? AND owner_id = ? AND output_variant = 'closed' AND status = 'batch_staged'
+        ORDER BY created_at DESC, rowid DESC LIMIT 1
+      `).bind(garment.id, identity.id).first<{ id: string }>();
+      if (!closedJob) continue;
+      const claim = await db.prepare("UPDATE processing_jobs SET status = 'batch_submitting' WHERE id = ? AND status = 'batch_staged'").bind(closedJob.id).run();
+      if (Number(claim.meta.changes) !== 1) continue;
+      const presentation: GarmentPresentation = needsLayeringCutout(garment) ? "open" : "closed";
+      const batchItem = { garment, job: { id: closedJob.id, quality: "low" as const, presentation, outputVariant: "closed" as const }, fileId: "" };
+      batchItems.push(batchItem);
       const source = await env.WARDROBE_MEDIA.get(processingKey);
-      if (!source) continue;
+      if (!source) throw new Error("No se encontró una foto del lote.");
       const bytes = await source.arrayBuffer();
       const contentType = source.httpMetadata?.contentType || "image/jpeg";
       const filename = source.customMetadata?.filename || `${clientId}.${contentType.split("/")[1] || "jpg"}`;
       const fileId = await uploadOpenAIFile(env, new File([bytes], filename, { type: contentType }), "user_data");
       sourceFileIds.add(fileId);
-
-      let closedJob = await db.prepare(`
-        SELECT id FROM processing_jobs
-        WHERE garment_id = ? AND owner_id = ? AND output_variant = 'closed' AND status = 'batch_staged'
-        ORDER BY created_at DESC LIMIT 1
-      `).bind(garment.id, identity.id).first<{ id: string }>();
-      const presentation: GarmentPresentation = garment.category === "Outerwear" || garment.category === "Tops" ? "open" : "closed";
-      if (!closedJob) closedJob = await createProcessingJob(db, identity.id, garment.id, true, "low", presentation, "closed", "batch");
-      batchItems.push({ garment, job: { id: closedJob.id, quality: "low", presentation, outputVariant: "closed" }, fileId });
+      batchItem.fileId = fileId;
     }
     if (batchItems.length < 2) throw new Error("No encontramos suficientes prendas válidas para el lote.");
 
@@ -2174,15 +2573,17 @@ async function reconcileGarmentBatches(
           db.prepare(`
             UPDATE garments
             SET status = 'processing', qa_status = 'pending', qa_notes = 'Ejecutando control automático.',
+              generated_image_key = CASE WHEN ? = 'closed' THEN ? ELSE generated_image_key END,
+              generated_open_image_key = CASE WHEN ? = 'open' THEN ? ELSE generated_open_image_key END,
               updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND owner_id = ?
-          `).bind(garment.id, identity.id),
+          `).bind(outputVariant, generatedKey, outputVariant, generatedKey, garment.id, identity.id),
           db.prepare(`
             UPDATE processing_jobs
-            SET status = 'queued', attempt = MAX(attempt, 1), updated_at = CURRENT_TIMESTAMP, error = NULL
+            SET status = 'queued', stage = 'postprocess', generated_key = ?, attempt = MAX(attempt, 1), updated_at = CURRENT_TIMESTAMP, error = NULL
             WHERE id = ? AND owner_id = ?
           `)
-            .bind(job.id, identity.id),
+            .bind(generatedKey, job.id, identity.id),
         ]);
         await syncIntakeItem(db, garment.id, "processing");
         await enqueueGarmentJob(env, {
@@ -2390,9 +2791,10 @@ async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Resp
     ? await db.prepare(`
       SELECT outfit_items.id, outfit_items.outfit_id, outfit_items.garment_client_id,
         outfit_items.variant, outfit_items.x, outfit_items.y, outfit_items.scale,
-        outfit_items.rotation, outfit_items.z
+        outfit_items.rotation, outfit_items.z, garments.layout_json, garments.image_key, garments.open_image_key
       FROM outfit_items
       INNER JOIN outfits ON outfits.id = outfit_items.outfit_id
+      LEFT JOIN garments ON garments.owner_id = outfits.owner_id AND garments.client_id = outfit_items.garment_client_id
       WHERE outfits.owner_id = ? AND outfits.is_public = 1
       ORDER BY outfit_items.z
     `).bind(user.id).all<{
@@ -2405,6 +2807,9 @@ async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Resp
       scale: number;
       rotation: number;
       z: number;
+      layout_json: string | null;
+      image_key: string | null;
+      open_image_key: string | null;
     }>()
     : { results: [] as Array<{
       id: string;
@@ -2416,6 +2821,9 @@ async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Resp
       scale: number;
       rotation: number;
       z: number;
+      layout_json: string | null;
+      image_key: string | null;
+      open_image_key: string | null;
     }> };
   const byOutfit = new Map<string, typeof outfitItems.results>();
   for (const item of outfitItems.results) byOutfit.set(item.outfit_id, [...(byOutfit.get(item.outfit_id) ?? []), item]);
@@ -2454,6 +2862,8 @@ async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Resp
       items: (byOutfit.get(outfit.id) ?? []).map((item) => {
         const staticMedia = staticGarmentMedia.get(item.garment_client_id);
         const isOpen = item.variant === "open";
+        const anatomy = publicGarmentAnatomy(item.layout_json, item.image_key, item.open_image_key);
+        const source = isOpen && staticMedia?.openImage ? staticMedia.openImage : staticMedia?.image;
         return {
           instanceId: item.id,
           garmentId: item.garment_client_id,
@@ -2466,6 +2876,7 @@ async function getPublicProfile(db: D1Database, rawHandle: string): Promise<Resp
           scale: item.scale / 1000,
           rotation: item.rotation / 1000,
           z: item.z,
+          bounds: (isOpen ? anatomy?.open : anatomy?.closed)?.bounds ?? (source ? staticLayoutBounds.get(source) : undefined),
         };
       }),
     })),
@@ -2719,11 +3130,11 @@ export async function handleWardrobeApi(
   }
   const publicProfileMatch = url.pathname.match(/^\/api\/public-profile\/([^/]+)$/);
   if (publicProfileMatch && request.method === "GET") {
-    if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+    if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
     return getPublicProfile(env.DB, decodeURIComponent(publicProfileMatch[1]));
   }
   if (url.pathname === "/api/discover" && request.method === "GET") {
-    if (!env.DB) return apiError("La base de datos todavía no está conectada.", 503);
+    if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
     return discoverProfiles(env.DB, url.searchParams.get("q") ?? "");
   }
   const publicMediaMatch = url.pathname.match(/^\/api\/public-media\/([^/]+)\/([^/]+)\/(cutout|open)$/);

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { fitLookPreview, type PreviewBounds } from "../look-preview";
+import { FormePublicHeader } from "../forme-public-header";
 
 type PublicGarment = {
   id: string;
@@ -25,6 +27,7 @@ type PublicLookItem = {
   scale: number;
   rotation: number;
   z: number;
+  bounds?: PreviewBounds;
 };
 
 type PublicLook = {
@@ -46,7 +49,7 @@ type PublicProfilePayload = {
 
 function PublicLookPreview({ look }: { look: PublicLook }) {
   return <div className="public-look-preview" aria-label={`Vista previa de ${look.name}`}>
-    {[...look.items].sort((a, b) => a.z - b.z).map((item) => <img
+    {fitLookPreview(look.items, item => item.bounds).sort((a, b) => a.z - b.z).map((item) => <img
       key={item.instanceId}
       src={item.image}
       alt=""
@@ -67,6 +70,7 @@ export default function PublicProfilePage() {
   const invalidHandle = !rawHandle.startsWith("@") || !handle;
   const [data, setData] = useState<PublicProfilePayload | null>(null);
   const [error, setError] = useState("");
+  const [shareNotice, setShareNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const initials = useMemo(() => data?.profile.name.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toLocaleUpperCase() || "F", [data]);
 
@@ -87,47 +91,57 @@ export default function PublicProfilePage() {
   async function shareProfile() {
     if (!data) return;
     const payload = { title: `${data.profile.name} en Formé`, text: `Mira el closet de ${data.profile.name}`, url: window.location.href };
-    if (navigator.share) await navigator.share(payload).catch(() => null);
-    else await navigator.clipboard.writeText(window.location.href).catch(() => null);
+    try {
+      if (navigator.share) await navigator.share(payload);
+      else { await navigator.clipboard.writeText(window.location.href); setShareNotice("Enlace copiado"); }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setShareNotice("No se pudo compartir. Puedes copiar el enlace de esta página.");
+    }
   }
 
-  if (invalidHandle) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>Este perfil no existe.</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
-  if (loading) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><div className="public-profile-loading" aria-label="Abriendo perfil"><i /><i /><i /></div></main>;
-  if (!data) return <main className="public-profile-state forme-app public-app"><Link href="/closet">FORMÉ<span>®</span></Link><h1>No encontramos este perfil.</h1><p>{error}</p><Link className="public-profile-home" href="/closet">VOLVER A FORMÉ →</Link></main>;
+  if (invalidHandle || loading || !data) return <main className="public-profile-page forme-app public-app">
+    <FormePublicHeader />
+    <div className="public-profile-frame"><section className="public-profile-status">
+      {!invalidHandle && loading ? <p role="status">Abriendo perfil…</p> : <>
+        <h1>Perfil no disponible</h1>{!invalidHandle && <p>{error}</p>}<Link href="/closet">Volver a Formé</Link>
+      </>}
+    </section></div>
+  </main>;
 
   return <main className="public-profile-page forme-app public-app">
+    <FormePublicHeader />
     <div className="public-profile-frame">
-      <header className="public-profile-nav"><Link href="/closet">FORMÉ<span>®</span></Link><button type="button" onClick={() => void shareProfile()}>COMPARTIR ↗</button></header>
+      {shareNotice && <p role="status">{shareNotice}</p>}
       <section className="public-profile-hero">
         <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
         <div className="public-profile-copy">
           <p>{data.profile.handle}</p>
           <h1>{data.profile.name}</h1>
           {data.profile.bio && <span>{data.profile.bio}</span>}
+          <div className="profile-page-links"><button type="button" onClick={() => void shareProfile()}>Compartir</button></div>
         </div>
-        <div className="public-profile-counts">
-          <p><strong>{data.garments.length}</strong><span>PRENDAS</span></p>
-          <p><strong>{data.outfits.length}</strong><span>LOOKS</span></p>
-        </div>
+        <dl className="profile-page-stats">
+          <div><dt>Prendas</dt><dd>{data.garments.length}</dd></div>
+          <div><dt>Looks</dt><dd>{data.outfits.length}</dd></div>
+        </dl>
       </section>
 
       {data.outfits.length > 0 && <section className="public-profile-section">
-        <header><p>LOOKS</p><span>{String(data.outfits.length).padStart(2, "0")}</span></header>
-        <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><p>{look.items.length} PIEZAS</p></article>)}</div>
+        <header><h2>Looks</h2><span>{data.outfits.length}</span></header>
+        <div className="public-looks-grid">{data.outfits.map((look) => <article key={look.id}><PublicLookPreview look={look} /><h2>{look.name}</h2><p>{look.items.length} prendas</p></article>)}</div>
       </section>}
 
       {data.garments.length > 0 && <section className="public-profile-section">
-        <header><p>SELECCIÓN DEL CLOSET</p><span>{String(data.garments.length).padStart(2, "0")}</span></header>
-        <div className="public-garments-grid">{data.garments.map((garment) => <article key={garment.id}>
+        <header><h2>Prendas</h2><span>{data.garments.length}</span></header>
+        <div className="public-garments-grid">{data.garments.map((garment) => <article key={garment.id} tabIndex={0} aria-label={garment.name}>
           <div><img src={garment.image} alt={garment.name} /></div>
-          <h2>{garment.name}</h2>
-          <p>{[garment.brand, garment.category, garment.tone].filter(Boolean).join(" / ")}</p>
+          <span className="public-garment-caption">{garment.name}</span>
         </article>)}</div>
       </section>}
 
       {data.outfits.length === 0 && data.garments.length === 0
-        ? <section className="public-profile-empty"><p>Este perfil todavía no comparte prendas ni looks.</p><Link href="/closet">CREA TU CLOSET EN FORMÉ →</Link></section>
-        : <footer className="public-profile-footer"><Link href="/closet">CREA TU CLOSET EN FORMÉ →</Link><span>Tu estilo, leído desde lo que ya tienes.</span></footer>}
+        ? <section className="public-profile-empty"><p>Aún no hay prendas ni looks publicados.</p><Link href="/closet">Crea tu closet en Formé</Link></section>
+        : <footer className="public-profile-footer"><Link href="/closet">Crea tu closet en Formé</Link></footer>}
     </div>
   </main>;
 }

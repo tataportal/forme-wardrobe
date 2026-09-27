@@ -1,90 +1,653 @@
-/*
- * Formé minimal product system
- * Scope: public pages and the complete product.
- * Rule: garments stay visible; interface appears only when it is needed.
- */
-
-.forme-landing,
-.forme-app.view-wardrobe.route-closet {
-  --fs-canvas: #f1f1ec;
-  --fs-ink: #111310;
-  --fs-muted: rgba(17, 19, 16, 0.56);
-  --fs-signal: #f0442f;
+/* Formé — editorial workspace. One type scale, one gutter, one interaction language. */
+:root {
+  --fs-canvas: #f3f3ef; --fs-surface: #fafaf7; --fs-ink: #1c1d1b;
+  --fs-muted: #696c66; --fs-line: #dcddd7; --fs-signal: #ed4933;
   --fs-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --fs-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --fs-garment-shadow: drop-shadow(0 12px 18px rgba(17, 19, 16, 0.12));
-  --garment-sticker-filter: var(--fs-garment-shadow);
-  color: var(--fs-ink);
-  font-family: var(--fs-font);
+  --fs-ease: cubic-bezier(.22,1,.36,1); --fs-gutter: 32px;
+  --fs-content-width: 1360px; --fs-page-width: calc(var(--fs-content-width) + 2 * var(--fs-gutter));
+  --fs-garment-shadow: drop-shadow(0 5px 8px rgb(20 22 18 / .08));
+  --forme-bg: var(--fs-canvas); --forme-surface: #eaeae4; --forme-ink: var(--fs-ink);
+  --forme-muted: var(--fs-muted); --forme-line: var(--fs-line); --forme-signal: var(--fs-signal);
+  --paper: var(--fs-canvas); --ink: var(--fs-ink); --muted: var(--fs-muted); --signal: var(--fs-signal);
 }
-
-/* Shared shell */
-.forme-landing .public-header,
-.forme-app.view-wardrobe.route-closet .topbar {
-  border: 0 !important;
-  background: color-mix(in srgb, var(--fs-canvas) 88%, transparent);
-  box-shadow: none !important;
-  backdrop-filter: blur(18px);
+.forme-app { color: var(--fs-ink); background: var(--fs-canvas); font: 14px/1.45 var(--fs-font); }
+.forme-app *, .forme-dialog * { box-sizing: border-box; }
+.forme-app :is(h1,h2,h3,p,figure,dl) { margin: 0; }
+.forme-app :is(h1,h2,h3) { font-family: var(--fs-font); font-weight: 500; letter-spacing: -.035em; }
+.forme-app h1 { font-size: clamp(30px,3.4vw,44px); line-height: 1.1; }
+.forme-app h2 { font-size: 22px; line-height: 1.2; }
+.forme-app button, .forme-app input, .forme-app select, .forme-app textarea, .forme-dialog button { font-family: var(--fs-font); }
+.forme-app :is(button,a,summary) { -webkit-tap-highlight-color: transparent; }
+.forme-app button { cursor: pointer; transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease; }
+.forme-app button:disabled { opacity: .4; cursor: default; }
+.forme-app :is(button,a,summary,input,select,textarea):focus-visible, .forme-dialog :focus-visible { outline: 2px solid var(--fs-signal); outline-offset: 3px; }
+.forme-app .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.forme-app .primary-action, .forme-dialog .primary-action {
+  width: auto; min-height: 44px; margin: 0; padding: 10px 18px; border: 1px solid var(--fs-ink); border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--fs-ink); color: #fff;
+  font: 500 14px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; text-decoration: none;
 }
+.forme-app .primary-action:hover:not(:disabled), .forme-dialog .primary-action:hover:not(:disabled) { background: #393c36; }
+.forme-app .primary-action.saved { color: var(--fs-muted); background: transparent; border-color: var(--fs-line); opacity: 1; }
+.forme-app .secondary-action { min-height: 44px; padding: 10px 18px; border: 1px solid var(--fs-line); border-radius: 7px; color: var(--fs-ink); background: transparent; }
+.forme-app .danger-action { color: #b33524; }
+/* Loading does not briefly expose the demo as someone else's closet. */
+.forme-app [data-pending] { visibility: hidden; }
+.forme-app .account-route-loading { position: absolute; top: 112px; left: var(--fs-gutter); right: var(--fs-gutter); padding: 0; }
+.forme-app .confirmation-dialog { width: min(440px,calc(100vw - 32px)); }
+.forme-app .confirmation-dialog p { margin: 16px 0 24px; color: var(--fs-muted); font-size: 14px; }
+.forme-app .confirmation-actions { display: flex; justify-content: end; gap: 12px; }
+/* Shared navigation */
+.forme-app .topbar, .forme-app .public-header { position: fixed; inset: 0 0 auto; z-index: 120; height: 64px; min-height: 64px; border: 0; border-bottom: 0; box-shadow: none; background: rgb(243 243 239 / .94); backdrop-filter: blur(16px); }
+.forme-app .topbar-inner { width: 100%; max-width: var(--fs-page-width); height: 64px; margin: 0 auto; padding: 0 var(--fs-gutter); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
+.forme-app .public-header { padding: 0 max(var(--fs-gutter),calc((100% - var(--fs-content-width)) / 2)); }
+.forme-app .public-navigation { gap: 24px; }
+.forme-app .public-navigation a { min-width: 94px; text-align: center; font-weight: 400; }
+.forme-app .wordmark, .forme-app .public-wordmark { justify-self: start; border: 0; padding: 0; background: transparent; color: var(--fs-ink); font: 800 24px/1 var(--fs-font); letter-spacing: -.07em; }
+.forme-app .wordmark span, .forme-app .public-wordmark span { font-size: 8px; vertical-align: top; margin-left: 4px; }
+.forme-app .zone-nav { display: flex; padding: 0; gap: 24px; border: 0; border-radius: 0; box-shadow: none; background: none; backdrop-filter: none; }
+.forme-app .zone-nav button { position: relative; min-height: 64px; padding: 0 2px; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--fs-muted); font: 400 13px/1 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app .zone-nav button.active { font-weight: 500; box-shadow: none; color: var(--fs-ink); background: none; }
+.forme-app .zone-nav button.active::after { content: none; }
+.forme-app .topbar-actions { justify-self: end; gap: 16px; }
+.forme-app .topbar-account { display: flex; align-items: center; gap: 16px; }
+.forme-app .pricing-entry, .forme-app .google-login, .forme-app .public-account-entry { min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--fs-ink); font: 500 13px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; text-decoration: none; }
+.forme-app .public-account-entry { justify-self: end; }
+.forme-app .avatar { display: grid; place-items: center; width: 44px; height: 44px; padding: 8px; border: 0; border-radius: 50%; overflow: hidden; background: transparent; }
+.forme-app .avatar img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
 
-.forme-landing .public-header {
-  min-height: 64px;
-  padding: 0;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+.forme-app .mobile-nav { display: none; }
+.forme-app:not(.view-studio) { padding-top: 64px; }
+.forme-app .content { width: 100%; max-width: var(--fs-page-width); margin: 0 auto; padding: 16px var(--fs-gutter) 72px; }
+.forme-app .pieces-section, .forme-app .looks-view { padding: 0; }
+.forme-app .closet-commandbar { min-height: 0; margin: 0 0 28px; padding: 0; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.forme-app .closet-commandbar > div { display: flex; align-items: baseline; gap: 14px; }
+.forme-app .closet-commandbar > div > span { color: var(--fs-muted); font: 12px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app .closet-commandbar > nav { display: flex; gap: 12px; }
+.forme-app .closet-commandbar .primary-action { min-height: 44px; }
+.forme-app .closet-action-icon { width: 18px; height: 18px; display: block; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.forme-app .closet-action-label { display: inline; }
+/* The collection is clothing first. Metadata and actions belong to the selected piece. */
+.forme-app .catalog-toolbar { display: grid; grid-template-columns: auto minmax(180px,1fr) auto auto; align-items: center; gap: 24px; margin: 0 0 28px; padding: 0; }
+.forme-app .catalog-collection { display: flex; align-items: center; min-width: 0; gap: 12px; }
+.forme-app .catalog-collection label { min-width: 0; }
+.forme-app .catalog-collection > span:not(.catalog-count) { font-size: 14px; }
+.forme-app .catalog-tools, .forme-app .garment-view-controls { display: flex; align-items: center; gap: 12px; }
+.forme-app .garment-view-controls { gap: 4px; }
+.forme-app .favorites-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; background: none; color: var(--fs-muted); font-size: 14px; }
+.forme-app .favorites-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.forme-app .favorites-toggle[aria-pressed="true"] { color: var(--fs-signal); }
+.forme-app .favorites-toggle[aria-pressed="true"] svg { fill: currentColor; }
+.forme-app .garment-view-controls.compact .favorites-toggle > span { display: none; }
+.forme-app .grid-view-icon { display: grid; grid-template-columns: repeat(2,6px); gap: 3px; width: 15px; height: 15px; }
+.forme-app .grid-view-icon i { display: block; border: 1px solid currentColor; }
+.forme-app .garment-view-controls .forme-menu-content { width: 168px; min-width: 168px; }
+.forme-app .garment-view-controls .forme-menu-content button { display: flex; justify-content: space-between; gap: 24px; }
+.forme-app .garment-view-controls .forme-menu-content button[aria-pressed="true"] { color: var(--fs-ink); background: rgb(28 29 27 / .05); }
+.forme-app .grid-size-heading { display: block; padding: 8px 10px 4px; color: var(--fs-muted); font-size: 12px; }
+.forme-app .catalog-collection select { width: 100%; max-width: 160px; min-height: 44px; padding: 0 20px 0 0; border: 0; border-radius: 0; background-color: transparent; color: var(--fs-ink); font: 500 14px/1.4 var(--fs-font); }
+.forme-app .catalog-count { flex-shrink: 0; color: var(--fs-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.forme-app .catalog-search { display: flex; align-items: center; justify-self: end; width: 220px; min-width: 0; gap: 9px; border: 0; }
+.forme-app .catalog-search > svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; color: var(--fs-muted); }
+.forme-app .catalog-search input { min-width: 0; width: 100%; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--fs-ink); font-size: 14px; }
+.forme-app .catalog-search input::placeholder { color: var(--fs-muted); }
+.forme-app .library-search input { width: 100%; height: 44px; padding: 10px 13px; border: 1px solid var(--fs-line); border-radius: 6px; background: transparent; color: var(--fs-ink); font-size: 13px; }
+.forme-app .catalog-filter, .forme-app .closet-add, .forme-app .looks-commandbar .primary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--fs-muted); font: 400 14px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app .catalog-filter.active { color: var(--fs-signal); }
+.forme-app .closet-add, .forme-app .looks-commandbar .primary-action { color: var(--fs-ink); font-weight: 500; }
+.forme-app :is(.catalog-filter,.closet-add) .closet-action-icon { width: 15px; height: 15px; }
+.forme-app .closet-add:hover, .forme-app .looks-commandbar .primary-action:hover { color: var(--fs-signal); background: transparent; }
+.forme-app .catalog-results { min-width: 0; }
+.forme-app .garment-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 40px 28px; padding: 0; }
+.forme-app [data-grid-size="small"] .garment-grid { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 32px 20px; }
+.forme-app [data-grid-size="large"] .garment-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.forme-app .garment-card { position: relative; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.forme-app .garment-open { display: block; position: relative; width: 100%; padding: 0; border: 0; border-radius: 0; color: var(--fs-muted); background: transparent; text-align: center; }
+.forme-app .garment-card .image-wrap { display: block; position: relative; aspect-ratio: 4/5; overflow: visible; background: transparent; border: 0; border-radius: 0; }
+.forme-app .garment-card .image-wrap::after { content: none; }
+.forme-app .garment-card .image-wrap > img { display: block; width: 100%; height: 100%; padding: 18px; object-fit: contain; filter: var(--garment-sticker-filter); transform: none; transition: none; background: transparent; border-radius: 0; }
+.forme-app .garment-caption { display: block; position: absolute; inset: auto 0 -22px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: 0; color: var(--fs-muted); font: 400 12px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; pointer-events: none; transition: opacity 150ms ease; }
+.forme-app .garment-open:is(:hover,:focus-visible) .garment-caption { opacity: 1; }
+.forme-app .garment-card .processing-badge { position: absolute; inset: auto 8px 8px; width: fit-content; margin: auto; font: 11px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app .looks-commandbar { min-height: 44px; }
+.forme-app .looks-commandbar .collection-name { font-size: 14px; font-weight: 500; color: var(--fs-ink); }
+.forme-app .filter-empty, .forme-app .closet-empty-personal, .forme-app .looks-empty { grid-column: 1/-1; min-height: 300px; padding: 48px 20px; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--fs-muted); font: 14px/1.5 var(--fs-font); text-align: center; }
+.forme-app :is(.closet-empty-personal,.looks-empty) h2 { color: var(--fs-ink); font-size: 28px; }
+.forme-app .filter-empty button { min-height: 44px; padding: 10px; font: 12px var(--fs-font); letter-spacing: 0; }
+/* Looks keep their title and sharing state under the image. */
+.forme-app .saved-looks-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 32px 20px; }
+.forme-app .saved-look-card { min-width: 0; padding: 0; border: 0; background: none; overflow: visible; }
+.forme-app .saved-look-card:has(.forme-menu[open]) { position: relative; z-index: 101; }
+.forme-app .saved-look-meta .forme-menu { position: static; }
+.forme-app .saved-look-open { box-shadow: none; display: block; width: 100%; border: 0; padding: 0; overflow: hidden; background: #eaece5; border-radius: 3px; }
+.forme-app .saved-look-preview { box-shadow: none; position: relative; width: 100%; height: auto; aspect-ratio: 2/3; background: transparent; overflow: hidden; border: 0; border-radius: 0; }
+.forme-app .saved-look-preview img { position: absolute; width: 76%; height: auto; aspect-ratio: 4/5; object-fit: contain; filter: var(--fs-garment-shadow); }
+.forme-app .saved-look-open > span { display: none; }
+.forme-app .saved-look-meta { text-transform: none; position: relative; display: flex; justify-content: space-between; align-items: start; min-height: 60px; gap: 10px; padding: 12px 0 0; }
+.forme-app .saved-look-meta > div { min-width: 0; }
+.forme-app .saved-look-meta strong { display: block; color: var(--fs-ink); font: 500 14px/1.35 var(--fs-font); letter-spacing: 0; text-transform: none; overflow-wrap: anywhere; }
+.forme-app .saved-look-meta small { display: block; margin-top: 5px; color: var(--fs-muted); font: 11px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; }
+/* Common disclosure menus: the rest of a task is one intentional click away. */
+.forme-menu { position: relative; flex: 0 0 auto; z-index: 20; }
+.forme-menu[open] { z-index: 100; }
+.forme-menu > summary { list-style: none; display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: 6px; font: 700 21px/1 var(--fs-font); cursor: pointer; }
+.forme-menu > summary::-webkit-details-marker { display: none; }
+.forme-menu > summary:hover, .forme-menu[open] > summary { background: #e6e7e0; }
+.forme-menu-content { position: absolute; right: 0; top: calc(100% + 6px); width: 220px; max-width: calc(100vw - 32px); padding: 6px; border: 1px solid var(--fs-line); border-radius: 9px; background: var(--fs-surface); box-shadow: 0 8px 32px rgb(20 22 18 / .1); animation: forme-reveal 150ms ease both; }
+.forme-app .forme-menu-content button { display: block; width: 100%; min-height: 44px; text-align: left; padding: 10px 12px; border: 0; border-radius: 4px; background: none; color: var(--fs-ink); font: 13px/1.4 var(--fs-font); }
+.forme-app .forme-menu-content button:hover { background: #edeee8; }
+.forme-app .forme-menu-content .danger-action { color: #b33524; }
+/* Canvas: one grid for the library, document and iteration controls. */
+.forme-app.view-studio .studio-view { position: fixed; inset: 64px 0 0; max-width: none; margin: 0; padding: 16px var(--fs-gutter) 24px; background: var(--fs-canvas); }
+.forme-app.view-studio .studio-layout { position: relative; width: 100%; max-width: var(--fs-content-width); height: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0,1fr) min(52%,max(340px,calc((100dvh - 232px) * 2 / 3 + 32px))); grid-template-rows: 44px minmax(0,1fr) 44px; gap: 16px 24px; background: var(--fs-canvas); }
+.forme-app.view-studio .studio-library-column { grid-column: 1; grid-row: 1/-1; display: grid; grid-template-rows: minmax(0,1fr); grid-auto-rows: auto; min-width: 0; min-height: 0; padding-right: 24px; border-right: 1px solid var(--fs-line); }
+.forme-app.view-studio .studio-heading { position: relative; inset: auto; grid-column: 2; grid-row: 1; z-index: 95; height: auto; min-width: 0; padding: 0; display: grid; grid-template-columns: 88px minmax(0,1fr) 88px; align-items: center; gap: 8px; }
+.forme-app.view-studio .studio-document-name { grid-column: 2; min-width: 0; display: flex; justify-content: center; align-items: baseline; gap: 8px; }
+.forme-app.view-studio .studio-document-name input { width: 100%; max-width: 360px; min-width: 0; height: 36px; text-align: center; padding: 0; border: 0; border-radius: 2px; outline-offset: 4px; background: transparent; color: var(--fs-ink); font: 500 16px/1.3 var(--fs-font); letter-spacing: -.015em; text-overflow: ellipsis; }
+.forme-app.view-studio .studio-document-name > span { color: var(--fs-muted); font: 12px/1.3 var(--fs-font); white-space: nowrap; }
+.forme-app.view-studio .studio-document-actions { grid-column: 2; grid-row: 3; position: relative; z-index: 96; display: flex; align-items: center; gap: 4px; container: look-actions / inline-size; min-width: 0; padding-top: 7px; border-top: 1px solid var(--fs-line); }
+.forme-app.view-studio .studio-document-actions button { flex-shrink: 0; box-shadow: none; letter-spacing: 0; }
+.forme-app.view-studio .history-action { width: 32px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--fs-muted); font-size: 20px; }
+.forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { width: auto; min-height: 36px; height: 36px; padding: 7px 10px; margin: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fs-ink); font: 400 14px/1.3 var(--fs-font); white-space: nowrap; }
+.forme-app.view-studio .new-look-action { padding-left: 0; }
+.forme-app.view-studio .mix-look-action { background: #e4e5df; font-weight: 500; }
+.forme-app.view-studio .studio-document-actions .save-look-action { margin-left: 8px; }
+.forme-app.view-studio .studio-document-actions button:hover:not(:disabled) { background: #e4e5df; color: var(--fs-ink); }
+.forme-app.view-studio .studio-document-actions .mix-look-action:hover:not(:disabled) { background: #d5d7cf; }
+.forme-app.view-studio .studio-document-actions button[aria-busy="true"] { position: relative; }
+.forme-app.view-studio .studio-document-actions button[aria-busy="true"] > span { visibility: hidden; }
+.forme-app.view-studio .studio-document-actions button[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border: 1.5px solid var(--fs-line); border-top-color: currentColor; border-radius: 50%; animation: forme-button-spin 700ms linear infinite; }
+@keyframes forme-button-spin { to { transform: rotate(360deg); } }
+.forme-app.view-studio .save-label-full { display: none; }
+.forme-app.view-studio .save-label-compact { display: inline; }
+.forme-app.view-studio .canvas-panel-nav { grid-column: 3; justify-self: end; display: flex; gap: 12px; }
+.forme-app.view-studio .canvas-panel-nav button { min-height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--fs-muted); font: 400 14px/1.3 var(--fs-font); }
+.forme-app.view-studio .canvas-panel-nav button.active { color: var(--fs-ink); text-decoration: underline; text-underline-offset: 6px; }
+.forme-app.view-studio .canvas-column { position: relative; inset: auto; grid-column: 2; grid-row: 2; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.forme-app.view-studio .look-canvas { width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; overflow: hidden; background: var(--fs-canvas); container-type: size; }
+.forme-app.view-studio .look-artboard,
+.forme-app.view-studio .look-canvas.library-open .look-artboard,
+.forme-app.view-studio .look-canvas.saved-looks-open .look-artboard {
+  position: absolute; inset: auto; left: 50%; top: 50%; width: min(calc(100cqh * 2 / 3),100cqw); height: auto;
+  aspect-ratio: 2/3; transform: translate(-50%,-50%); border: 0; background: transparent; transition: none; container-type: inline-size;
 }
-
-.forme-landing .public-wordmark,
-.forme-app.view-wardrobe.route-closet .wordmark {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: 800 29px/1 var(--fs-font);
-  letter-spacing: -0.07em;
+.forme-app.view-studio .canvas-piece { position: absolute; width: 76%; height: auto; aspect-ratio: 4/5; cursor: grab; }
+.forme-app.view-studio .canvas-piece:active { cursor: grabbing; }
+.forme-app.view-studio .canvas-piece img { width: 100%; height: 100%; object-fit: contain; filter: var(--fs-garment-shadow); }
+.forme-app.view-studio .canvas-piece-ui { position: absolute; pointer-events: none; }
+.forme-app.view-studio .canvas-selection-box { display: block; position: absolute; inset: auto; left: var(--selection-left,0); top: var(--selection-top,0); width: var(--selection-width,100%); height: var(--selection-height,100%); z-index: 0; border: 1px solid var(--fs-signal); pointer-events: none; }
+.forme-app.view-studio .canvas-panel-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.forme-app.view-studio .canvas-piece-actions { position: absolute; inset: 0; min-width: 0; margin: 0; padding: 0; border: 0; pointer-events: none; }
+.forme-app.view-studio :is(.piece-action,.transform-handle) { position: absolute; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; box-shadow: none; background: transparent; color: var(--fs-ink); pointer-events: auto; transform: translate(-50%,-50%); }
+.forme-app.view-studio :is(.piece-action,.transform-handle) svg { display: block; width: 36px; height: 36px; padding: 7px; border: 1px solid var(--fs-line); border-radius: 50%; background: var(--fs-surface); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: background 120ms ease, border-color 120ms ease; }
+.forme-app.view-studio :is(.piece-action,.transform-handle):hover:not(:disabled) svg { border-color: var(--fs-ink); }
+.forme-app.view-studio .piece-action[aria-pressed="true"] svg { color: var(--fs-signal); border-color: var(--fs-signal); }
+.forme-app.view-studio .piece-remove:hover:not(:disabled) svg { color: var(--fs-signal); border-color: var(--fs-signal); }
+.forme-app.view-studio :is(.piece-action,.transform-handle):disabled { opacity: .35; cursor: default; }
+.forme-app.view-studio .piece-duplicate { left: 0; top: 0; }
+.forme-app.view-studio .piece-remove { left: 100%; top: 0; }
+.forme-app.view-studio .piece-layer-up { left: 0; top: calc(50% - 24px); }
+.forme-app.view-studio .piece-layer-down { left: 0; top: calc(50% + 24px); }
+.forme-app.view-studio .piece-keep { left: 100%; top: calc(50% - 24px); }
+.forme-app.view-studio .piece-replace { left: 100%; top: calc(50% + 24px); }
+.forme-app.view-studio .transform-handle { touch-action: none; }
+.forme-app.view-studio .rotate-handle { top: 100%; left: 0; cursor: grab; }
+.forme-app.view-studio .rotate-handle:active { cursor: grabbing; }
+.forme-app.view-studio .scale-handle { top: 100%; left: 100%; bottom: auto; right: auto; cursor: nwse-resize; }
+.forme-app.view-studio .compact-tools .rotate-handle { left: 33.333333%; top: 0; }
+.forme-app.view-studio .compact-tools .piece-keep { left: 66.666667%; top: 0; }
+.forme-app.view-studio .compact-tools .piece-layer-down { left: 0; top: 100%; }
+.forme-app.view-studio .compact-tools .piece-layer-up { left: 33.333333%; top: 100%; }
+.forme-app.view-studio .compact-tools .piece-replace { left: 66.666667%; top: 100%; }
+/* Touch has direct gestures; only actions without a gesture stay around the prenda. */
+.forme-app.view-studio .touch-tools :is(.transform-handle,.piece-keep,.piece-replace) { display: none; }
+.forme-app.view-studio .touch-tools .piece-layer-up { left: 0; top: 100%; }
+.forme-app.view-studio .touch-tools .piece-layer-down { left: 100%; top: 100%; }
+.forme-app.view-studio .look-canvas { touch-action: none; }
+.forme-app.view-studio .canvas-piece { -webkit-touch-callout: none; }
+.forme-app.view-studio .piece-kept { position: absolute; left: calc(var(--selection-left,0px) + var(--selection-width,100%) - 8px); top: calc(var(--selection-top,0px) + var(--selection-height,100%) / 2 - 8px); width: 16px; height: 16px; border-radius: 50%; background: var(--fs-surface); color: var(--fs-signal); pointer-events: none; }
+.forme-app.view-studio .piece-kept svg { width: 16px; height: 16px; padding: 2px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.forme-app.view-studio .canvas-piece-ui.selected:not(.touch-tools) .piece-kept { display: none; }
+.forme-app.view-studio :is(.look-controls,.saved-looks-panel,.canvas-layers-panel) { position: relative; inset: auto; width: 100%; height: auto; min-width: 0; min-height: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; overflow: hidden; opacity: 1; }
+.forme-app.view-studio :is(.look-controls,.saved-looks-panel,.canvas-layers-panel) h2 { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; margin: 0; font: 500 16px/1.3 var(--fs-font); letter-spacing: -.015em; }
+.forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { display: flex; flex-direction: column; gap: 8px; max-height: min(300px,36dvh); margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--fs-line); animation: forme-reveal 150ms ease both; }
+.forme-app.view-studio .canvas-panel-close { position: absolute; display: grid; place-items: center; top: 12px; right: 0; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--fs-muted); font-size: 24px; }
+.forme-app.view-studio .garment-library-panel { --library-thumbnail: 120px; display: grid; grid-template-columns: minmax(0,1fr) minmax(120px,1fr); grid-template-rows: 44px 44px minmax(0,1fr); gap: 12px 16px; animation: none; overflow: visible; }
+.forme-app.view-studio .garment-library-panel[data-grid-size="small"] { --library-thumbnail: 88px; }
+.forme-app.view-studio .garment-library-panel[data-grid-size="large"] { --library-thumbnail: 168px; }
+.forme-app.view-studio .garment-library-panel > h2 { grid-column: 1; grid-row: 1; }
+.forme-app.view-studio .library-tools { grid-column: 1/-1; grid-row: 2; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.forme-app.view-studio .library-options { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.forme-app.view-studio .library-tools .garment-view-controls { flex: 0 0 auto; }
+.forme-app.view-studio .studio-library-column:has(.garment-view-controls .forme-menu[open]) { z-index: 110; }
+.forme-app.view-studio .library-tools .forme-menu-content { top: calc(100% + 4px); bottom: auto; }
+.forme-app.view-studio .library-options label { min-width: 0; }
+.forme-app.view-studio .library-options label:only-child { grid-column: 1/-1; }
+.forme-app.view-studio .library-options select { width: 100%; min-width: 0; min-height: 36px; padding: 0; border: 0; border-radius: 0; background-color: transparent; color: var(--fs-muted); font: 14px/1.3 var(--fs-font); }
+.forme-app.view-studio .library-search { grid-column: 2; grid-row: 1; min-width: 0; align-self: center; }
+.forme-app.view-studio .library-search input { height: 36px; border: 0; border-bottom: 1px solid var(--fs-line); border-radius: 0; padding: 0; background: transparent; font-size: 14px; }
+.forme-app.view-studio .sticker-tray-groups { grid-column: 1/-1; grid-row: 3; overflow: auto; min-height: 0; overscroll-behavior: contain; margin: 0; padding: 0 4px 16px 0; }
+.forme-app.view-studio .sticker-tray { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(var(--library-thumbnail),100%),1fr)); gap: 28px 20px; }
+.forme-app.view-studio .sticker-tray button { position: relative; display: block; min-width: 0; height: auto; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.forme-app.view-studio .sticker-tray img { display: block; width: 100%; height: auto; aspect-ratio: 4/5; padding: 4px; object-fit: contain; background: transparent; border: 0; border-radius: 0; filter: var(--garment-sticker-filter); }
+.forme-app.view-studio .canvas-thumbnail-label { position: absolute; inset: auto 0 -20px; display: block; overflow: hidden; padding: 0; color: var(--fs-muted); background: transparent; opacity: 0; transform: none; font: 12px/1.3 var(--fs-font); white-space: nowrap; text-overflow: ellipsis; text-align: center; pointer-events: none; transition: opacity 150ms ease; }
+.forme-app.view-studio .sticker-tray button:is(:hover,:focus-visible) .canvas-thumbnail-label { opacity: 1; }
+.forme-app.view-studio .sticker-tray-section + .sticker-tray-section { margin: 0; border: 0; }
+.forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 44px 36px auto minmax(0,1fr); }
+.forme-app.view-studio .replacement-notice { grid-column: 1/-1; grid-row: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 0; border: 0; background: transparent; font: 13px/1.4 var(--fs-font); }
+.forme-app.view-studio .replacement-notice button { min-height: 36px; padding: 6px 0; border: 0; background: none; font: 13px/1.4 var(--fs-font); }
+.forme-app.view-studio .garment-library-panel:has(.replacement-notice) .sticker-tray-groups { grid-row: 4; }
+.forme-app.view-studio .saved-look-panel-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); grid-auto-rows: max-content; align-content: start; gap: 16px 12px; min-height: 0; overflow: auto; }
+.forme-app.view-studio .saved-look-panel-card { display: block; min-width: 0; min-height: 0; border: 0; border-radius: 0; padding: 0; background: none; box-shadow: none; transform: none; }
+.forme-app.view-studio .saved-look-panel-open { width: 100%; padding: 0; border: 1px solid transparent; border-radius: 3px; background: #eceee7; overflow: hidden; }
+.forme-app.view-studio .saved-look-panel-card.active .saved-look-panel-open { border-color: var(--fs-signal); }
+.forme-app.view-studio .saved-look-panel-name { display: block; margin-top: 6px; font-size: 11px; overflow-wrap: anywhere; }
+.forme-app.view-studio .canvas-layers-panel > p { font-size: 12px; color: var(--fs-muted); }
+.forme-app.view-studio .canvas-layers-panel h2 span { font-size: 12px; color: var(--fs-muted); }
+.forme-app.view-studio .canvas-layers-panel ol { padding: 0; margin: 0; list-style: none; overflow: auto; }
+.forme-app.view-studio .canvas-layers-panel li { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 6px; }
+.forme-app.view-studio .canvas-layers-panel li.active { background: #e9ede1; }
+.forme-app.view-studio .canvas-layers-panel li button { min-width: 36px; min-height: 44px; padding: 0; border: 0; background: none; }
+.forme-app.view-studio .canvas-layers-panel .layer-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
+.forme-app.view-studio .layer-select img { width: 32px; height: 44px; object-fit: contain; }
+.forme-app.view-studio .layer-select span { font-size: 13px; line-height: 1.4; }
+.forme-app.view-studio .layer-select small { display: block; font-size: 12px; color: var(--fs-muted); }
+.forme-app.view-studio .replacement-notice { font-size: 12px; color: var(--fs-muted); }
+.forme-app.view-studio .replacement-notice button { display: block; min-height: 44px; padding: 6px 0; border: 0; background: none; color: var(--fs-signal); }
+.forme-app.view-studio .empty-canvas { width: min(270px,90%); }
+.forme-app.view-studio .empty-canvas h2 { font: 500 26px/1.1 var(--fs-font); letter-spacing: -.035em; }
+.forme-app.view-studio .empty-canvas p { font: 13px/1.5 var(--fs-font); color: var(--fs-muted); }
+.forme-app.view-studio .empty-canvas button { min-height: 44px; padding: 10px 14px; border-radius: 6px; font: 13px/1.3 var(--fs-font); letter-spacing: 0; }
+.forme-app .share-status-message, .forme-app .canvas-status-message { position: fixed; z-index: 110; inset: auto auto 88px 50%; transform: translateX(-50%); max-width: calc(100vw - 40px); padding: 10px 14px; display: flex; align-items: center; gap: 16px; border: 1px solid var(--fs-line); border-radius: 8px; background: var(--fs-surface); color: var(--fs-ink); font: 12px/1.4 var(--fs-font); box-shadow: 0 6px 24px rgb(20 22 18 / .06); animation: forme-reveal 180ms ease; }
+.forme-app :is(.share-status-message,.canvas-status-message) button { width: 32px; height: 32px; border: 0; background: none; font-size: 22px; }
+/* Native dialogs and gradual disclosure */
+.forme-dialog { display: block; height: fit-content; min-height: 0; width: min(840px,calc(100vw - 48px)); max-height: calc(100dvh - 48px); margin: auto; padding: 24px; border: 1px solid var(--fs-line); border-radius: 12px; background: var(--fs-surface); color: var(--fs-ink); box-shadow: 0 24px 90px rgb(20 22 18 / .15); overflow: auto; }
+.forme-dialog::backdrop { background: rgb(29 32 25 / .28); backdrop-filter: blur(3px); }
+.forme-dialog[open] { animation: forme-reveal 180ms var(--fs-ease); }
+.forme-app .dialog-heading, .forme-app .garment-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 0 20px; margin: 0; border: 0; }
+.forme-app :is(.dialog-heading,.garment-editor-header) h2 { font-size: 18px; }
+.forme-app :is(.dialog-heading,.garment-editor-header) > button { width: 44px; height: 44px; min-width: 44px; border: 0; background: none; font: 24px var(--fs-font); }
+.forme-app .filter-dialog { height: fit-content; width: min(480px,calc(100vw - 40px)); }
+.forme-app .catalog-sort { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 16px; margin: 0 0 20px; color: var(--fs-muted); font-size: 12px; }
+.forme-app .catalog-sort select { min-width: 0; width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--fs-line); border-radius: 5px; background: transparent; color: var(--fs-ink); font-size: 14px; }
+.forme-app .filter-dialog .primary-action { width: 100%; margin-top: 20px; }
+.forme-app .attribute-filters { display: grid; grid-template-columns: 1fr; gap: 20px; padding: 0; }
+.forme-app .filter-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 16px; }
+.forme-app :is(.attribute-filters,.garment-editor-fields) label { display: grid; border: 0; padding: 0; gap: 8px; color: var(--fs-muted); font: 12px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app :is(.attribute-filters,.garment-editor-fields) :is(input,select,textarea) { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--fs-line); border-radius: 5px; background: transparent; color: var(--fs-ink); font: 14px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app :is(.advanced-filters,.garment-edit-advanced,.processing-options) summary { min-height: 44px; padding: 12px 0; color: var(--fs-muted); font: 13px/1.4 var(--fs-font); cursor: pointer; }
+.forme-app .reset-filters { min-height: 44px; border: 0; background: transparent; color: var(--fs-muted); text-align: left; font-size: 12px; letter-spacing: 0; }
+.forme-app .garment-editor-body { min-height: 0; height: auto; overflow: visible; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: start; gap: 32px; padding: 0; }
+.forme-app .garment-editor-visual { position: static; padding: 0; border: 0; background: none; }
+.forme-app .garment-editor-image { height: auto; aspect-ratio: 4/5; padding: 20px; background: #eeefe8; border-radius: 5px; }
+.forme-app .garment-editor-image img { width: 100%; height: 100%; object-fit: contain; }
+.forme-app .garment-detail-actions { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px 24px; }
+.forme-app .garment-detail-actions button { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--fs-muted); font: 13px/1.4 var(--fs-font); }
+.forme-app .garment-detail-actions button[aria-pressed="true"] { color: var(--fs-signal); }
+.forme-app .garment-detail-copy { display: grid; align-content: start; align-self: center; gap: 20px; padding-top: 0; }
+.forme-app .garment-detail-copy .primary-action { justify-self: start; }
+.forme-app .garment-detail-copy .detail-eyebrow { color: var(--fs-muted); font-size: 12px; }
+.forme-app .garment-detail-copy h3 { font-size: 30px; line-height: 1.1; }
+.forme-app .garment-detail-copy > p { font-size: 14px; line-height: 1.6; color: var(--fs-muted); }
+.forme-app .garment-detail-copy dl { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 6px 0; }
+.forme-app .garment-detail-copy dt { font-size: 12px; color: var(--fs-muted); }
+.forme-app .garment-detail-copy dd { margin: 4px 0 0; font-size: 14px; }
+.forme-app .garment-editor-form { min-width: 0; padding: 0; overflow: visible; }
+.forme-app .garment-editor-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.forme-app .garment-editor-fields .field-wide { grid-column: 1/-1; }
+.forme-app .custom-tag-editor { margin-top: 20px; }
+.forme-app .custom-tag-editor small { display: none; }
+.forme-app .tag-input-row { display: flex; margin-top: 10px; gap: 8px; }
+.forme-app .tag-input-row input { min-width: 0; width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--fs-line); border-radius: 5px; background: none; }
+.forme-app .tag-input-row button { min-height: 44px; padding: 0 10px; border: 0; background: none; font:13px/1.4 var(--fs-font); }
+.forme-app .item-public-toggle { padding: 20px 0; border-color: var(--fs-line); }
+.forme-app .item-public-toggle strong { font: 500 13px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app .item-public-toggle small { font: 12px/1.5 var(--fs-font); }
+.forme-app .garment-sharing .item-public-toggle { padding: 0; }
+.forme-app .garment-profile-link { min-height: 44px; padding: 0; border: 0; background: none; color: var(--fs-muted); font: 13px/1.4 var(--fs-font); text-decoration: underline; text-underline-offset: 3px; }
+.forme-app .garment-editor-actions { position:static; margin:0; display: flex; flex-wrap: wrap; gap: 8px; padding: 20px 0 0; border: 0; }
+.forme-app .garment-editor-actions button { min-height: 44px; padding: 10px; border: 1px solid var(--fs-line); border-radius: 6px; background: none; font: 13px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app .garment-editor-actions .delete-garment { margin-right: auto; border-color: transparent; color: #b33524; }
+.forme-app .garment-editor-actions button[type="submit"] { background: var(--fs-ink); color: white; }
+.forme-app .garment-editor-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+/* Intake begins with one clear action. */
+.forme-app .upload-view { padding: 0; width: min(736px,100%); margin: 0 auto; }
+.forme-app .upload-view:not(:has(.has-files)) { display: grid; align-content: center; width: min(736px,100%); min-height: calc(100dvh - 160px); margin: 0 auto; }
+.forme-app .upload-view:not(:has(.has-files)) .upload-heading { margin-bottom: 24px; }
+.forme-app .upload-view:not(:has(.has-files)) .upload-layout { width: 100%; margin: 0; }
+.forme-app .upload-heading { display: flex; justify-content: space-between; align-items: center; margin: 0 0 40px; gap: 20px; }
+.forme-app .upload-heading h1 { font-size: 28px; }
+.forme-app .upload-heading > button { min-height: 44px; border: 0; background: none; color: var(--fs-muted); font: 13px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app .upload-layout { display: block; width: min(640px,100%); margin: 48px auto; }
+.forme-app .upload-layout.has-files { display: block; width: 100%; margin: 0; }
+.forme-app .bulk-dropzone { min-height: 340px; aspect-ratio: auto; padding: 40px; border: 1px dashed #b7bbaf; border-radius: 10px; background: transparent; }
+.forme-app .dropzone-empty { display: flex; align-items: center; flex-direction: column; gap: 16px; text-align: center; }
+.forme-app .dropzone-empty h3 { font-size: 22px; }
+.forme-app .dropzone-empty p { font: 14px/1.5 var(--fs-font); color: var(--fs-muted); }
+.forme-app .dropzone-empty small { font: 12px/1.4 var(--fs-font); color: var(--fs-muted); letter-spacing: 0; }
+.forme-app .upload-icon { display: block; width: 36px; height: 36px; margin: 0; border: 0; background: none; font: 28px var(--fs-font); }
+.forme-app .intake-panel { padding: 0; border: 0; background: transparent; }
+.forme-app .batch-heading { padding: 0 0 16px; font: 12px var(--fs-font); }
+.forme-app .upload-item { padding: 12px 0; border-color: var(--fs-line); }
+.forme-app .upload-status { margin: 16px 0; font: 13px/1.5 var(--fs-font); letter-spacing: 0; }
+/* One photo queue: preview, state and corrections share the same place. */
+.forme-app .upload-queue-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:16px; font-size:14px; }
+.forme-app .upload-queue-heading button, .forme-app .upload-edit { min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--fs-ink); font:13px var(--fs-font); }
+.forme-app .upload-photo-queue { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px 20px; max-height:56dvh; overflow-y:auto; padding:0 8px 8px 0; }
+.forme-app .upload-photo { min-width:0; }
+.forme-app .upload-photo-visual { position:relative; height:180px; background:var(--fs-surface); border-radius:4px; }
+.forme-app .upload-photo-visual img { width:100%; height:100%; object-fit:contain; padding:12px; }
+.forme-app .upload-remove { position:absolute; top:0; right:0; width:44px; height:44px; border:0; background:var(--fs-surface); color:var(--fs-ink); font:22px var(--fs-font); border-radius:4px; }
+.forme-app .upload-photo-name { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:13px/1.4 var(--fs-font); margin:12px 0 4px; }
+.forme-app .upload-photo-state { font:12px/1.4 var(--fs-font); color:var(--fs-muted); }
+.forme-app .upload-photo-error { font:12px/1.5 var(--fs-font); margin:8px 0; color:#b33524; overflow-wrap:anywhere; }
+.forme-app .upload-photo-note { font:12px/1.5 var(--fs-font); margin:8px 0; color:var(--fs-muted); }
+.forme-app .upload-error { color:#b33524; white-space:pre-line; overflow-wrap:anywhere; }
+.forme-app .upload-footer { display:flex; align-items:center; justify-content:space-between; gap:20px; border-top:1px solid var(--fs-line); margin-top:20px; padding-top:20px; }
+.forme-app .upload-footer p:empty { display:none; }
+.forme-app .upload-footer p { font:13px/1.5 var(--fs-font); color:var(--fs-muted); }
+.forme-app .upload-footer .primary-action { margin-left:auto; flex-shrink:0; }
+@media (max-width:640px) {
+  .forme-app .upload-photo-queue { grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 16px; max-height:52dvh; }
+  .forme-app .upload-photo-visual { height:156px; }
+  .forme-app .upload-footer { align-items:stretch; flex-direction:column; gap:12px; }
 }
-
-.forme-landing .public-menu {
-  position: relative;
-  justify-self: end;
+/* Account and public collection share the same margins and type. */
+.forme-app :is(.profile-page,.settings-page) { width: min(var(--fs-page-width),100%); margin: 0 auto; padding: 40px var(--fs-gutter) 72px; }
+.forme-app .profile-page-hero { box-shadow: none; position: relative; display: grid; grid-template-columns: 96px minmax(0,1fr) auto; align-items: center; gap: 24px; padding: 0 0 32px; min-height: 0; border: 0; border-bottom: 1px solid var(--fs-line); border-radius: 0; background: none; }
+.forme-app .profile-page-hero::before { content: none; }
+.forme-app .profile-page-portrait { width: 96px; height: 112px; margin: 0; border-radius: 4px; overflow: hidden; }
+.forme-app .profile-page-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.forme-app .profile-page-intro > span { font: 12px/1.4 var(--fs-font); color: var(--fs-muted); }
+.forme-app .profile-page-intro h1 { text-transform: none; margin: 6px 0; font-size: 32px; }
+.forme-app .profile-page-intro > p { max-width: 500px; font: 14px/1.5 var(--fs-font); }
+.forme-app .profile-page-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
+.forme-app .profile-page-links button, .forme-app .account-sign-out { min-height: 44px; padding: 8px 0; border: 0; background: none; color: var(--fs-ink); font: 13px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; text-decoration: underline; text-underline-offset: 4px; }
+.forme-app .profile-page-stats { background: none; box-shadow: none; display: flex; gap: 24px; padding: 0; border: 0; }
+.forme-app .profile-page-stats dt { text-transform: none; letter-spacing: 0; color: var(--fs-muted); font: 12px/1.4 var(--fs-font); }
+.forme-app .profile-page-stats dd { margin: 4px 0 0; font: 500 26px/1.1 var(--fs-font); }
+.forme-app .profile-share-notice { margin-top:16px; color:var(--fs-muted); font:13px/1.5 var(--fs-font); }
+.forme-app .profile-page-body { display: block; margin-top: 36px; }
+.forme-app .profile-page-editor { box-shadow: none; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; }
+.forme-app .profile-edit-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 64px; align-items: start; }
+.forme-app .profile-identity-fields > header { margin-bottom: 24px; }
+.forme-app .profile-identity-fields > header h2 { font-size: 22px; }
+.forme-app .profile-identity-fields > header p { margin-top: 8px; color: var(--fs-muted); font: 13px/1.5 var(--fs-font); }
+.forme-app .profile-preferences > .profile-page-visibility:first-child { margin-top: 0; }
+.forme-app .profile-preferences > .profile-page-visibility:first-child h3 { font-size: 22px; }
+.forme-app .profile-page-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.forme-app .profile-page-fields label { text-transform: none; letter-spacing: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 8px; font: 12px/1.4 var(--fs-font); color: var(--fs-muted); }
+.forme-app .profile-page-fields label:last-child { grid-column: 1/-1; }
+.forme-app .profile-page-fields input, .forme-app .profile-page-fields textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--fs-line); border-radius: 0; background: none; color: var(--fs-ink); font: 16px/1.4 var(--fs-font); }
+.forme-app .profile-handle-input { font: 400 16px/1.4 var(--fs-font); display: flex; align-items: center; gap: 4px; padding: 0; border-bottom: 1px solid var(--fs-line); }
+.forme-app .profile-handle-input input { border: 0; }
+.forme-app .profile-handle-input:focus-within { border-bottom-color: var(--fs-signal); }
+.forme-app .profile-page-visibility { margin-top: 36px; padding: 0; border: 0; }
+.forme-app .profile-page-visibility h3 { font-size: 18px; margin-bottom: 12px; }
+.forme-app .profile-page-visibility > label { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0; padding: 16px 0; border: 0; border-radius: 0; background: none; border-bottom: 1px solid var(--fs-line); }
+.forme-app .profile-page-visibility strong { text-transform: none; letter-spacing: 0; font: 500 14px/1.5 var(--fs-font); }
+.forme-app .profile-page-visibility small { display: block; margin-top: 3px; color: var(--fs-muted); font: 12px/1.5 var(--fs-font); }
+.forme-app .profile-page-save-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding: 24px 0 0; }
+.forme-app .profile-page-save-row strong { font: 400 14px/1.4 var(--fs-font); }
+.forme-app .profile-page-save-row span { text-transform: none; letter-spacing: 0; font: 12px/1.4 var(--fs-font); }
+.forme-app .profile-page-save-row button { margin-left:auto; min-height: 44px; padding: 12px 18px; border: 1px solid var(--fs-ink); border-radius: 6px; background: var(--fs-ink); color: white; font: 14px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app .profile-page-save-row button.saved { border-color: var(--fs-line); background: none; color: var(--fs-muted); }
+.forme-app .settings-page-heading { margin: 0; min-height: 0; border: 0; display: flex; justify-content: space-between; gap: 24px; padding: 0 0 32px; }
+.forme-app .settings-page-heading h1 { font-size: 28px; }
+.forme-app .settings-page-heading span { display: block; margin-top: 12px; color: var(--fs-muted); font: 14px/1.5 var(--fs-font); }
+.forme-app .settings-page-heading button { min-height: 44px; padding: 8px 0; border: 0; background: none; text-decoration: underline; }
+.forme-app .settings-page-grid { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 32px 64px; width: 100%; max-width: none; }
+.forme-app .settings-page-grid > section { padding: 24px 0; border: 0; border-top: 1px solid var(--fs-line); background: none; border-radius: 0; }
+.forme-app .settings-identity { display: flex; align-items: center; gap: 20px; }
+.forme-app .settings-identity .profile-drawer-avatar { width: 64px; height: 64px; overflow: hidden; border-radius: 50%; }
+.forme-app .settings-identity img { width: 100%; height: 100%; object-fit: cover; }
+.forme-app .settings-identity h2 { font-size: 22px; }
+.forme-app .settings-identity .account-sign-out { display: block; margin-top: 8px; }
+.forme-app .settings-identity small { color: var(--fs-muted); }
+.forme-app .settings-account-links { display: grid; gap: 12px; }
+.forme-app .settings-account-links a { display: flex; align-items: center; min-height: 44px; color: inherit; font-size: 14px; }
+.forme-app .settings-account-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.forme-app .account-page-gate { display: block; min-height: 0; max-width: 760px; margin: 0 auto; padding: 80px var(--fs-gutter); background: none; }
+.forme-app .account-page-gate aside { display: none; }
+.forme-app .account-page-gate h1 { margin: 14px 0; }
+.forme-app .account-page-gate span { font: 14px/1.6 var(--fs-font); }
+.forme-app .account-page-gate button { margin-top: 28px; min-height: 44px; padding: 12px 18px; border: 0; border-radius: 6px; background: var(--fs-ink); color: white; }
+.forme-app.public-profile-page { padding: 64px 0 0; background: var(--fs-canvas); }
+.forme-app.public-profile-page .public-profile-frame { width: min(var(--fs-page-width),100%); min-height: calc(100dvh - 64px); margin: 0 auto; padding: 40px var(--fs-gutter) 72px; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.forme-app.public-profile-page .public-profile-status { display: grid; justify-items: start; gap: 16px; }
+.forme-app.public-profile-page .public-profile-status h1 { font-size: 32px; }
+.forme-app.public-profile-page .public-profile-status p { color: var(--fs-muted); font-size: 14px; }
+.forme-app.public-profile-page .public-profile-status a { display: inline-flex; align-items: center; min-height: 44px; color: var(--fs-ink); font-size: 13px; }
+.forme-app.public-profile-page .public-profile-nav { min-height: 64px; padding: 0; border-bottom: 1px solid var(--fs-line); }
+.forme-app.public-profile-page .public-profile-nav::after { content: none; }
+.forme-app.public-profile-page .public-profile-nav a { font: 800 28px/1 var(--fs-font); letter-spacing: -.07em; }
+.forme-app.public-profile-page .public-profile-nav button { min-height: 44px; padding: 8px 0; border: 0; background: none; font: 13px var(--fs-font); letter-spacing: 0; }
+.forme-app.public-profile-page .public-profile-hero { box-shadow: none; display: grid; grid-template-columns: 96px minmax(0,1fr) auto; align-items: center; gap: 24px; min-height: 0; margin: 0; padding: 0 0 32px; border: 0; border-radius: 0; background: none; }
+.forme-app.public-profile-page .public-profile-hero::before { content: none; }
+.forme-app.public-profile-page .public-profile-avatar { width: 96px; height: 112px; border: 0; border-radius: 4px; background: var(--forme-surface); font: 500 28px/1 var(--fs-font); }
+.forme-app.public-profile-page .public-profile-copy h1 { font: 500 32px/1.1 var(--fs-font); letter-spacing: -.035em; text-transform: none; margin: 6px 0; }
+.forme-app.public-profile-page .public-profile-copy p { color: var(--fs-muted); font: 12px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app.public-profile-page .public-profile-copy > span { max-width: 500px; margin: 0; font: 14px/1.5 var(--fs-font); }
+.forme-app.public-profile-page .public-profile-counts { display: flex; gap: 24px; font-family: var(--fs-font); }
+.forme-app.public-profile-page .public-profile-counts span { text-transform: none; letter-spacing: 0; }
+.forme-app.public-profile-page .public-profile-counts strong { font: 500 28px/1.1 var(--fs-font); }
+.forme-app.public-profile-page .public-profile-section { box-shadow: none; margin: 0; padding: 24px 0; border: 0; border-top: 1px solid var(--fs-line); border-radius: 0; background: none; }
+.forme-app.public-profile-page .public-profile-section header { margin-bottom: 24px; }
+.forme-app.public-profile-page .public-profile-section header > span { font: 12px/1.4 var(--fs-font); letter-spacing: 0; }
+.forme-app.public-profile-page .public-profile-empty { box-shadow: none; min-height: 160px; padding: 48px 0; border: 0; border-top: 1px solid var(--fs-line); border-radius: 0; background: none; text-align: center; }
+.forme-app.public-profile-page .public-profile-empty p { max-width: 420px; margin: 0 auto; color: var(--fs-muted); font: 14px/1.6 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app.public-profile-page .public-profile-footer a { font: 13px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; }
+.forme-app.public-profile-page .public-profile-footer { min-height: 0; margin: 24px 0 0; padding: 24px 0; border: 0; border-top: 1px solid var(--fs-line); border-radius: 0; box-shadow: none; background: none; }
+.forme-app.public-profile-page .public-profile-empty a { display: inline-flex; margin-top: 16px; min-height: 44px; align-items: center; font-size: 13px; letter-spacing: 0; }
+.forme-app.public-profile-page .public-looks-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 32px 20px; }
+.forme-app.public-profile-page .public-garments-grid { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 40px 28px; }
+.forme-app.public-profile-page :is(.public-looks-grid,.public-garments-grid) article { border: 0; border-radius: 0; background: none; }
+.forme-app.public-profile-page .public-garments-grid article { position: relative; }
+.forme-app.public-profile-page .public-garments-grid article > div { border: 0; border-radius: 0; box-shadow: none; background: transparent; overflow: visible; }
+.forme-app.public-profile-page .public-garments-grid article:focus-visible { outline: 2px solid var(--fs-signal); outline-offset: 3px; }
+.forme-app.public-profile-page .public-garments-grid img { padding: 18px; filter: var(--garment-sticker-filter); }
+.forme-app.public-profile-page .public-garment-caption { position: absolute; inset: auto 0 -22px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fs-muted); font: 12px/1.4 var(--fs-font); opacity: 0; transition: opacity 150ms ease; }
+.forme-app.public-profile-page .public-garments-grid article:is(:hover,:focus-visible) .public-garment-caption { opacity: 1; }
+.forme-app.public-profile-page :is(.public-looks-grid,.public-garments-grid) h2 { margin-top: 12px; font: 500 14px/1.3 var(--fs-font); }
+.forme-app.public-profile-page .public-look-preview { aspect-ratio: 2/3; border: 0; border-radius: 3px; box-shadow: none; background: #eaece5; }
+/* Plan information accurately separates the available beta from future billing. */
+.forme-app.pricing-page { background: var(--fs-canvas); }
+.forme-app .pricing-page-content { width: min(960px,100%); padding: 56px var(--fs-gutter) 72px; margin: 0 auto; }
+.forme-app .pricing-intro h1 { font-size: 32px; }
+.forme-app .pricing-intro > span { display: block; margin-top: 16px; color: var(--fs-muted); font: 14px/1.6 var(--fs-font); }
+.forme-app .pricing-start { display:inline-flex; margin-top:24px; min-height:44px; align-items:center; text-decoration:none; }
+.forme-app .pricing-future { margin-top:40px; border-top:1px solid var(--fs-line); padding-top:20px; }
+.forme-app .pricing-future summary { cursor:pointer; min-height:44px; font:500 16px/1.5 var(--fs-font); }
+.forme-app .pricing-future > p { color:var(--fs-muted); font:13px/1.5 var(--fs-font); }
+.forme-app .pricing-cycle { display: inline-flex; gap: 20px; margin: 36px 0 24px; padding: 0; border: 0; background: none; }
+.forme-app .pricing-cycle button { min-height: 44px; padding: 8px 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: none; font: 13px var(--fs-font); letter-spacing: 0; color: var(--fs-muted); }
+.forme-app .pricing-cycle-note, .forme-app .pricing-plan-list small { color: var(--fs-muted); font: 13px/1.5 var(--fs-font); letter-spacing: 0; }
+.forme-app .pricing-cycle button.active { color: var(--fs-ink); border-color: currentColor; background: none; }
+.forme-app .pricing-plan-list { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.forme-app .pricing-plan-list article, .forme-app .pricing-plan-list article.recommended { color: var(--fs-ink); min-height: 0; padding: 24px 0; border: 0; border-top: 1px solid var(--fs-line); border-radius: 0; background: none; box-shadow: none; }
+.forme-app .pricing-plan-heading { display: flex; justify-content: space-between; align-items: baseline; }
+.forme-app .pricing-plan-heading h2 { font-size: 22px; }
+.forme-app .pricing-plan-price strong { font: 500 26px/1.1 var(--fs-font); }
+.forme-app .pricing-plan-price span { margin-left: 6px; font-size: 12px; color: var(--fs-muted); }
+.forme-app .pricing-plan-description { margin: 20px 0; color: var(--fs-muted); font: 14px/1.5 var(--fs-font); }
+.forme-app .pricing-plan-list li { font: 13px/1.6 var(--fs-font); }
+.forme-app .pricing-beta-note { margin-top: 28px; color: var(--fs-muted); font: 13px/1.6 var(--fs-font); }
+@keyframes forme-reveal { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+@media (min-width: 1500px) { .forme-app .garment-grid, .forme-app.public-profile-page .public-garments-grid { grid-template-columns: repeat(6,minmax(0,1fr)); } }
+@media (min-width: 901px) and (max-width: 1100px) { .forme-app .garment-grid, .forme-app.public-profile-page .public-garments-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } .forme-app .catalog-search { max-width: none; } }
+@media (max-width: 900px) {
+  :root { --fs-gutter: 20px; }
+  .forme-app .topbar-inner { grid-template-columns: 1fr auto; gap: 20px; }
+  .forme-app .zone-nav { display: none; }
+  .forme-app .wordmark { font-size: 24px; }
+  .forme-app .topbar-account { gap: 14px; }
+  .forme-app .mobile-nav { position: fixed; inset: auto 0 0; z-index: 120; height: calc(64px + env(safe-area-inset-bottom)); min-height: calc(64px + env(safe-area-inset-bottom)); padding: 0 var(--fs-gutter) env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; border: 0; border-top: 1px solid var(--fs-line); background: rgb(243 243 239 / .96); backdrop-filter: blur(16px); }
+  .forme-app .mobile-nav button { position: relative; min-height: 64px; padding: 12px 0; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--fs-muted); font: 500 13px/1 var(--fs-font); letter-spacing: 0; text-transform: none; display: grid; place-items: center; }
+  .forme-app .mobile-nav button.active { color: var(--fs-ink); background: none; }
+  .forme-app .mobile-nav button.active::before { content: ""; position: absolute; top: -1px; width: 24px; height: 2px; background: var(--fs-ink); }
+  .forme-app .content { padding: 12px var(--fs-gutter) calc(100px + env(safe-area-inset-bottom)); }
+  .forme-app .closet-commandbar { margin-bottom: 24px; gap: 12px; }
+  .forme-app .closet-commandbar > div { display: grid; gap: 6px; }
+  .forme-app .closet-commandbar h1 { font-size: 30px; }
+  .forme-app .closet-commandbar .primary-action { padding: 0; font-size: 14px; }
+  .forme-app .closet-commandbar .primary-action svg { width: 16px; }
+  .forme-app .catalog-toolbar { grid-template-columns: minmax(0,1fr) auto; gap: 4px 20px; margin: 0 0 20px; padding: 0; }
+  .forme-app .catalog-collection { grid-column: 1; grid-row: 1; gap: 8px; }
+  .forme-app .closet-add { grid-column: 2; grid-row: 1; justify-self: end; font-size: 14px; }
+  .forme-app .catalog-search { grid-column: 1; grid-row: 2; justify-self: stretch; width: 100%; max-width: none; margin: 0; }
+  .forme-app .catalog-tools { grid-column: 2; grid-row: 2; justify-self: end; gap: 0; }
+  .forme-app .catalog-tools .favorites-toggle > span, .forme-app .catalog-filter > span { display: none; }
+  .forme-app .catalog-tools .catalog-filter { width: 44px; }
+  .forme-app :is(.catalog-search,.library-search) input, .forme-app .catalog-sort select { font-size: 16px; }
+  .forme-app .garment-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 32px 20px; }
+  .forme-app [data-grid-size="small"] .garment-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 28px 12px; }
+  .forme-app [data-grid-size="large"] .garment-grid { grid-template-columns: minmax(0,1fr); }
+  .forme-app .garment-card .image-wrap > img { padding: 8px; }
+  .forme-app.public-profile-page .public-garments-grid img { padding: 8px; }
+  .forme-app .looks-commandbar > div { display: flex; gap: 10px; }
+  .forme-app .saved-looks-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 26px 14px; }
+  .forme-app .saved-look-meta { padding-top: 8px; gap: 4px; }
+  .forme-app .saved-look-meta strong { font-size: 13px; }
+  .forme-app .saved-look-meta .forme-menu { margin: -6px -8px 0 0; }
+  .forme-app .saved-look-card:nth-child(odd) .forme-menu-content { right: auto; left: 0; }
+  .forme-app .saved-look-meta small { font-size: 11px; }
+  .forme-app.view-studio .studio-view { inset: 64px 0 calc(64px + env(safe-area-inset-bottom)); padding: 12px 20px; }
+  .forme-app.view-studio .studio-layout { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px 20px; }
+  .forme-app.view-studio .studio-library-column { padding-right: 20px; }
+  .forme-app.view-studio .studio-document-name > span { display: none; }
+  .forme-app.view-studio .history-action[aria-label="Rehacer"] { display: none; }
+  .forme-app.view-studio .studio-document-actions { gap: 2px; }
+  .forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { padding-inline: 8px; }
+  .forme-app.view-studio .new-look-action { padding-left: 0; }
+  .forme-app.view-studio .sticker-tray { grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 24px 16px; }
+  .forme-app.view-studio .library-search input { font-size: 16px; }
+  .forme-app.view-studio .canvas-panel-nav { gap: 12px; }
+  .forme-app.view-studio .canvas-layers-panel li button { min-width: 44px; }
+  .forme-app.view-studio .canvas-layers-panel .layer-select { min-width: 0; }
+  .forme-app.view-studio .empty-canvas h2 { font-size: 24px; }
+  .forme-app.view-studio .empty-canvas p { font-size: 12px; }
+  .forme-app .share-status-message, .forme-app .canvas-status-message { bottom: calc(144px + env(safe-area-inset-bottom)); width: max-content; }
+  .forme-app .forme-dialog { display: block; height: fit-content; min-height: 0; width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 20px; border-radius: 10px; }
+  .forme-app .garment-editor-body { grid-template-columns: 1fr; gap: 20px; }
+  .forme-app .garment-editor.is-editing .garment-editor-image { height: 160px; }
+  .forme-app .garment-editor-image { height: 230px; aspect-ratio: auto; padding: 12px; }
+  .forme-app .garment-detail-copy { padding: 0; gap: 18px; }
+  .forme-app .garment-detail-copy h3 { font-size: 26px; }
+  .forme-app .garment-detail-copy dl { padding: 0; }
+  .forme-app .garment-editor-fields :is(input,select,textarea), .forme-app .attribute-filters select, .forme-app .tag-input-row input { font-size: 16px; }
+  .forme-app .garment-editor-fields { gap: 18px 14px; }
+  .forme-app .garment-editor-actions { position: sticky; bottom: -20px; margin: 0 -20px -20px; padding: 16px 20px; background: var(--fs-surface); border-top: 1px solid var(--fs-line); }
+  .forme-app .garment-editor-actions button[type="submit"] { flex: 1 0 100%; }
+  .forme-app .upload-heading { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+  .forme-app .upload-heading h1 { font-size: 24px; }
+  .forme-app .upload-view:not(:has(.has-files)) { min-height: calc(100dvh - 188px); }
+  .forme-app .upload-layout { margin: 12px 0; }
+  .forme-app .upload-layout.has-files { grid-template-columns: 1fr; gap: 28px; }
+  .forme-app .bulk-dropzone { min-height: 320px; padding: 32px 20px; }
+  .forme-app .dropzone-empty h3 { font-size: 24px; }
+  .forme-app :is(.profile-page,.settings-page) { padding: 28px var(--fs-gutter) calc(100px + env(safe-area-inset-bottom)); }
+  .forme-app .profile-edit-columns, .forme-app .settings-page-grid { grid-template-columns: minmax(0,1fr); gap: 36px; }
+  .forme-app .profile-page-hero { grid-template-columns: 72px minmax(0,1fr); gap: 20px; padding-bottom: 28px; }
+  .forme-app .profile-page-portrait { width: 72px; height: 88px; align-self: start; }
+  .forme-app .profile-page-intro h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .forme-app .profile-page-links { margin-top: 10px; gap: 0 16px; }
+  .forme-app .profile-page-links button { font-size: 13px; }
+  .forme-app .profile-page-stats { grid-column: 1/-1; gap: 32px; }
+  .forme-app .profile-page-stats > div { flex-direction: row; text-transform: none; display: flex; align-items: baseline; gap: 8px; }
+  .forme-app .profile-page-stats dd { font-size: 22px; }
+  .forme-app .profile-page-body { margin-top: 28px; }
+  .forme-app .profile-page-fields { grid-template-columns: 1fr; gap: 22px; }
+  .forme-app .profile-page-save-row { flex-wrap: wrap; }
+  .forme-app .settings-page-heading { gap: 16px; }
+  .forme-app .settings-page-heading span { font-size: 13px; }
+  .forme-app.public-profile-page .public-profile-frame { padding: 28px var(--fs-gutter) calc(100px + env(safe-area-inset-bottom)); }
+  .forme-app.public-profile-page .public-profile-hero { grid-template-columns: 72px minmax(0,1fr); gap: 20px; padding: 0 0 28px; }
+  .forme-app.public-profile-page .public-profile-avatar { width: 72px; height: 88px; align-self: start; }
+  .forme-app.public-profile-page .public-profile-copy h1 { font-size: 28px; }
+  .forme-app.public-profile-page .public-profile-counts { grid-column: 1/-1; }
+  .forme-app.public-profile-page .public-profile-counts strong { font-size: 22px; }
+  .forme-app.public-profile-page .public-looks-grid, .forme-app.public-profile-page .public-garments-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 14px; }
+  .forme-app .public-header { grid-template-columns: 1fr auto; gap: 12px; backdrop-filter: none; }
+  .forme-app .public-navigation { display: flex; position: fixed; inset: auto 0 0; height: 64px; padding: 0 20px env(safe-area-inset-bottom); justify-content: space-around; gap: 14px; background: var(--fs-canvas); border-top: 1px solid var(--fs-line); }
+  .forme-app .public-navigation a { min-width: 0; display: grid; align-items: center; min-height: 44px; font-size: 13px; }
+  .forme-app .public-account-entry { display: inline-flex; align-items: center; }
+  .forme-app .pricing-page-content { padding: 32px var(--fs-gutter) 100px; }
+  .forme-app .pricing-intro h1 { font-size: 30px; }
+  .forme-app .pricing-plan-list { grid-template-columns: 1fr; gap: 20px; }
 }
-
-.forme-landing .public-menu summary {
-  padding: 10px 0;
-  list-style: none;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+@media (max-width: 699px) {
+  .forme-app.view-studio .studio-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: 44px minmax(0,1fr) 44px 216px; gap: 8px; }
+  .forme-app.view-studio .studio-heading { grid-column: 1; grid-row: 1; gap: 4px; }
+  .forme-app.view-studio .canvas-column { grid-column: 1; grid-row: 2; }
+  .forme-app.view-studio .studio-document-actions { grid-column: 1; grid-row: 3; padding-top: 0; gap: 4px; }
+  .forme-app.view-studio .studio-document-actions button, .forme-app.view-studio .studio-document-actions .forme-menu > summary { min-height: 40px; height: 40px; }
+  .forme-app.view-studio .studio-library-column { grid-column: 1; grid-row: 4; padding: 8px 0 0; border: 0; border-top: 1px solid var(--fs-line); }
+  .forme-app.view-studio .garment-library-panel, .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { --library-thumbnail: 88px; grid-template-columns: minmax(0,1fr) minmax(110px,1fr); grid-template-rows: 36px 44px minmax(0,1fr); gap: 4px 16px; }
+  .forme-app.view-studio .garment-library-panel[data-grid-size="small"] { --library-thumbnail: 68px; }
+  .forme-app.view-studio .garment-library-panel[data-grid-size="large"] { --library-thumbnail: 112px; }
+  .forme-app.view-studio .library-tools .forme-menu-content { top: auto; bottom: calc(100% + 4px); }
+  .forme-app.view-studio .garment-library-panel > h2 { min-height: 36px; }
+  .forme-app.view-studio .library-options { gap: 16px; }
+  .forme-app.view-studio .library-options select { min-height: 32px; font-size: 14px; }
+  .forme-app.view-studio .sticker-tray-groups { padding: 0 0 16px; overflow-x: auto; overflow-y: hidden; }
+  .forme-app.view-studio .sticker-tray-section { height: 100%; }
+  .forme-app.view-studio .sticker-tray { display: flex; width: max-content; height: 100%; gap: 16px; }
+  .forme-app.view-studio .sticker-tray button { flex: 0 0 var(--library-thumbnail); width: var(--library-thumbnail); height: 100%; }
+  .forme-app.view-studio .sticker-tray img { width: var(--library-thumbnail); height: 100%; max-height: calc(var(--library-thumbnail) * 1.25); padding: 2px; }
+  .forme-app.view-studio .canvas-thumbnail-label { bottom: -18px; font-size: 11px; }
+  .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 36px 44px auto minmax(0,1fr); }
+  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { position: absolute; inset: 52px 0 268px; max-height: none; margin: 0; padding: 8px 16px; border: 1px solid var(--fs-line); border-radius: 4px; background: var(--fs-surface); z-index: 97; }
+  .forme-app.view-studio .canvas-panel-close { top: 8px; right: 8px; }
 }
-
-.forme-landing .public-menu summary::-webkit-details-marker {
-  display: none;
+@media (max-width: 370px) {
+  .forme-app .closet-add-context { display: none; }
+  .forme-app .closet-commandbar .primary-action svg { display: none; }
+  .forme-app.view-studio .studio-view { padding-inline: 12px; }
+  .forme-app.view-studio .studio-document-actions { gap: 2px; }
+  .forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { padding-inline: 6px; }
+  .forme-app.view-studio .new-look-action { padding-left: 0; }
 }
-
-.forme-landing .public-menu nav {
-  min-width: 132px;
-  padding: 8px 0 12px;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  display: grid;
-  justify-items: end;
-  gap: 10px;
-  background: var(--fs-signal);
+@media (max-width: 699px) and (max-height: 740px) {
+  .forme-app.view-studio .studio-layout { grid-template-rows: 40px minmax(0,1fr) 40px 172px; gap: 4px; }
+  .forme-app.view-studio .garment-library-panel, .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 32px 44px minmax(0,1fr); }
+  .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 32px 44px auto minmax(0,1fr); }
+  .forme-app.view-studio .garment-library-panel > h2 { min-height: 32px; }
+  .forme-app.view-studio .library-options select { min-height: 28px; }
+  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { inset: 44px 0 220px; }
 }
-
-.forme-landing .public-menu nav a {
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
+@media (max-height: 600px) and (orientation: landscape) {
+  .forme-app.view-studio .studio-view { padding-block: 4px; }
+  .forme-app.view-studio .studio-layout { grid-template-rows: 36px minmax(0,1fr) 40px; gap-block: 4px; }
+  .forme-app.view-studio .studio-library-column { grid-row: 1/-1; }
+  .forme-app.view-studio .studio-document-actions { padding-top: 0; }
+  .forme-app.view-studio .garment-library-panel { grid-template-rows: 36px 32px minmax(0,1fr); gap-block: 4px; }
+  .forme-app.view-studio .garment-library-panel > h2 { min-height: 36px; }
+  @media (max-width: 699px) {
+    .forme-app.view-studio .studio-layout { grid-template-columns: minmax(0,1fr) 280px; column-gap: 16px; }
+    .forme-app.view-studio .studio-heading { grid-column: 2; grid-row: 1; }
+    .forme-app.view-studio .canvas-column { grid-column: 2; grid-row: 2; }
+    .forme-app.view-studio .studio-document-actions { grid-column: 2; grid-row: 3; gap: 2px; }
+    .forme-app.view-studio .studio-document-actions button, .forme-app.view-studio .studio-document-actions .forme-menu > summary { min-height: 36px; height: 36px; }
+    .forme-app.view-studio .canvas-core-action, .forme-app.view-studio .studio-document-actions .primary-action { padding-inline: 6px; }
+    .forme-app.view-studio .new-look-action { padding-left: 0; }
+    .forme-app.view-studio .studio-library-column { grid-column: 1; grid-row: 1/-1; padding: 0 12px 0 0; border-top: 0; border-right: 1px solid var(--fs-line); }
+    .forme-app.view-studio .garment-library-panel { grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 8px; }
+    .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 36px 32px auto minmax(0,1fr); }
+    .forme-app.view-studio .library-options { gap: 8px; }
+    .forme-app.view-studio .sticker-tray-groups { overflow: auto; }
+    .forme-app.view-studio .sticker-tray-section { height: auto; }
+    .forme-app.view-studio .sticker-tray { display: grid; grid-template-columns: repeat(auto-fill,minmax(76px,1fr)); width: 100%; height: auto; gap: 24px 12px; }
+    .forme-app.view-studio .sticker-tray button { width: 100%; height: auto; }
+    .forme-app.view-studio .sticker-tray img { width: 100%; height: auto; max-height: none; }
+    .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { inset: 40px 0 40px calc(100% - 280px); width: auto; padding: 4px 12px; gap: 4px; }
+    .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) h2 { min-height: 28px; }
+    .forme-app.view-studio .canvas-layers-panel > p { display: none; }
+    .forme-app.view-studio .canvas-panel-close { top: 0; right: 0; width: 36px; height: 36px; }
+  }
 }
-
-.forme-landing .public-menu summary:focus-visible,
-.forme-landing .public-menu a:focus-visible,
-.forme-landing .landing-primary:focus-visible,
-.forme-app.view-wardrobe.route-closet button:focus-visible,
-.forme-app.view-wardrobe.route-closet select:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 4px;
+@media (prefers-reduced-motion: reduce) {
+  .forme-app *, .forme-dialog *, .forme-dialog[open] { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .forme-app.view-studio .studio-document-actions button[aria-busy="true"]::after { animation: none; }
 }
 
 /* Portada */
@@ -185,1905 +748,6 @@
   animation: none;
 }
 
-/* Closet shell */
-.forme-app.view-wardrobe.route-closet {
-  background: var(--fs-canvas);
-}
-
-.forme-app.view-wardrobe.route-closet .topbar {
-  height: 64px;
-}
-
-.forme-app.view-wardrobe.route-looks .topbar {
-  height: 64px;
-}
-
-.forme-app.view-wardrobe.route-closet .topbar-inner {
-  max-width: none;
-  padding: 0;
-}
-
-.forme-app.view-wardrobe.route-looks .topbar-inner {
-  max-width: none;
-  padding: 0;
-}
-
-.forme-app.view-wardrobe.route-closet .zone-nav {
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  gap: 24px;
-}
-
-.forme-app.view-wardrobe.route-looks .zone-nav {
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  gap: 24px;
-}
-
-.forme-app.view-wardrobe.route-closet .zone-nav button,
-.forme-app.view-wardrobe.route-closet .canvas-entry,
-.forme-app.view-wardrobe.route-closet .pricing-entry,
-.forme-app.view-wardrobe.route-closet .google-login {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-}
-
-.forme-app.view-wardrobe.route-looks .zone-nav button,
-.forme-app.view-wardrobe.route-looks .pricing-entry,
-.forme-app.view-wardrobe.route-looks .google-login {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-}
-
-.forme-app.view-wardrobe.route-closet .zone-nav button.active,
-.forme-app.view-wardrobe.route-closet .zone-nav button:hover,
-.forme-app.view-wardrobe.route-closet .canvas-entry:hover,
-.forme-app.view-wardrobe.route-closet .canvas-entry.active {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-wardrobe.route-looks .zone-nav button.active,
-.forme-app.view-wardrobe.route-looks .zone-nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app .pricing-entry {
-  display: none;
-}
-
-.forme-app.view-wardrobe.route-closet .avatar {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-.forme-app.view-wardrobe.route-looks .avatar {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-.forme-app.view-wardrobe.route-closet .content {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0 0 96px;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar {
-  min-height: 108px;
-  padding: 22px 0 20px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar h1 {
-  margin: 0;
-  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-}
-
-.forme-app .closet-looks-nav {
-  display: flex;
-  align-items: baseline;
-  gap: 0;
-}
-
-.forme-app .closet-looks-nav button {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.forme-app .closet-looks-nav > span {
-  color: var(--fs-muted);
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav {
-  gap: 0;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button,
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav > span {
-  min-height: 0;
-  color: var(--fs-muted);
-  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button.active,
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button,
-.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav > span {
-  min-height: 0;
-  color: var(--fs-muted);
-  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-  text-transform: none;
-}
-
-.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button.active,
-.forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar span {
-  color: var(--fs-muted);
-  font-size: 12px;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar nav {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar button {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-commandbar button:hover,
-.forme-app.view-wardrobe.route-closet .closet-commandbar button.active,
-.forme-app.view-wardrobe.route-closet .closet-commandbar .closet-add {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-wardrobe.route-closet .wardrobe-catalog {
-  padding: 0 0 72px;
-  gap: 28px;
-}
-
-.forme-app.view-wardrobe.route-closet .guest-closet {
-  padding: 0;
-}
-
-.forme-app.view-wardrobe.route-closet .guest-basics {
-  margin: 0;
-  padding-bottom: 72px;
-}
-
-.forme-app.view-wardrobe.route-closet .filter-sidebar.open {
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app.view-wardrobe.route-closet .filter-sidebar-header,
-.forme-app.view-wardrobe.route-closet .attribute-filters label {
-  border: 0 !important;
-}
-
-.forme-app.view-wardrobe.route-closet .filter-sidebar-header {
-  padding: 0 0 12px;
-  color: var(--fs-muted);
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app.view-wardrobe.route-closet .attribute-filters label,
-.forme-app.view-wardrobe.route-closet .reset-filters {
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-  font-size: 10px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app.view-wardrobe.route-closet .attribute-filters select {
-  color: var(--fs-ink);
-  font: 500 14px/1.2 var(--fs-font);
-}
-
-/* Garments are the permanent layer. Everything else is contextual. */
-.forme-app.view-wardrobe.route-closet .garment-grid {
-  gap: 10px;
-}
-
-.forme-app.view-wardrobe.route-closet .garment-card,
-.forme-app.view-wardrobe.route-closet .garment-card:hover {
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  transform: none;
-}
-
-.forme-app.view-wardrobe.route-closet .image-wrap {
-  overflow: visible;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app.view-wardrobe.route-closet .image-wrap::after {
-  content: none;
-}
-
-.forme-app.view-wardrobe.route-closet .image-wrap img {
-  width: 100%;
-  height: 100%;
-  padding: clamp(10px, 7%, 26px);
-  object-fit: contain;
-  object-position: center;
-  filter: var(--fs-garment-shadow);
-  transition: transform 180ms var(--fs-ease);
-}
-
-.forme-app.view-wardrobe.route-closet .garment-card:hover .image-wrap img,
-.forme-app.view-wardrobe.route-closet .garment-card:focus-within .image-wrap img {
-  transform: translateY(-2px);
-}
-
-.forme-app.view-wardrobe.route-closet .card-hover-row {
-  position: absolute;
-  z-index: 4;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 160ms ease;
-}
-
-.forme-app.view-wardrobe.route-closet .card-meta {
-  width: auto;
-  min-width: 0;
-  padding: 0;
-  position: static;
-  flex: 1 1 auto;
-  opacity: 1;
-  pointer-events: none;
-}
-
-.forme-app.view-wardrobe.route-closet .card-meta > span {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.forme-app.view-wardrobe.route-closet .card-meta strong {
-  display: block;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--fs-ink);
-  font: 600 13px/1.12 var(--fs-font);
-  letter-spacing: -0.015em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.forme-app.view-wardrobe.route-closet .card-meta small {
-  display: block;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--fs-muted);
-  font: 500 10px/1.2 var(--fs-font);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: none;
-  white-space: nowrap;
-}
-
-.forme-app.view-wardrobe.route-closet .card-hover-actions {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  pointer-events: none;
-}
-
-.forme-app.view-wardrobe.route-closet .heart {
-  width: 28px;
-  height: 28px;
-  top: 0;
-  right: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-  color: var(--fs-muted);
-  opacity: 0;
-  pointer-events: none;
-  transform: none;
-  transition: color 160ms ease, opacity 160ms ease;
-}
-
-.forme-app.view-wardrobe.route-closet .heart.active {
-  color: var(--fs-signal);
-}
-
-.forme-app.view-wardrobe.route-closet .card-edit-open,
-.forme-app.view-wardrobe.route-closet .card-studio-add {
-  width: max-content;
-  min-height: 0;
-  padding: 0;
-  position: static;
-  z-index: 4;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  font: 600 11px/1.12 var(--fs-font);
-  letter-spacing: -0.01em;
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
-  cursor: pointer;
-}
-
-.forme-app.view-wardrobe.route-closet .card-edit-open {
-  color: var(--fs-muted);
-}
-
-.forme-app.view-wardrobe.route-closet .card-studio-add {
-  color: var(--fs-signal);
-}
-
-.forme-app.view-wardrobe.route-closet .garment-card:hover .heart,
-.forme-app.view-wardrobe.route-closet .garment-card:focus-within .heart {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.forme-app.view-wardrobe.route-closet .garment-card:hover .card-hover-row,
-.forme-app.view-wardrobe.route-closet .garment-card:focus-within .card-hover-row {
-  opacity: 1;
-}
-
-.forme-app.view-wardrobe.route-closet .garment-card:hover .card-hover-actions,
-.forme-app.view-wardrobe.route-closet .garment-card:focus-within .card-hover-actions {
-  pointer-events: auto;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-group + .closet-group {
-  margin-top: 64px;
-  padding-top: 0;
-  border: 0 !important;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-group-heading {
-  min-height: 46px;
-  padding: 0;
-  border: 0 !important;
-  align-items: center;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-group-heading h3 {
-  margin: 0;
-  font: 600 15px/1 var(--fs-font);
-  letter-spacing: -0.02em;
-  text-transform: none;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-group-heading > span {
-  color: var(--fs-muted);
-  font: 500 11px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app.view-wardrobe.route-closet .closet-empty-personal {
-  min-height: 240px;
-  padding: 24px 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-/* Photo roles remain internal operational metadata. */
-.forme-app .garment-photo-switch {
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.forme-app .garment-photo-switch button {
-  min-height: 28px;
-  padding: 0 0 5px;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  background: transparent;
-  color: var(--forme-muted);
-  font: 600 9px/1 var(--forme-mono);
-  letter-spacing: 0.08em;
-  cursor: pointer;
-}
-
-.forme-app .garment-photo-switch button.active {
-  border-bottom-color: var(--forme-signal);
-  color: var(--forme-ink);
-}
-
-@media (hover: none) {
-  .forme-app.view-wardrobe.route-closet .card-hover-row,
-  .forme-app.view-wardrobe.route-closet .heart {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .forme-landing .public-header {
-    padding: 0;
-  }
-
-  .forme-landing .landing-hero {
-    min-height: 100dvh;
-    padding: 92px 0 8px;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(280px, 1fr);
-    align-content: stretch;
-    gap: 12px;
-    overflow: hidden;
-  }
-
-  .forme-landing .landing-hero-copy > p {
-    margin-bottom: 18px;
-    font-size: 10px;
-  }
-
-  .forme-landing .landing-hero-copy h1 {
-    font-size: clamp(48px, 13.4vw, 64px);
-    line-height: 0.86;
-  }
-
-  .forme-landing .landing-hero-copy > span {
-    width: min(100%, 340px);
-    margin-top: 20px;
-    font-size: 15px;
-  }
-
-  .forme-landing .landing-primary {
-    margin-top: 22px;
-    font-size: 13px;
-  }
-
-  .forme-landing .landing-sculpture-hero {
-    height: 100%;
-    min-height: 280px;
-  }
-
-  .forme-landing .landing-garment-main {
-    width: min(72%, 300px);
-  }
-
-  .forme-app.view-wardrobe.route-closet .topbar-inner {
-    padding: 0;
-  }
-
-  .forme-app.view-wardrobe.route-looks .topbar-inner {
-    padding: 0;
-  }
-
-  .forme-app.view-wardrobe.route-closet .content {
-    padding-inline: 0;
-  }
-
-  .forme-app.view-wardrobe.route-closet .closet-commandbar {
-    min-height: 88px;
-    padding: 14px 0;
-  }
-
-  .forme-app.view-wardrobe.route-closet .closet-commandbar h1,
-  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav button,
-  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav > span {
-    font-size: 40px;
-  }
-
-  .forme-app.view-wardrobe.route-closet .closet-commandbar nav {
-    gap: 14px;
-  }
-
-  .forme-app.view-wardrobe.route-closet .closet-commandbar .closet-looks-nav {
-    gap: 0;
-  }
-
-  .forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav button,
-  .forme-app.view-wardrobe.route-looks .archive-hero-copy .closet-looks-nav > span {
-    font-size: 40px;
-  }
-
-  .forme-app.view-wardrobe.route-closet .wardrobe-catalog {
-    padding-top: 0;
-  }
-
-  .forme-app.view-wardrobe.route-closet .garment-grid {
-    gap: 6px;
-  }
-
-  .forme-app.view-wardrobe.route-closet .image-wrap img {
-    padding: 5%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .forme-landing .landing-garment,
-  .forme-app.view-wardrobe.route-closet .image-wrap img,
-  .forme-app.view-wardrobe.route-closet .card-hover-row,
-  .forme-app.view-wardrobe.route-closet .heart,
-  .forme-app.view-wardrobe.route-closet .card-edit-open,
-  .forme-app.view-wardrobe.route-closet .card-studio-add {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/*
- * Approved product-wide minimal system
- * Scope: every Formé route.
- */
-.forme-app,
-.public-app,
-.forme-landing {
-  --fs-canvas: #f1f1ec;
-  --fs-surface: #e7e8e3;
-  --fs-ink: #111310;
-  --fs-muted: rgba(17, 19, 16, 0.56);
-  --fs-line: rgba(17, 19, 16, 0.16);
-  --fs-signal: #f0442f;
-  --fs-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --fs-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --fs-garment-shadow: drop-shadow(0 12px 18px rgba(17, 19, 16, 0.12));
-  --garment-sticker-filter: var(--fs-garment-shadow);
-  background: var(--fs-canvas);
-  color: var(--fs-ink);
-  font-family: var(--fs-font);
-}
-
-.forme-app .topbar,
-.public-app .public-header {
-  height: 64px;
-  min-height: 64px;
-  border: 0 !important;
-  background: color-mix(in srgb, var(--fs-canvas) 90%, transparent);
-  box-shadow: none !important;
-  backdrop-filter: blur(18px);
-}
-
-.forme-app .topbar::after {
-  content: none !important;
-}
-
-.forme-app .topbar-inner,
-.public-app .public-header {
-  width: 100%;
-  max-width: none;
-  padding: 0;
-}
-
-.forme-app .wordmark,
-.public-app .public-wordmark {
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  font: 800 29px/1 var(--fs-font);
-  letter-spacing: -0.07em;
-}
-
-.forme-app .zone-nav {
-  min-width: 0;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-  gap: 24px;
-  backdrop-filter: none;
-}
-
-.forme-app .zone-nav button,
-.forme-app .google-login,
-.forme-app .pricing-entry {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .zone-nav button:hover,
-.forme-app .zone-nav button.active,
-.forme-app .google-login:hover {
-  background: transparent !important;
-  color: var(--fs-ink);
-  box-shadow: none !important;
-}
-
-.forme-app .pricing-entry {
-  display: none;
-}
-
-.forme-app .avatar,
-.forme-app .session-checking {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0 !important;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .content {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0 0 96px;
-}
-
-.forme-app button {
-  border-radius: 0;
-}
-
-.forme-app button:active,
-.public-app button:active,
-.public-app a:active {
-  transform: translateY(1px);
-}
-
-.public-app .public-header {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  color: var(--fs-ink);
-}
-
-.public-app .public-navigation {
-  gap: 24px;
-}
-
-.public-app .public-navigation a,
-.public-app .public-entry {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  display: inline-flex;
-  align-items: center;
-  font: 600 12px/1 var(--fs-font);
-  text-decoration: none;
-}
-
-.public-app .public-navigation a:hover,
-.public-app .public-entry:hover {
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  transform: none;
-}
-
-.public-app .public-entry {
-  justify-self: end;
-  color: var(--fs-ink);
-}
-
-/* Closet / Looks */
-.forme-app.view-wardrobe.route-looks .content,
-.forme-app.view-wardrobe.route-asistente .content {
-  padding: 0 0 96px;
-}
-
-.forme-app .looks-commandbar,
-.forme-app .assistant-commandbar {
-  min-height: 108px;
-  padding: 22px 0 20px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.forme-app .looks-commandbar > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.forme-app .looks-commandbar .closet-looks-nav button,
-.forme-app .looks-commandbar .closet-looks-nav > span {
-  min-height: 0;
-  color: var(--fs-muted);
-  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-}
-
-.forme-app .looks-commandbar .closet-looks-nav button.active,
-.forme-app .looks-commandbar .closet-looks-nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app .looks-commandbar > div > span {
-  color: var(--fs-muted);
-  font-size: 12px;
-}
-
-.forme-app .looks-commandbar nav,
-.forme-app .closet-commandbar nav {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.forme-app .looks-commandbar nav button,
-.forme-app .closet-commandbar nav button {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-  cursor: pointer;
-}
-
-.forme-app .looks-commandbar nav button:last-child,
-.forme-app .closet-commandbar nav button:last-child,
-.forme-app .looks-commandbar nav button:hover,
-.forme-app .closet-commandbar nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app .saved-looks-grid {
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 42px 10px;
-}
-
-.forme-app .saved-look-card,
-.forme-app .saved-look-card:hover {
-  min-width: 0;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-  transform: none;
-}
-
-.forme-app .saved-look-open,
-.forme-app .saved-look-preview {
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .saved-look-open > span {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 12px 0;
-  border: 0;
-  background: color-mix(in srgb, var(--fs-canvas) 92%, transparent);
-  color: var(--fs-ink);
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .saved-look-meta {
-  padding-top: 10px;
-  align-items: baseline;
-}
-
-.forme-app .saved-look-meta strong {
-  font: 600 14px/1.1 var(--fs-font);
-  letter-spacing: -0.02em;
-}
-
-.forme-app .saved-look-meta small {
-  margin-top: 4px;
-  color: var(--fs-muted);
-  font: 500 10px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .saved-look-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-
-.forme-app .saved-look-card:hover .saved-look-actions,
-.forme-app .saved-look-card:focus-within .saved-look-actions {
-  opacity: 1;
-}
-
-.forme-app .saved-look-meta button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 600 10px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .saved-look-meta button:hover,
-.forme-app .saved-look-meta .share-look,
-.forme-app .saved-look-meta .visibility-toggle.public {
-  color: var(--fs-ink);
-}
-
-.forme-app .looks-empty {
-  min-height: 320px;
-  padding: 0;
-  border: 0 !important;
-  background: transparent;
-}
-
-.forme-app .looks-empty p,
-.forme-app .looks-empty button {
-  font-family: var(--fs-font);
-}
-
-/* Weekly planner */
-.forme-app .looks-view > .week-view {
-  margin-top: 96px;
-  padding: 0;
-}
-
-.forme-app .app-section-heading {
-  padding: 0 0 24px;
-  border: 0 !important;
-}
-
-.forme-app .app-section-heading h2 {
-  font: 600 clamp(32px, 3.2vw, 48px)/0.92 var(--fs-font);
-  letter-spacing: -0.055em;
-}
-
-.forme-app .app-section-heading span {
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-}
-
-.forme-app .week-progress i {
-  display: none !important;
-}
-
-.forme-app .week-progress strong {
-  font: 600 24px/1 var(--fs-font);
-}
-
-.forme-app .week-progress span,
-.forme-app .week-auto-plan {
-  color: var(--fs-muted);
-  font: 600 10px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .week-auto-plan {
-  min-height: 36px;
-  border: 0;
-  color: var(--fs-ink);
-}
-
-.forme-app .week-strip {
-  gap: 8px;
-  padding: 0;
-}
-
-.forme-app .week-strip > button {
-  min-height: 208px;
-  padding: 0 0 12px;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .week-strip-preview {
-  margin-bottom: 10px;
-  background: transparent !important;
-}
-
-.forme-app .week-strip > button.active {
-  background: transparent;
-  box-shadow: none !important;
-  color: var(--fs-signal);
-}
-
-.forme-app .week-strip > button > span,
-.forme-app .week-strip > button > strong,
-.forme-app .week-strip > button > small {
-  margin-left: 0;
-  margin-right: 0;
-  font-family: var(--fs-font);
-}
-
-.forme-app .week-workspace {
-  padding-top: 44px;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  gap: 56px;
-}
-
-.forme-app .day-plan-card,
-.forme-app .week-look-grid > button {
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .day-plan-header {
-  padding: 0;
-}
-
-.forme-app .day-plan-empty {
-  min-height: 360px;
-  padding: 0;
-}
-
-.forme-app .day-plan-empty > span {
-  border: 0;
-  border-radius: 0;
-}
-
-.forme-app .occasion-row {
-  gap: 16px;
-}
-
-.forme-app .occasion-row button {
-  min-height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .occasion-row button.active {
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-}
-
-.forme-app .week-look-grid {
-  gap: 22px 8px;
-}
-
-.forme-app .week-look-grid > button > span {
-  padding: 8px 0;
-}
-
-/* Assistant */
-.forme-app .assistant-commandbar {
-  align-items: flex-end;
-}
-
-.forme-app .assistant-commandbar h1,
-.forme-app .assistant-commandbar p {
-  margin: 0;
-}
-
-.forme-app .assistant-commandbar h1 {
-  font: 600 clamp(38px, 4.4vw, 64px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-}
-
-.forme-app .assistant-commandbar p {
-  max-width: 520px;
-  margin-top: 12px;
-  color: var(--fs-muted);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
-.forme-app .assistant-commandbar > span {
-  color: var(--fs-muted);
-  font: 600 11px/1 var(--fs-font);
-}
-
-.forme-app .assistant-dialogue {
-  padding: 52px 0 0;
-  border: 0;
-  background: transparent;
-  gap: 44px;
-}
-
-.forme-app .assistant-dialogue-copy h2 {
-  margin: 0;
-  font: 600 clamp(30px, 3vw, 44px)/0.95 var(--fs-font);
-  letter-spacing: -0.05em;
-}
-
-.forme-app .assistant-dialogue-copy > span {
-  margin-top: 10px;
-  font-family: var(--fs-font);
-}
-
-.forme-app .assistant-question-flow {
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 56px;
-}
-
-.forme-app .assistant-preset-list > p,
-.forme-app .assistant-followup-list > p,
-.forme-app .assistant-data-gap p {
-  margin-bottom: 12px;
-  color: var(--fs-muted);
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .assistant-preset-list {
-  gap: 0;
-}
-
-.forme-app .assistant-preset-list > button {
-  min-height: 64px;
-  padding: 10px 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-}
-
-.forme-app .assistant-preset-list > button.active {
-  color: var(--fs-signal);
-}
-
-.forme-app .assistant-preset-list strong,
-.forme-app .assistant-preset-list small,
-.forme-app .assistant-preset-list b {
-  font-family: var(--fs-font);
-}
-
-.forme-app .assistant-preset-list strong {
-  font-size: 17px;
-  font-weight: 600;
-}
-
-.forme-app .assistant-followup-list > div {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px 10px;
-}
-
-.forme-app .assistant-followup-list button {
-  min-height: 84px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-ink);
-}
-
-.forme-app .assistant-followup-list button.active {
-  background: transparent;
-  color: var(--fs-signal);
-}
-
-.forme-app .assistant-followup-list button strong,
-.forme-app .assistant-followup-list button small {
-  font-family: var(--fs-font);
-}
-
-.forme-app .assistant-data-readiness {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.forme-app .assistant-data-gap {
-  margin: 0;
-}
-
-.forme-app .assistant-data-gap button {
-  border: 0;
-  color: var(--fs-ink);
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .assistant-response {
-  margin-top: 72px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  gap: 34px;
-}
-
-.forme-app .assistant-response-copy p,
-.forme-app .assistant-response-copy small {
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .assistant-response-copy h2 {
-  font: 600 clamp(30px, 3vw, 46px)/0.95 var(--fs-font);
-  letter-spacing: -0.05em;
-}
-
-.forme-app .assistant-response-copy > span {
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-}
-
-.forme-app .assistant-response-signals {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 28px;
-  border: 0;
-}
-
-.forme-app .assistant-response-signals article {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  display: block;
-}
-
-.forme-app .assistant-response-signals article span {
-  display: none;
-}
-
-.forme-app .assistant-response-signals article p {
-  color: var(--fs-ink);
-  font: 500 14px/1.5 var(--fs-font);
-}
-
-.forme-app .assistant-response-actions button {
-  border: 0;
-  color: var(--fs-ink);
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .styling-results {
-  padding-top: 96px;
-}
-
-.forme-app .styling-results-heading {
-  padding-bottom: 24px;
-}
-
-.forme-app .styling-results-heading p {
-  display: none;
-}
-
-.forme-app .styling-results-heading h2 {
-  font: 600 clamp(28px, 3vw, 44px)/0.95 var(--fs-font);
-  letter-spacing: -0.05em;
-}
-
-.forme-app .styling-results-meta span,
-.forme-app .styling-results-meta button {
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .styling-recommendation-grid {
-  padding-top: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 42px 10px;
-}
-
-.forme-app .styling-recommendation {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  display: block;
-}
-
-.forme-app .styling-recommendation-copy {
-  padding: 10px 0 0;
-}
-
-.forme-app .styling-recommendation-copy > span {
-  display: none;
-}
-
-.forme-app .styling-recommendation-copy h3 {
-  margin: 0 0 6px;
-  font: 600 15px/1.1 var(--fs-font);
-}
-
-.forme-app .styling-recommendation-copy p {
-  font-family: var(--fs-font);
-}
-
-.forme-app .styling-recommendation-copy button {
-  margin-top: 16px;
-  padding: 0;
-  color: var(--fs-ink);
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-}
-
-/* Canvas */
-.forme-app.view-studio {
-  --studio-rail-left: clamp(248px, 18vw, 320px);
-  --studio-rail-right: clamp(200px, 15vw, 260px);
-  --fs-canvas: #f4f4f4;
-  --studio-dot-color: rgba(17, 19, 16, 0.22);
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--fs-canvas);
-}
-
-.forme-app.view-studio .topbar {
-  height: 64px;
-  border: 0 !important;
-  background: color-mix(in srgb, var(--fs-canvas) 88%, transparent);
-  box-shadow: none !important;
-  backdrop-filter: blur(18px);
-}
-
-.forme-app.view-studio .topbar::after {
-  display: none;
-}
-
-.forme-app.view-studio .topbar-inner {
-  max-width: none;
-  padding: 0;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 16px;
-}
-
-.forme-app.view-studio .wordmark {
-  justify-self: start;
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  font: 800 29px/1 var(--fs-font);
-  letter-spacing: -0.07em;
-}
-
-.forme-app.view-studio .zone-nav {
-  min-width: 0;
-  padding: 0;
-  justify-self: center;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none;
-  gap: 24px;
-}
-
-.forme-app.view-studio .zone-nav button,
-.forme-app.view-studio .zone-nav button.active {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app.view-studio .zone-nav button.active,
-.forme-app.view-studio .zone-nav button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-studio .studio-view {
-  position: fixed;
-  inset: 64px 0 0;
-  padding: 0;
-}
-
-.forme-app.view-studio .studio-layout {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-columns: var(--studio-rail-left) minmax(0, 1fr) var(--studio-rail-right);
-  grid-template-areas: "library canvas looks";
-  background-color: var(--fs-canvas);
-  background-image: radial-gradient(circle at 6px 27px, var(--studio-dot-color) 0 1px, transparent 1.2px);
-  background-size: 37px 37px;
-}
-
-.forme-app.view-studio .canvas-column {
-  grid-area: canvas;
-  min-width: 0;
-  min-height: 0;
-  position: relative;
-}
-
-.forme-app.view-studio .look-canvas {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  background: transparent;
-}
-
-.forme-app.view-studio .look-artboard {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  aspect-ratio: auto;
-  transform: none;
-}
-
-.forme-app.view-studio .snapshot-frame {
-  width: auto;
-  height: min(calc(100cqh - 132px), 150cqw);
-  max-width: calc(100cqw - 96px);
-  aspect-ratio: 2 / 3;
-  border: 1px dashed rgba(17, 19, 16, 0.18);
-  background: transparent;
-  box-shadow: none;
-}
-
-.forme-app.view-studio .snapshot-frame span {
-  padding: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 500 10px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app.view-studio .snapshot-frame::before,
-.forme-app.view-studio .snapshot-frame::after {
-  border-color: rgba(17, 19, 16, 0.38);
-}
-
-.forme-app.view-studio .empty-canvas h2,
-.forme-app.view-studio .empty-canvas p {
-  font-family: var(--fs-font);
-}
-
-.forme-app.view-studio .empty-canvas h2 {
-  font-weight: 600;
-}
-
-.forme-app.view-studio .look-controls,
-.forme-app.view-studio .saved-looks-panel {
-  width: auto;
-  height: auto;
-  position: relative;
-  inset: auto;
-  padding: 16px 12px;
-  overflow: hidden;
-  border: 0 !important;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--fs-ink) 2.5%, var(--fs-canvas));
-  box-shadow: none !important;
-  backdrop-filter: none;
-  transform: none !important;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.forme-app.view-studio .look-controls {
-  grid-area: library;
-}
-
-.forme-app.view-studio .saved-looks-panel {
-  grid-area: looks;
-}
-
-.forme-app.view-studio .floating-panel-toggle {
-  display: none;
-}
-
-.forme-app.view-studio .floating-panel-header {
-  min-height: 32px;
-  padding: 0 0 10px;
-  border: 0;
-  color: var(--fs-muted);
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app.view-studio .floating-panel-header button {
-  display: none;
-}
-
-.forme-app.view-studio .studio-library-filters {
-  margin: 0 0 16px;
-  padding: 0;
-  border: 0;
-  display: flex;
-  gap: 12px;
-}
-
-.forme-app.view-studio .studio-library-filters button {
-  min-height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 500 11px/1 var(--fs-font);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app.view-studio .studio-library-filters button:hover,
-.forme-app.view-studio .studio-library-filters button.active {
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-}
-
-.forme-app.view-studio .tray-heading {
-  padding: 8px 0;
-}
-
-.forme-app.view-studio .tray-heading h3,
-.forme-app.view-studio .tray-heading p {
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app.view-studio .sticker-tray-section + .sticker-tray-section {
-  margin-top: 24px;
-  padding-top: 0;
-  border: 0;
-}
-
-.forme-app.view-studio .sticker-tray {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 6px;
-}
-
-.forme-app.view-studio .sticker-tray img,
-.forme-app.view-studio .sticker-tray button:hover img,
-.forme-app.view-studio .sticker-tray button:focus-visible img {
-  padding: 4px;
-  border: 0;
-  background: transparent;
-  filter: var(--fs-garment-shadow);
-}
-
-.forme-app.view-studio .sticker-tray span {
-  padding-top: 4px;
-  font: 500 11px/1.15 var(--fs-font);
-}
-
-.forme-app.view-studio .library-utilities {
-  padding-top: 12px;
-  border: 0;
-}
-
-.forme-app.view-studio .clear-look {
-  border: 0;
-  font: 600 10px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app.view-studio .saved-look-panel-list {
-  padding: 0;
-}
-
-.forme-app.view-studio .saved-look-panel-card {
-  min-height: 96px;
-  padding: 8px 0;
-  border: 0;
-  background: transparent;
-  grid-template-columns: 62px minmax(0, 1fr);
-}
-
-.forme-app.view-studio .saved-look-panel-card.active {
-  box-shadow: none;
-  color: var(--fs-signal);
-}
-
-.forme-app.view-studio .saved-look-panel-card .saved-look-preview {
-  border: 0;
-  background: transparent;
-}
-
-.forme-app.view-studio .saved-look-panel-card strong,
-.forme-app.view-studio .saved-look-panel-card small,
-.forme-app.view-studio .saved-look-panel-empty p,
-.forme-app.view-studio .saved-look-panel-empty small {
-  font-family: var(--fs-font);
-}
-
-.forme-app.view-studio .canvas-action-bar {
-  width: auto;
-  min-width: 0;
-  min-height: 48px;
-  left: var(--studio-rail-left);
-  right: var(--studio-rail-right);
-  bottom: 0;
-  transform: none;
-  padding: 0 18px;
-  border: 0 !important;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
-  box-shadow: none !important;
-  backdrop-filter: blur(16px);
-  grid-template-columns: repeat(4, auto);
-  justify-content: center;
-  gap: 32px;
-}
-
-.forme-app.view-studio .canvas-action-bar button,
-.forme-app.view-studio .canvas-action-bar .save-look-action,
-.forme-app.view-studio .canvas-action-bar .save-look-action.saved,
-.forme-app.view-studio .canvas-action-bar .mix-look-action,
-.forme-app.view-studio .canvas-action-bar .share-look-action {
-  min-height: 48px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 600 11px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app.view-studio .canvas-action-bar .save-look-action,
-.forme-app.view-studio .canvas-action-bar button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app.view-studio .canvas-action-bar .mix-look-action {
-  color: var(--fs-signal);
-}
-
-.forme-app.view-studio .canvas-action-bar button b {
-  font-family: var(--fs-font);
-}
-
-.forme-app.view-studio .canvas-piece img {
-  filter: var(--fs-garment-shadow);
-}
-
-.forme-app.view-studio .transform-handle {
-  border: var(--piece-outline-width) solid var(--fs-ink);
-  background: var(--fs-canvas);
-  box-shadow: none;
-}
-
-/* Profile and settings */
-.forme-app .profile-page,
-.forme-app .settings-page,
-.forme-app .account-page-gate {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 36px 0 96px;
-}
-
-.forme-app .profile-page-hero {
-  min-height: 0;
-  padding: 0 0 72px;
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 32px;
-  overflow: visible;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.forme-app .profile-page-hero::before {
-  content: none;
-}
-
-.forme-app .profile-page-portrait {
-  width: 180px;
-  height: 220px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.forme-app .profile-page-intro > span,
-.forme-app .profile-page-intro h1,
-.forme-app .profile-page-intro > p,
-.forme-app .profile-page-stats dt,
-.forme-app .profile-page-stats dd {
-  font-family: var(--fs-font);
-}
-
-.forme-app .profile-page-intro > span {
-  color: var(--fs-muted);
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-intro h1 {
-  margin-top: 6px;
-  font: 600 clamp(40px, 5vw, 72px)/0.88 var(--fs-font);
-  letter-spacing: -0.065em;
-}
-
-.forme-app .profile-page-links {
-  gap: 8px 20px;
-}
-
-.forme-app .profile-page-links button,
-.forme-app .profile-page-reading > button {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 600 10px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-links button:hover,
-.forme-app .profile-page-reading > button:hover {
-  color: var(--fs-ink);
-}
-
-.forme-app .profile-page-stats {
-  width: auto;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  display: grid;
-  grid-template-columns: repeat(3, auto);
-  gap: 28px;
-}
-
-.forme-app .profile-page-stats dt {
-  color: var(--fs-muted);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.forme-app .profile-page-stats dd {
-  font-size: 32px;
-  font-weight: 600;
-}
-
-.forme-app .profile-page-body {
-  margin-top: 0;
-  padding-top: 0;
-  border: 0;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
-  gap: 80px;
-}
-
-.forme-app .profile-page-editor,
-.forme-app .profile-page-reading {
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.forme-app .profile-page-editor > header h2,
-.forme-app .profile-page-reading > header h2,
-.forme-app .profile-page-fields input,
-.forme-app .profile-page-fields textarea,
-.forme-app .profile-page-fields .profile-handle-input,
-.forme-app .profile-page-reading li span,
-.forme-app .profile-page-reading > header p {
-  font-family: var(--fs-font);
-}
-
-.forme-app .profile-page-editor > header h2,
-.forme-app .profile-page-reading > header h2 {
-  font: 600 clamp(30px, 3vw, 46px)/0.95 var(--fs-font);
-  letter-spacing: -0.05em;
-}
-
-.forme-app .profile-page-fields {
-  margin-top: 36px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px 24px;
-}
-
-.forme-app .profile-page-fields > label {
-  font-family: var(--fs-font);
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-fields input,
-.forme-app .profile-page-fields textarea {
-  padding: 8px 0;
-  border: 0 !important;
-  border-bottom: 1px solid var(--fs-line) !important;
-  border-radius: 0;
-  background: transparent !important;
-  font-size: 18px;
-  box-shadow: none;
-}
-
-.forme-app .profile-page-fields .profile-handle-input {
-  border: 0 !important;
-  border-bottom: 1px solid var(--fs-line) !important;
-  border-radius: 0;
-  background: transparent !important;
-}
-
-.forme-app .profile-page-visibility {
-  margin-top: 48px;
-}
-
-.forme-app .profile-page-visibility > label {
-  margin-top: 0;
-  padding: 16px 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-}
-
-.forme-app .profile-page-visibility h3,
-.forme-app .profile-page-visibility strong,
-.forme-app .profile-page-visibility small {
-  font-family: var(--fs-font);
-}
-
-.forme-app .profile-page-visibility h3 {
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.forme-app .profile-page-visibility strong {
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-save-row {
-  border: 0;
-}
-
-.forme-app .profile-page-save-row span,
-.forme-app .profile-page-save-row strong,
-.forme-app .profile-page-save-row button {
-  font-family: var(--fs-font);
-}
-
-.forme-app .profile-page-save-row span {
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-save-row button {
-  width: auto;
-  min-height: 40px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  letter-spacing: 0;
-}
-
-.forme-app .profile-page-save-row button:hover,
-.forme-app .profile-page-save-row button.saved {
-  border: 0;
-  background: transparent;
-  color: var(--fs-signal);
-}
-
-.forme-app .profile-page-reading {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .profile-page-reading li span {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.forme-app .profile-page-exploration {
-  border: 0;
-}
-
-.forme-app .settings-page-heading,
-.forme-app .settings-page-grid,
-.forme-app .account-page-gate {
-  border: 0 !important;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .settings-page-heading h1,
-.forme-app .settings-page-heading p,
-.forme-app .settings-page-heading span,
-.forme-app .settings-page-grid h2,
-.forme-app .settings-page-grid h3,
-.forme-app .settings-page-grid p,
-.forme-app .settings-page-grid span,
-.forme-app .settings-page-grid small {
-  font-family: var(--fs-font);
-}
-
-.forme-app .settings-page-grid > section,
-.forme-app .settings-page-grid > button {
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
 
 /* About */
 .about-page {
@@ -2185,849 +849,24 @@
   line-height: 1.5;
 }
 
-/* Pricing */
-.pricing-page-content {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 140px 0 96px;
-}
-
-.pricing-page .pricing-intro {
-  padding: 0;
-}
-
-.pricing-page .pricing-intro h1 {
-  max-width: 900px;
-  margin: 0;
-  font: 600 clamp(58px, 7vw, 104px)/0.84 var(--fs-font);
-  letter-spacing: -0.075em;
-}
-
-.pricing-page .pricing-intro span {
-  max-width: 520px;
-  margin-top: 24px;
-  color: var(--fs-muted);
-  font-family: var(--fs-font);
-}
-
-.pricing-page .pricing-cycle {
-  margin: 48px 0 14px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  gap: 24px;
-}
-
-.pricing-page.forme-app.public-app .pricing-cycle {
-  width: max-content;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-}
-
-.pricing-page.forme-app.public-app .pricing-cycle button,
-.pricing-page.forme-app.public-app .pricing-cycle button.active {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent !important;
-  color: var(--fs-muted);
-}
-
-.pricing-page.forme-app.public-app .pricing-cycle button.active {
-  color: var(--fs-ink);
-}
-
-.pricing-page.forme-app.public-app .pricing-cycle button:focus-visible {
-  outline: 0;
-  box-shadow: inset 0 -2px var(--fs-signal);
-}
-
-.pricing-page .pricing-cycle button {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  font: 600 12px/1 var(--fs-font);
-  letter-spacing: 0;
-}
-
-.pricing-page .pricing-cycle button.active {
-  background: transparent;
-  color: var(--fs-ink);
-}
-
-.pricing-page .pricing-cycle button.active b,
-.pricing-page .pricing-cycle b {
-  color: var(--fs-signal);
-}
-
-.pricing-page .pricing-plan-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 64px;
-}
-
-.pricing-page .pricing-plan-list article,
-.pricing-page .pricing-plan-list article.recommended {
-  min-height: 390px;
-  padding: 48px 0 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  box-shadow: none;
-}
-
-.pricing-page.forme-app.public-app .pricing-plan-list > article,
-.pricing-page.forme-app.public-app .pricing-plan-list > article.recommended {
-  min-height: 390px;
-  padding: 48px 0 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  color: var(--fs-ink);
-  box-shadow: none !important;
-}
-
-.pricing-page .pricing-plan-heading h3,
-.pricing-page .pricing-plan-price strong,
-.pricing-page .pricing-plan-price span,
-.pricing-page .pricing-plan-description,
-.pricing-page .pricing-plan-list li,
-.pricing-page .pricing-plan-list article > small,
-.pricing-page .pricing-plan-list article > button {
-  font-family: var(--fs-font);
-}
-
-.pricing-page .pricing-plan-heading h3 {
-  margin: 0;
-  font: 600 clamp(32px, 3vw, 48px)/0.95 var(--fs-font);
-  letter-spacing: -0.05em;
-}
-
-.pricing-page .pricing-plan-price strong {
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.pricing-page .pricing-plan-description,
-.pricing-page .pricing-plan-list article.recommended .pricing-plan-description,
-.pricing-page .pricing-plan-list article.recommended .pricing-plan-price span {
-  color: var(--fs-muted);
-}
-
-.pricing-page .pricing-plan-list ul {
-  margin-top: 28px;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.pricing-page .pricing-plan-list li {
-  padding-left: 0;
-}
-
-.pricing-page .pricing-plan-list li::before {
-  content: none;
-}
-
-.pricing-page .pricing-plan-list article > button,
-.pricing-page .pricing-plan-list article.recommended > button {
-  width: auto;
-  min-height: 36px;
-  margin-top: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  letter-spacing: 0;
-}
-
-.pricing-page .pricing-beta-note {
-  margin-top: 64px;
-  color: var(--fs-muted);
-  text-align: left;
-}
-
-/* Upload and garment editing */
-.forme-app .upload-view {
-  padding-top: 32px;
-}
-
-.forme-app .upload-heading {
-  padding: 0 0 32px;
-  border: 0;
-}
-
-.forme-app .upload-heading h2,
-.forme-app .upload-heading button {
-  font-family: var(--fs-font);
-}
-
-.forme-app .upload-heading h2 {
-  font: 600 clamp(34px, 4vw, 56px)/0.9 var(--fs-font);
-  letter-spacing: -0.06em;
-}
-
-.forme-app .upload-heading button {
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  letter-spacing: 0;
-}
-
-.forme-app .upload-layout {
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 48px;
-}
-
-.forme-app .dropzone,
-.forme-app .intake-panel,
-.forme-app .upload-item {
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none !important;
-}
-
-.forme-app .dropzone {
-  background: rgba(17, 19, 16, 0.035);
-}
-
-.forme-app .dropzone h3,
-.forme-app .dropzone p,
-.forme-app .dropzone small,
-.forme-app .batch-heading,
-.forme-app .upload-item-fields label,
-.forme-app .upload-item-fields input,
-.forme-app .upload-item-fields select,
-.forme-app .upload-item-state,
-.forme-app .primary-action {
-  font-family: var(--fs-font);
-}
-
-.forme-app .intake-panel {
-  padding: 0;
-}
-
-.forme-app .upload-item {
-  padding: 10px 0;
-}
-
-.forme-app .upload-item-fields input,
-.forme-app .upload-item-fields select {
-  border: 0;
-  border-bottom: 1px solid var(--fs-line);
-  border-radius: 0;
-  background: transparent;
-}
-
-.forme-app .primary-action {
-  border: 0;
-  background: transparent;
-  color: var(--fs-ink);
-  letter-spacing: 0;
-}
-
-.forme-app .garment-editor-backdrop {
-  background: rgba(17, 19, 16, 0.28);
-  backdrop-filter: blur(8px);
-}
-
-.forme-app .garment-editor {
-  border: 0 !important;
-  border-radius: 0;
-  background: var(--fs-canvas);
-  box-shadow: none !important;
-}
-
-.forme-app .garment-editor-header,
-.forme-app .garment-editor-intro,
-.forme-app .garment-editor-fields label,
-.forme-app .custom-tag-editor,
-.forme-app .processing-options,
-.forme-app .garment-editor-actions {
-  border-color: var(--fs-line);
-}
-
-.forme-app .garment-editor-header span,
-.forme-app .garment-editor-intro h2,
-.forme-app .garment-editor-intro span,
-.forme-app .garment-editor-fields label,
-.forme-app .garment-editor-fields input,
-.forme-app .garment-editor-fields select,
-.forme-app .custom-tag-editor,
-.forme-app .processing-options,
-.forme-app .garment-editor-actions button {
-  font-family: var(--fs-font);
-}
-
-.forme-app .garment-editor-image {
-  border: 0;
-  background: transparent;
-}
-
-.forme-app .garment-editor-image img {
-  filter: var(--fs-garment-shadow);
-}
-
-.forme-app .garment-tag-preview span,
-.forme-app .custom-tag-list button {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.forme-app .editor-canvas-add,
-.forme-app .processing-option-actions button,
-.forme-app .tag-input-row button,
-.forme-app .garment-editor-actions button {
-  border: 0;
-  background: transparent;
-  color: var(--fs-muted);
-  letter-spacing: 0;
-}
-
-.forme-app .editor-canvas-add,
-.forme-app .garment-editor-actions button:last-child {
-  color: var(--fs-ink);
-}
-
-.forme-app .garment-editor-actions {
-  background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
-  backdrop-filter: blur(16px);
-}
-
-@media (max-width: 900px) {
-  .forme-app .topbar-inner,
-  .public-app .public-header {
-    padding: 0;
-  }
-
-  .public-app .public-navigation {
-    display: none;
-  }
-
-  .public-app .public-header {
-    grid-template-columns: 1fr auto;
-  }
-
-  .forme-app .content {
-    padding: 0 0 calc(96px + env(safe-area-inset-bottom));
-  }
-
-  .forme-app .mobile-nav {
-    height: calc(64px + env(safe-area-inset-bottom));
-    padding: 0 0 env(safe-area-inset-bottom);
-    border: 0;
-    background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
-    box-shadow: none;
-    backdrop-filter: blur(18px);
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .forme-app .mobile-nav button {
-    border: 0;
-    background: transparent;
-    color: var(--fs-muted);
-    font: 600 11px/1 var(--fs-font);
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  .forme-app .mobile-nav button span {
-    display: none;
-  }
-
-  .forme-app .mobile-nav button.active {
-    color: var(--fs-ink);
-  }
-
-  .forme-app .closet-commandbar,
-  .forme-app .looks-commandbar,
-  .forme-app .assistant-commandbar {
-    min-height: 88px;
-    padding: 14px 0;
-  }
-
-  .forme-app .closet-commandbar .closet-looks-nav button,
-  .forme-app .closet-commandbar .closet-looks-nav > span,
-  .forme-app .looks-commandbar .closet-looks-nav button,
-  .forme-app .looks-commandbar .closet-looks-nav > span,
-  .forme-app .assistant-commandbar h1 {
-    font-size: 40px;
-  }
-
-  .forme-app .looks-commandbar nav,
-  .forme-app .closet-commandbar nav {
-    gap: 14px;
-  }
-
-  .forme-app .saved-looks-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 28px 6px;
-  }
-
-  .forme-app .saved-look-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    opacity: 1;
-  }
-
-  .forme-app .looks-view > .week-view {
-    margin-top: 64px;
-    padding: 0;
-  }
-
-  .forme-app .week-heading {
-    gap: 18px;
-  }
-
-  .forme-app .week-strip {
-    grid-template-columns: repeat(7, 140px);
-    padding-right: 16px;
-  }
-
-  .forme-app .week-strip > button {
-    min-width: 140px;
-  }
-
-  .forme-app .week-workspace {
-    grid-template-columns: 1fr;
-    gap: 44px;
-  }
-
-  .forme-app .assistant-commandbar {
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .forme-app .assistant-commandbar p {
-    max-width: 360px;
-    font-size: 13px;
-  }
-
-  .forme-app .assistant-commandbar > span {
-    display: none;
-  }
-
-  .forme-app .assistant-dialogue {
-    margin: 0;
-    padding: 48px 0 0;
-  }
-
-  .forme-app .assistant-question-flow,
-  .forme-app .assistant-followup-list > div {
-    grid-template-columns: 1fr;
-    gap: 36px;
-  }
-
-  .forme-app .assistant-followup-list > div {
-    gap: 18px;
-  }
-
-  .forme-app .assistant-response {
-    padding: 0;
-  }
-
-  .forme-app .assistant-response-signals,
-  .forme-app .styling-recommendation-grid {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-
-  .forme-app .styling-results-heading {
-    gap: 18px;
-  }
-
-  .forme-app .profile-page,
-  .forme-app .settings-page,
-  .forme-app .account-page-gate {
-    padding: 24px 0 calc(96px + env(safe-area-inset-bottom));
-  }
-
-  .forme-app .profile-page-hero {
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 20px;
-  }
-
-  .forme-app .profile-page-portrait {
-    width: 96px;
-    height: 128px;
-  }
-
-  .forme-app .profile-page-intro h1 {
-    font-size: 44px;
-  }
-
-  .forme-app .profile-page-stats {
-    grid-column: 1 / -1;
-  }
-
-  .forme-app .profile-page-body,
-  .forme-app .profile-page-fields {
-    grid-template-columns: 1fr;
-    gap: 56px;
-  }
-
-  .forme-app .profile-page-fields {
-    gap: 28px;
-  }
-
-  .forme-app .profile-page-bio {
-    grid-column: auto;
-  }
-
-  .forme-app .profile-page-save-row button {
-    width: auto;
-  }
-
-  .about-minimal-hero {
-    min-height: 100dvh;
-    padding: 96px 0 24px;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(280px, 1fr);
-    gap: 18px;
-  }
-
-  .about-minimal-hero h1 {
-    font-size: clamp(50px, 14vw, 68px);
-  }
-
-  .about-minimal-hero p {
-    margin-top: 20px;
-    font-size: 15px;
-  }
-
-  .about-minimal-hero figure {
-    height: 100%;
-    min-height: 300px;
-  }
-
-  .about-minimal-hero img {
-    width: min(76%, 340px);
-    margin: 0 auto;
-    display: block;
-  }
-
-  .about-minimal-system {
-    min-height: auto;
-    padding: 72px 0;
-    grid-template-columns: 1fr;
-    gap: 72px;
-  }
-
-  .about-minimal-system h2 {
-    font-size: 48px;
-  }
-
-  .pricing-page-content {
-    padding: 112px 0 calc(96px + env(safe-area-inset-bottom));
-  }
-
-  .pricing-page .pricing-intro h1 {
-    font-size: 54px;
-  }
-
-  .pricing-page .pricing-plan-list {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-
-  .pricing-page .pricing-plan-list article,
-  .pricing-page .pricing-plan-list article.recommended {
-    min-height: 0;
-    padding: 36px 0;
-  }
-
-  .forme-app .upload-layout {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .forme-app.view-studio {
-    --studio-rail-left: 0px;
-    --studio-rail-right: 0px;
-  }
-
-  .forme-app.view-studio .studio-view {
-    inset: 64px 0 calc(64px + env(safe-area-inset-bottom));
-  }
-
-  .forme-app.view-studio .studio-layout {
-    display: block;
-  }
-
-  .forme-app.view-studio .canvas-column {
-    width: 100%;
-    height: 100%;
-  }
-
-  .forme-app.view-studio .look-controls,
-  .forme-app.view-studio .saved-looks-panel {
-    width: auto;
-    height: min(58vh, 520px);
-    position: fixed;
-    z-index: 82;
-    left: 0;
-    right: 0;
-    top: auto;
-    bottom: calc(124px + env(safe-area-inset-bottom));
-    padding: 14px 12px;
-    background: color-mix(in srgb, var(--fs-canvas) 96%, transparent);
-    backdrop-filter: blur(18px);
-    transition: transform 220ms var(--fs-ease), opacity 160ms ease;
-  }
-
-  .forme-app.view-studio .look-controls.panel-closed,
-  .forme-app.view-studio .saved-looks-panel.panel-closed {
-    transform: translateY(calc(100% + 140px)) !important;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .forme-app.view-studio .floating-panel-header button {
-    display: block;
-  }
-
-  .forme-app.view-studio .floating-panel-toggle {
-    min-width: 86px;
-    height: 32px;
-    bottom: calc(128px + env(safe-area-inset-bottom));
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-    display: flex;
-    color: var(--fs-muted);
-    font-family: var(--fs-font);
-  }
-
-  .forme-app.view-studio .library-panel-toggle {
-    left: 12px;
-  }
-
-  .forme-app.view-studio .saved-panel-toggle {
-    right: 12px;
-  }
-
-  .forme-app.view-studio .canvas-action-bar {
-    left: 0;
-    right: 0;
-    bottom: calc(64px + env(safe-area-inset-bottom));
-    min-height: 56px;
-    padding: 0 10px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .forme-app.view-studio .canvas-action-bar button,
-  .forme-app.view-studio .canvas-action-bar .save-look-action,
-  .forme-app.view-studio .canvas-action-bar .mix-look-action,
-  .forme-app.view-studio .canvas-action-bar .share-look-action {
-    justify-content: center;
-    font-size: 9px;
-  }
-
-  .forme-app.view-studio .canvas-action-bar button b {
-    display: none;
-  }
-}
-
-@media (hover: none) {
-  .forme-app .saved-look-open > span {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .forme-app *,
-  .public-app * {
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Final consistency pass: one navigation language, no decorative frames. */
-.forme-landing .public-navigation,
-.public-app .public-navigation {
-  justify-self: center;
-}
-
-.forme-landing .public-header-balance,
-.public-app .public-header-balance {
-  min-width: 96px;
-  justify-self: end;
-}
-
-.forme-app .assistant-preset-list > button.active {
-  border: 0 !important;
-  border-radius: 0 !important;
-  outline: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--fs-signal);
-}
-
-.forme-app .assistant-followup-list button.active {
-  outline: 0;
-  box-shadow: none;
-}
-
-.forme-app .assistant-preset-list > button:focus-visible,
-.forme-app .assistant-followup-list button:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 4px;
-}
-
-.forme-app .styling-recommendation .saved-look-preview {
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.forme-app .style-exploration-control {
-  padding: 20px 0 0;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.forme-app .settings-page-heading > button {
-  min-height: 36px;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--fs-ink);
-}
-
-.forme-app .settings-page-heading > button:hover {
-  color: var(--fs-signal);
-}
-
-/* Final product pass: exact title rhythm, denser garment-first catalog. */
-.forme-app .closet-looks-nav > button,
-.forme-app .closet-looks-nav > span {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.forme-app .looks-commandbar .closet-looks-nav {
-  gap: 0;
-}
-
-.forme-app.view-wardrobe.route-closet .garment-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.forme-app .looks-empty {
-  min-height: 128px;
-  display: flex;
-  align-items: center;
-}
-
-.forme-app .looks-view > .week-view {
-  margin-top: 48px;
-}
-
-@media (min-width: 1680px) {
-  .forme-app.view-wardrobe.route-closet .garment-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 901px) and (max-width: 1180px) {
-  .forme-app.view-wardrobe.route-closet .garment-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .forme-app.view-wardrobe.route-closet .garment-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .forme-app .looks-empty {
-    min-height: 84px;
-  }
-
-  .forme-app .looks-view > .week-view {
-    margin-top: 40px;
-  }
-
-  .forme-app.view-studio .topbar {
-    height: 64px;
-    border: 0 !important;
-    background: color-mix(in srgb, var(--fs-canvas) 90%, transparent);
-    box-shadow: none !important;
-    backdrop-filter: blur(18px);
-  }
-
-  .forme-app.view-studio .topbar::after {
-    display: none !important;
-  }
-
-  .forme-app.view-studio .topbar-inner {
-    width: 100%;
-    padding: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0;
-  }
-
-  .forme-app.view-studio .topbar-actions {
-    justify-self: end;
-  }
-
-  .forme-app.view-studio .mobile-nav {
-    height: calc(64px + env(safe-area-inset-bottom));
-    padding: 0 0 env(safe-area-inset-bottom);
-    border: 0;
-    background: color-mix(in srgb, var(--fs-canvas) 94%, transparent);
-    box-shadow: none;
-    backdrop-filter: blur(18px);
-  }
-
-  .forme-app.view-studio .mobile-nav button {
-    color: var(--fs-muted);
-    font: 600 11px/1 var(--fs-font);
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  .forme-app.view-studio .mobile-nav button.active {
-    color: var(--fs-ink);
-  }
-
-  .forme-landing .public-header,
-  .public-app .public-header {
-    grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
-  }
-
-  .forme-landing .public-navigation,
-  .public-app .public-navigation {
-    display: flex;
-    gap: 14px;
-  }
-
-  .forme-landing .public-navigation a,
-  .public-app .public-navigation a {
-    min-height: 36px;
-    font-size: 11px;
-  }
-
-  .forme-app .looks-commandbar nav,
-  .forme-app .closet-commandbar nav {
-    gap: 8px;
-  }
+/* One row, with direct actions. Labels yield to icons when the column narrows. */
+.forme-app.view-studio .studio-document-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.forme-app.view-studio .studio-document-actions svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.forme-app.view-studio .studio-document-actions :is(.mix-look-action,.save-look-action) > svg { display: none; }
+.forme-app.view-studio .canvas-utility-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.forme-app.view-studio .canvas-icon-action { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--fs-muted); }
+.forme-app.view-studio .studio-document-actions .danger-action:hover:not(:disabled) { color: var(--fs-signal); }
+.forme-app.view-studio .studio-document-actions button[aria-busy="true"] > svg { visibility: hidden; }
+@container look-actions (max-width: 540px) {
+  .forme-app.view-studio .studio-document-actions .canvas-action-label { display: none; }
+  .forme-app.view-studio .studio-document-actions :is(.mix-look-action,.save-look-action) > svg { display: block; }
+  .forme-app.view-studio .studio-document-actions :is(button,.primary-action) { width: 36px; min-height: 40px; height: 40px; padding: 0; }
+  .forme-app.view-studio .studio-document-actions .save-look-action { margin-left: 0; }
+  .forme-app.view-studio .canvas-utility-actions { gap: 0; }
+}
+@container look-actions (max-width: 370px) {
+  .forme-app.view-studio .studio-document-actions .history-action[aria-label="Rehacer"] { display: none; }
+}
+@container look-actions (max-width: 330px) {
+  .forme-app.view-studio .studio-document-actions :is(button,.primary-action) { width: 32px; }
 }

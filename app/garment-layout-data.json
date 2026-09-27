@@ -1,0 +1,4983 @@
+{
+  "version": 2,
+  "images": {
+    "/wardrobe/final/0000001.png": {
+      "bounds": [
+        0.05957,
+        0.095312,
+        0.876953,
+        0.75
+      ],
+      "shoulderY": 0.161328,
+      "hemY": 0.844531,
+      "neckRise": 0.066016,
+      "sleeveBottoms": [
+        0.8125,
+        0.814063
+      ],
+      "bodyHeight": 0.683203,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "2eef0e4893cd343b01fbf28fba93739ad43c69587e87ab9dd2c8707e9275fe93"
+    },
+    "/wardrobe/final/0000001-c.png": {
+      "bounds": [
+        0.037433,
+        0.07204,
+        0.919786,
+        0.791013
+      ],
+      "shoulderY": 0.141666,
+      "hemY": 0.862229,
+      "neckRise": 0.069626,
+      "sleeveBottoms": [
+        0.828446,
+        0.830094
+      ],
+      "bodyHeight": 0.720563,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ed3d3aeb5ed863a90d900309f0065dcc7fff7e9f78267895cbe2f6524e0fc703"
+    },
+    "/wardrobe/final/0000002.png": {
+      "bounds": [
+        0.077148,
+        0.092969,
+        0.870117,
+        0.824219
+      ],
+      "shoulderY": 0.217969,
+      "hemY": 0.844531,
+      "neckRise": 0.125,
+      "sleeveBottoms": [
+        0.917188,
+        0.917188
+      ],
+      "bodyHeight": 0.626563,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "6bac90754fe3f1b9d5eb6d3e6df312e816fb642b01ee954e74ca5a4161ae3367"
+    },
+    "/wardrobe/final/0000002-c.png": {
+      "bounds": [
+        0.057932,
+        0.038516,
+        0.884135,
+        0.850214
+      ],
+      "shoulderY": 0.167459,
+      "hemY": 0.813783,
+      "neckRise": 0.128942,
+      "sleeveBottoms": [
+        0.88873,
+        0.88873
+      ],
+      "bodyHeight": 0.646324,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ed4a59fbdfab2782b30aa3866567cb4ff1ca6a744028172aeb0493b1dff8c92f"
+    },
+    "/wardrobe/final/0000003.png": {
+      "bounds": [
+        0.082031,
+        0.079687,
+        0.842773,
+        0.811719
+      ],
+      "shoulderY": 0.167578,
+      "hemY": 0.890625,
+      "neckRise": 0.087891,
+      "sleeveBottoms": [
+        0.801562,
+        0.802344
+      ],
+      "bodyHeight": 0.723047,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "913e4fec8b258ba7900895041f06f4ecf10881bae08d4c32e56cebfc5e1fc88e"
+    },
+    "/wardrobe/final/0000003-c.png": {
+      "bounds": [
+        0.083779,
+        0.080599,
+        0.827986,
+        0.814551
+      ],
+      "shoulderY": 0.168796,
+      "hemY": 0.894366,
+      "neckRise": 0.088197,
+      "sleeveBottoms": [
+        0.804993,
+        0.805777
+      ],
+      "bodyHeight": 0.725569,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "47cfa2d716f29cae3f3266d8487fb46e002f28faf88242fc8ad972150974b5cf"
+    },
+    "/wardrobe/final/0000004.png": {
+      "bounds": [
+        0.103516,
+        0.085938,
+        0.796875,
+        0.801562
+      ],
+      "shoulderY": 0.171875,
+      "hemY": 0.885156,
+      "neckRise": 0.085938,
+      "sleeveBottoms": [
+        0.846875,
+        0.847656
+      ],
+      "bodyHeight": 0.713281,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "3b5c2c5abb76e5747cb8ef37898a14c476e49d5f051e5dd7f36543dba1377b62"
+    },
+    "/wardrobe/final/0000004-c.png": {
+      "bounds": [
+        0.105169,
+        0.086305,
+        0.794118,
+        0.801712
+      ],
+      "shoulderY": 0.172259,
+      "hemY": 0.885673,
+      "neckRise": 0.085954,
+      "sleeveBottoms": [
+        0.847385,
+        0.848166
+      ],
+      "bodyHeight": 0.713414,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "7ce923dfbad18b6ac1dde4efb260a19abea9d2ddb4acfba56b8f7bc64be3c869"
+    },
+    "/wardrobe/final/0000005.png": {
+      "bounds": [
+        0.083008,
+        0.095312,
+        0.849609,
+        0.802344
+      ],
+      "shoulderY": 0.213672,
+      "hemY": 0.850781,
+      "neckRise": 0.118359,
+      "sleeveBottoms": [
+        0.896875,
+        0.892969
+      ],
+      "bodyHeight": 0.637109,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "bd782bbfd6ac5942dee6ceebc6f5fb382550d524707e80ca5b870c8b1bbdd759"
+    },
+    "/wardrobe/final/0000005-c.png": {
+      "bounds": [
+        0.080214,
+        0.094151,
+        0.853832,
+        0.792439
+      ],
+      "shoulderY": 0.21105,
+      "hemY": 0.840294,
+      "neckRise": 0.116898,
+      "sleeveBottoms": [
+        0.885819,
+        0.881961
+      ],
+      "bodyHeight": 0.629245,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1a497b55a32995c3ec307b944f5cbd89609a195ed8df01587465073ffc1c547d"
+    },
+    "/wardrobe/final/0000006.png": {
+      "bounds": [
+        0.040039,
+        0.148438,
+        0.931641,
+        0.704688
+      ],
+      "shoulderY": 0.242969,
+      "hemY": 0.848437,
+      "neckRise": 0.094531,
+      "sleeveBottoms": [
+        0.823438,
+        0.823438
+      ],
+      "bodyHeight": 0.605469,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "ba3bac50240d58a820a358fabe65c39bd1150acd0b620548fd52f93aab42c83e"
+    },
+    "/wardrobe/final/0000006-c.png": {
+      "bounds": [
+        0.043672,
+        0.148359,
+        0.913547,
+        0.703281
+      ],
+      "shoulderY": 0.242702,
+      "hemY": 0.846962,
+      "neckRise": 0.094343,
+      "sleeveBottoms": [
+        0.822012,
+        0.822012
+      ],
+      "bodyHeight": 0.60426,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "e559b05c568442e45c0a24ad22602c9bf22885430351149d323fa6816dd0c511"
+    },
+    "/wardrobe/final/0000007.png": {
+      "bounds": [
+        0.091797,
+        0.05625,
+        0.814453,
+        0.886719
+      ],
+      "shoulderY": 0.14375,
+      "hemY": 0.899219,
+      "neckRise": 0.0875,
+      "sleeveBottoms": [
+        0.707031,
+        0.707812
+      ],
+      "bodyHeight": 0.755469,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "22c24da987d41b6a849aca3d2a3f4d74a3298d5a1d8739db0be6eb035ebcbe24"
+    },
+    "/wardrobe/final/0000007-c.png": {
+      "bounds": [
+        0.09893,
+        0.057061,
+        0.817291,
+        0.893723
+      ],
+      "shoulderY": 0.145253,
+      "hemY": 0.906689,
+      "neckRise": 0.088191,
+      "sleeveBottoms": [
+        0.712983,
+        0.713771
+      ],
+      "bodyHeight": 0.761436,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "97b6fe215fa36b543bb0e2f84528ec69c91852bc91a973fd87c07ea9fb796ecd"
+    },
+    "/wardrobe/final/0000008.png": {
+      "bounds": [
+        0.053711,
+        0.078906,
+        0.90625,
+        0.773438
+      ],
+      "shoulderY": 0.196875,
+      "hemY": 0.829688,
+      "neckRise": 0.117969,
+      "sleeveBottoms": [
+        0.847656,
+        0.847656
+      ],
+      "bodyHeight": 0.632813,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "0f9f7938bf0463ee7680bb0e0759a8d964fbc0633df131b3c94d2d54aebf4126"
+    },
+    "/wardrobe/final/0000008-c.png": {
+      "bounds": [
+        0.073975,
+        0.117689,
+        0.84492,
+        0.731812
+      ],
+      "shoulderY": 0.229309,
+      "hemY": 0.828064,
+      "neckRise": 0.11162,
+      "sleeveBottoms": [
+        0.845065,
+        0.845065
+      ],
+      "bodyHeight": 0.598755,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1f3d2e219ae97202f16ee0c5978a0898b6345d671808b714e9f91df8c49c2f5e"
+    },
+    "/wardrobe/final/0000009.png": {
+      "bounds": [
+        0.082031,
+        0.089063,
+        0.837891,
+        0.832812
+      ],
+      "shoulderY": 0.171875,
+      "hemY": 0.84375,
+      "neckRise": 0.082812,
+      "sleeveBottoms": [
+        0.819531,
+        0.81875
+      ],
+      "bodyHeight": 0.671875,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "da00bfc77d695cae5cf1d6ce06a68bf4edea0932ac510f46364afe511b746412"
+    },
+    "/wardrobe/final/0000009-c.png": {
+      "bounds": [
+        0.08467,
+        0.07632,
+        0.826203,
+        0.859486
+      ],
+      "shoulderY": 0.161784,
+      "hemY": 0.855179,
+      "neckRise": 0.085465,
+      "sleeveBottoms": [
+        0.830184,
+        0.829378
+      ],
+      "bodyHeight": 0.693394,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "9b801aba769f62548efaebe4cfd811d576b2cc779a4d2d6c90040eb10673482f"
+    },
+    "/wardrobe/final/0000010.png": {
+      "bounds": [
+        0.029297,
+        0.142969,
+        0.941406,
+        0.694531
+      ],
+      "shoulderY": 0.241406,
+      "hemY": 0.807813,
+      "neckRise": 0.098437,
+      "sleeveBottoms": [
+        0.835938,
+        0.836719
+      ],
+      "bodyHeight": 0.566406,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d5d97860277aec7f80aa42817cc52be7971d30d9d7f67da9720ea67ef0bdc7b3"
+    },
+    "/wardrobe/final/0000010-c.png": {
+      "bounds": [
+        0.027629,
+        0.14194,
+        0.942959,
+        0.694722
+      ],
+      "shoulderY": 0.240405,
+      "hemY": 0.806966,
+      "neckRise": 0.098465,
+      "sleeveBottoms": [
+        0.835099,
+        0.83588
+      ],
+      "bodyHeight": 0.566562,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "48facd2fb8ba0b981ce9b6132e5fcfb241e3cdc852653155baa70a38144db40e"
+    },
+    "/wardrobe/final/0000011.png": {
+      "bounds": [
+        0.029297,
+        0.1,
+        0.949219,
+        0.786719
+      ],
+      "shoulderY": 0.183984,
+      "hemY": 0.884375,
+      "neckRise": 0.083984,
+      "sleeveBottoms": [
+        0.824219,
+        0.822656
+      ],
+      "bodyHeight": 0.700391,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "892297d680c11d424d5061b659eead472604af63e440d6fd3bc2f9b545561c55"
+    },
+    "/wardrobe/final/0000011-c.png": {
+      "bounds": [
+        0.027629,
+        0.11127,
+        0.942959,
+        0.778174
+      ],
+      "shoulderY": 0.194342,
+      "hemY": 0.887125,
+      "neckRise": 0.083072,
+      "sleeveBottoms": [
+        0.827622,
+        0.826077
+      ],
+      "bodyHeight": 0.692784,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "0833e9731034444aff94c1789dcf9805b194523b3bdf099a7a1886d0f588fa21"
+    },
+    "/wardrobe/final/0000012.png": {
+      "bounds": [
+        0.125977,
+        0.114062,
+        0.765625,
+        0.803125
+      ],
+      "shoulderY": 0.182422,
+      "hemY": 0.76875,
+      "neckRise": 0.068359,
+      "sleeveBottoms": [
+        0.765625,
+        0.765625
+      ],
+      "bodyHeight": 0.586328,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "eb22f5650543db7a52cf4389170da08e3d375883bd0298ddae7c9d1b9fb14b10"
+    },
+    "/wardrobe/final/0000012-c.png": {
+      "bounds": [
+        0.113191,
+        0.105563,
+        0.785205,
+        0.813837
+      ],
+      "shoulderY": 0.174835,
+      "hemY": 0.768983,
+      "neckRise": 0.069271,
+      "sleeveBottoms": [
+        0.765817,
+        0.765817
+      ],
+      "bodyHeight": 0.594149,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "b499fa5b45def0c30ccde86f0b293feb33f1ba10706a52bae3092699b92d3018"
+    },
+    "/wardrobe/final/0000013.png": {
+      "bounds": [
+        0.09082,
+        0.09375,
+        0.829102,
+        0.819531
+      ],
+      "shoulderY": 0.176953,
+      "hemY": 0.822656,
+      "neckRise": 0.083203,
+      "sleeveBottoms": [
+        0.913281,
+        0.913281
+      ],
+      "bodyHeight": 0.645703,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "2753053a5bcf6e975039284103d969c9795d245e9f15008a4bfad59b5b1821aa"
+    },
+    "/wardrobe/final/0000013-c.png": {
+      "bounds": [
+        0.090018,
+        0.093438,
+        0.819964,
+        0.808845
+      ],
+      "shoulderY": 0.175556,
+      "hemY": 0.812839,
+      "neckRise": 0.082118,
+      "sleeveBottoms": [
+        0.902282,
+        0.902282
+      ],
+      "bodyHeight": 0.637283,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "677851443ec62c8ab04cab2a55c10c9facff429f66e0ccd1fe65b3200c598fed"
+    },
+    "/wardrobe/final/0000014.png": {
+      "bounds": [
+        0.074219,
+        0.124219,
+        0.853516,
+        0.722656
+      ],
+      "shoulderY": 0.187891,
+      "hemY": 0.732031,
+      "neckRise": 0.063672,
+      "sleeveBottoms": [
+        0.839844,
+        0.846875
+      ],
+      "bodyHeight": 0.544141,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "283df94ee2e7634c5a7ba41c02b84986d5e0a9db5430c5ae4c4830f507be0e04"
+    },
+    "/wardrobe/final/0000014-c.png": {
+      "bounds": [
+        0.057932,
+        0.1398,
+        0.881462,
+        0.732525
+      ],
+      "shoulderY": 0.204342,
+      "hemY": 0.755913,
+      "neckRise": 0.064541,
+      "sleeveBottoms": [
+        0.865198,
+        0.872325
+      ],
+      "bodyHeight": 0.551572,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "b7bf6729320cc9c96b3d77996bbfaefdd0075447cb2c804874c3c98a4476ff4d"
+    },
+    "/wardrobe/final/0000015.png": {
+      "bounds": [
+        0.082031,
+        0.073438,
+        0.84668,
+        0.807031
+      ],
+      "shoulderY": 0.140234,
+      "hemY": 0.870313,
+      "neckRise": 0.066797,
+      "sleeveBottoms": [
+        0.754687,
+        0.755469
+      ],
+      "bodyHeight": 0.730078,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "5ab5b5cfdae915ea1bda2e83867685ec37e6e92b49f653068d9522fab8ce7ce6"
+    },
+    "/wardrobe/final/0000015-c.png": {
+      "bounds": [
+        0.080214,
+        0.067047,
+        0.841355,
+        0.832382
+      ],
+      "shoulderY": 0.135942,
+      "hemY": 0.888954,
+      "neckRise": 0.068895,
+      "sleeveBottoms": [
+        0.769697,
+        0.770503
+      ],
+      "bodyHeight": 0.753012,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "279cd56efa60408ee152111cb18a868bf0bdf52a9816ba1a0c6457054ceead75"
+    },
+    "/wardrobe/final/0000016.png": {
+      "bounds": [
+        0.212891,
+        0.060937,
+        0.612305,
+        0.910156
+      ],
+      "shoulderY": 0.128516,
+      "hemY": 0.969531,
+      "neckRise": 0.067578,
+      "sleeveBottoms": [
+        0.630469,
+        0.632031
+      ],
+      "bodyHeight": 0.841016,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "248a192aad0b6a06fcd3e801c34c244eb25c270a5eba16434cadc50c4faaaf4f"
+    },
+    "/wardrobe/final/0000016-c.png": {
+      "bounds": [
+        0.195187,
+        0.050642,
+        0.616756,
+        0.900856
+      ],
+      "shoulderY": 0.11753,
+      "hemY": 0.949951,
+      "neckRise": 0.066888,
+      "sleeveBottoms": [
+        0.614353,
+        0.6159
+      ],
+      "bodyHeight": 0.832422,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "60dda97cd698af013f4e84a2ed28f47f36d65bb57bce42d792c3f3a262519d02"
+    },
+    "/wardrobe/final/0000017.png": {
+      "bounds": [
+        0.058594,
+        0.152344,
+        0.885742,
+        0.704688
+      ],
+      "shoulderY": 0.259766,
+      "hemY": 0.85625,
+      "neckRise": 0.107422,
+      "sleeveBottoms": [
+        0.798438,
+        0.797656
+      ],
+      "bodyHeight": 0.596484,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "e04a32f307575cd7432053be8e9278a26cd954627a34ab83f8819f8ea71157f7"
+    },
+    "/wardrobe/final/0000018.png": {
+      "bounds": [
+        0.043945,
+        0.125,
+        0.905273,
+        0.750781
+      ],
+      "shoulderY": 0.265234,
+      "hemY": 0.771094,
+      "neckRise": 0.140234,
+      "sleeveBottoms": [
+        0.874219,
+        0.874219
+      ],
+      "bodyHeight": 0.505859,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1b9f83da6c82e85d80b0150da4ae7256cd7307349b7f7b07078f4404fed07027"
+    },
+    "/wardrobe/final/0000018-c.png": {
+      "bounds": [
+        0.045455,
+        0.126248,
+        0.913547,
+        0.752496
+      ],
+      "shoulderY": 0.266803,
+      "hemY": 0.773818,
+      "neckRise": 0.140555,
+      "sleeveBottoms": [
+        0.877179,
+        0.877179
+      ],
+      "bodyHeight": 0.507015,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "dca5cd21c5f4005b2c7a7ed53ef5a27fd71ba4592d857acafc94b80ca1c08f51"
+    },
+    "/wardrobe/final/0000019.png": {
+      "bounds": [
+        0.070313,
+        0.122656,
+        0.860352,
+        0.764062
+      ],
+      "shoulderY": 0.202344,
+      "hemY": 0.770312,
+      "neckRise": 0.079687,
+      "sleeveBottoms": [
+        0.886719,
+        0.886719
+      ],
+      "bodyHeight": 0.567969,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1da6970fcc9a91a71c1712c41013f4a830f8ff6f90fdc76766642325cdca9269"
+    },
+    "/wardrobe/final/0000019-c.png": {
+      "bounds": [
+        0.07041,
+        0.125535,
+        0.852941,
+        0.766049
+      ],
+      "shoulderY": 0.20543,
+      "hemY": 0.774875,
+      "neckRise": 0.079895,
+      "sleeveBottoms": [
+        0.891583,
+        0.891583
+      ],
+      "bodyHeight": 0.569445,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "4468112c4818356e8a0ffd996a2246becb952e4760a37758243327c7e71000ae"
+    },
+    "/wardrobe/final/0000020.png": {
+      "bounds": [
+        0.136719,
+        0.048438,
+        0.737305,
+        0.923438
+      ],
+      "shoulderY": 0.103906,
+      "hemY": 0.961719,
+      "neckRise": 0.055469,
+      "sleeveBottoms": [
+        0.94375,
+        0.925
+      ],
+      "bodyHeight": 0.857812,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "5629c8c52f3de84a92b757842ef99554a058270a134e9b76b65a7c6e12c80661"
+    },
+    "/wardrobe/final/0000020-c.png": {
+      "bounds": [
+        0.105169,
+        0.022825,
+        0.782531,
+        0.949358
+      ],
+      "shoulderY": 0.07985,
+      "hemY": 0.961741,
+      "neckRise": 0.057026,
+      "sleeveBottoms": [
+        0.943268,
+        0.923992
+      ],
+      "bodyHeight": 0.881891,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "619f2c90ffc6e0a9e946d2418d488e1544a462033cf7d2005b112c9320f1103c"
+    },
+    "/wardrobe/final/0000021.png": {
+      "bounds": [
+        0.035156,
+        0.074219,
+        0.943359,
+        0.783594
+      ],
+      "shoulderY": 0.162891,
+      "hemY": 0.853125,
+      "neckRise": 0.088672,
+      "sleeveBottoms": [
+        0.835938,
+        0.8375
+      ],
+      "bodyHeight": 0.690234,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "9469e77fb8a27ebd57b08cc13bdbb449f84dcf909ac78826b42e174a80f25097"
+    },
+    "/wardrobe/final/0000021-c.png": {
+      "bounds": [
+        0.043672,
+        0.107703,
+        0.909091,
+        0.747504
+      ],
+      "shoulderY": 0.192291,
+      "hemY": 0.850735,
+      "neckRise": 0.084588,
+      "sleeveBottoms": [
+        0.834339,
+        0.83583
+      ],
+      "bodyHeight": 0.658444,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "29522aaad393bf2e7222217db3588045abd7292667a910766154a75606d9785c"
+    },
+    "/wardrobe/final/0000022.png": {
+      "bounds": [
+        0.09082,
+        0.096875,
+        0.818359,
+        0.796875
+      ],
+      "shoulderY": 0.171875,
+      "hemY": 0.814063,
+      "neckRise": 0.075,
+      "sleeveBottoms": [
+        0.792969,
+        0.790625
+      ],
+      "bodyHeight": 0.642188,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "62f27e722b305a6a2b69c127dd9ffb2780bbd587455eed7be3c81ea78fe2a801"
+    },
+    "/wardrobe/final/0000022-c.png": {
+      "bounds": [
+        0.079323,
+        0.097718,
+        0.85205,
+        0.81883
+      ],
+      "shoulderY": 0.174784,
+      "hemY": 0.834665,
+      "neckRise": 0.077066,
+      "sleeveBottoms": [
+        0.81299,
+        0.810582
+      ],
+      "bodyHeight": 0.659881,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "75a4d4e02e4f98226fb8cb9a53857398e5f38f3075a01da1e6ef13c8fbda4c23"
+    },
+    "/wardrobe/final/0000023.png": {
+      "bounds": [
+        0.082031,
+        0.092969,
+        0.849609,
+        0.798438
+      ],
+      "shoulderY": 0.158594,
+      "hemY": 0.817187,
+      "neckRise": 0.065625,
+      "sleeveBottoms": [
+        0.891406,
+        0.891406
+      ],
+      "bodyHeight": 0.658594,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "b5f609923204cff2bce3b25321471433fe2ad1d2172f16fb3a0466a574b6f64f"
+    },
+    "/wardrobe/final/0000023-c.png": {
+      "bounds": [
+        0.067736,
+        0.098431,
+        0.856506,
+        0.798859
+      ],
+      "shoulderY": 0.16409,
+      "hemY": 0.823032,
+      "neckRise": 0.06566,
+      "sleeveBottoms": [
+        0.89729,
+        0.89729
+      ],
+      "bodyHeight": 0.658941,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "421af61d307459eaa69b308bd2c929b035aaae238e5b10b6e7f7e214a72c27b9"
+    },
+    "/wardrobe/final/0000024.png": {
+      "bounds": [
+        0.057617,
+        0.1125,
+        0.901367,
+        0.807031
+      ],
+      "shoulderY": 0.154688,
+      "hemY": 0.801562,
+      "neckRise": 0.042188,
+      "sleeveBottoms": [
+        0.917188,
+        0.919531
+      ],
+      "bodyHeight": 0.646875,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "6be96fd7bef20fbaccf13cb1e17a051627f844461d9ad0d5465a69c04a938023"
+    },
+    "/wardrobe/final/0000025.png": {
+      "bounds": [
+        0.091797,
+        0.089063,
+        0.84375,
+        0.883594
+      ],
+      "shoulderY": 0.251172,
+      "hemY": 0.802344,
+      "neckRise": 0.162109,
+      "sleeveBottoms": [
+        0.972656,
+        0.971094
+      ],
+      "bodyHeight": 0.551172,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "28e23e618a3b606b12da98e18e39da7a74039cfdd3705e1a97ecbb3649b18035"
+    },
+    "/wardrobe/final/0000025-c.png": {
+      "bounds": [
+        0.095365,
+        0.079173,
+        0.820856,
+        0.869472
+      ],
+      "shoulderY": 0.238691,
+      "hemY": 0.781054,
+      "neckRise": 0.159519,
+      "sleeveBottoms": [
+        0.948645,
+        0.947107
+      ],
+      "bodyHeight": 0.542363,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "a8548e4b55e3059c48555c0b0d5da07a93706fe36174471aa812adb9a8ad35e3"
+    },
+    "/wardrobe/final/0000026.png": {
+      "bounds": [
+        0.112305,
+        0.090625,
+        0.777344,
+        0.832031
+      ],
+      "shoulderY": 0.150391,
+      "hemY": 0.728125,
+      "neckRise": 0.059766,
+      "sleeveBottoms": [
+        0.788281,
+        0.788281
+      ],
+      "bodyHeight": 0.577734,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "01937141adf8f6215988123f7f1f9122c1bb4797b66a3d34f75253b9f54d107b"
+    },
+    "/wardrobe/final/0000026-c.png": {
+      "bounds": [
+        0.110517,
+        0.090585,
+        0.786096,
+        0.833096
+      ],
+      "shoulderY": 0.150427,
+      "hemY": 0.7289,
+      "neckRise": 0.059842,
+      "sleeveBottoms": [
+        0.789134,
+        0.789134
+      ],
+      "bodyHeight": 0.578473,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d5462301d3d62d858e9bdd78c0679b776e741cc3f826bdd8603257e2e341e24a"
+    },
+    "/wardrobe/final/0000027.png": {
+      "bounds": [
+        0.089844,
+        0.086719,
+        0.824219,
+        0.814063
+      ],
+      "shoulderY": 0.178906,
+      "hemY": 0.824219,
+      "neckRise": 0.092188,
+      "sleeveBottoms": [
+        0.773438,
+        0.773438
+      ],
+      "bodyHeight": 0.645312,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "b122c85b2b87a0864d77e62cafae769d5fe2bfe9c898e792cc0ddc7f71a7e9a1"
+    },
+    "/wardrobe/final/0000027-c.png": {
+      "bounds": [
+        0.094474,
+        0.067047,
+        0.814617,
+        0.85378
+      ],
+      "shoulderY": 0.163732,
+      "hemY": 0.840529,
+      "neckRise": 0.096685,
+      "sleeveBottoms": [
+        0.787271,
+        0.787271
+      ],
+      "bodyHeight": 0.676797,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "739a751cfca75a9e9ab946a797d8efc7010b5a66dbc96b3316ef2c51003befb9"
+    },
+    "/wardrobe/final/0000028.png": {
+      "bounds": [
+        0.085938,
+        0.117188,
+        0.836914,
+        0.791406
+      ],
+      "shoulderY": 0.13125,
+      "hemY": 0.864062,
+      "neckRise": 0.014063,
+      "sleeveBottoms": [
+        0.905469,
+        0.905469
+      ],
+      "bodyHeight": 0.732812,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "47e7a1bed07a590c736f36c82f0ca95d5d8a959fb196e000faeee2f503e16e73"
+    },
+    "/wardrobe/final/0000029.png": {
+      "bounds": [
+        0.041992,
+        0.117188,
+        0.915039,
+        0.774219
+      ],
+      "shoulderY": 0.224219,
+      "hemY": 0.775781,
+      "neckRise": 0.107031,
+      "sleeveBottoms": [
+        0.890625,
+        0.891406
+      ],
+      "bodyHeight": 0.551562,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "5e3045dd050bc89346a09f9adc6d859a876436d4a777107e28dda5c806de2005"
+    },
+    "/wardrobe/final/0000029-c.png": {
+      "bounds": [
+        0.038324,
+        0.10485,
+        0.937611,
+        0.791726
+      ],
+      "shoulderY": 0.214302,
+      "hemY": 0.778337,
+      "neckRise": 0.109452,
+      "sleeveBottoms": [
+        0.895777,
+        0.896576
+      ],
+      "bodyHeight": 0.564035,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "afae9f9d5296ff386eb8f2b6e10cb11158ff634cf006787f15bbd01862f23fce"
+    },
+    "/wardrobe/final/0000030.png": {
+      "bounds": [
+        0.023438,
+        0.109375,
+        0.955078,
+        0.791406
+      ],
+      "shoulderY": 0.183594,
+      "hemY": 0.89375,
+      "neckRise": 0.074219,
+      "sleeveBottoms": [
+        0.735938,
+        0.739844
+      ],
+      "bodyHeight": 0.710156,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "7374b4b022d54e25291c2b8c4b3643e61deaa840fcd63dea8966417786478711"
+    },
+    "/wardrobe/final/0000030-c.png": {
+      "bounds": [
+        0.033868,
+        0.107703,
+        0.934938,
+        0.793153
+      ],
+      "shoulderY": 0.182086,
+      "hemY": 0.893809,
+      "neckRise": 0.074383,
+      "sleeveBottoms": [
+        0.735648,
+        0.739563
+      ],
+      "bodyHeight": 0.711723,
+      "slots": 3.5,
+      "region": "upper",
+      "sha256": "faabdcae0013c6e2a6f5cf89ee156a352ff6f697e5f0c618b903eff9ed1f8932"
+    },
+    "/wardrobe/final/0000031.png": {
+      "bounds": [
+        0.116211,
+        0.092969,
+        0.75293,
+        0.829688
+      ],
+      "shoulderY": 0.177734,
+      "hemY": 0.921875,
+      "neckRise": 0.084766,
+      "sleeveBottoms": [
+        0.764062,
+        0.763281
+      ],
+      "bodyHeight": 0.744141,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "5d6b3f5abebab5c6d9b9265aa46cdeb51d3a120bc2cb7114f1ccf1d6bc77337d"
+    },
+    "/wardrobe/final/0000032.png": {
+      "bounds": [
+        0.056641,
+        0.142969,
+        0.895508,
+        0.728125
+      ],
+      "shoulderY": 0.264453,
+      "hemY": 0.805469,
+      "neckRise": 0.121484,
+      "sleeveBottoms": [
+        0.869531,
+        0.870313
+      ],
+      "bodyHeight": 0.541016,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ee9062fd025afa46007054e06c8223e45d4771e4f1b756a4435ae15baf965ede"
+    },
+    "/wardrobe/final/0000032-c.png": {
+      "bounds": [
+        0.029412,
+        0.107703,
+        0.941176,
+        0.789586
+      ],
+      "shoulderY": 0.239442,
+      "hemY": 0.826125,
+      "neckRise": 0.131739,
+      "sleeveBottoms": [
+        0.895595,
+        0.896442
+      ],
+      "bodyHeight": 0.586683,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "7ffa08780666c101813ae14537520ae8145a5525c33f8c4bd0aee86bec2c1150"
+    },
+    "/wardrobe/final/0000033.png": {
+      "bounds": [
+        0.12207,
+        0.107031,
+        0.758789,
+        0.791406
+      ],
+      "shoulderY": 0.167187,
+      "hemY": 0.895312,
+      "neckRise": 0.060156,
+      "sleeveBottoms": [
+        0.860938,
+        0.8625
+      ],
+      "bodyHeight": 0.728125,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "916521873b87bd80f484c6eadce4a8dc52872e453d2123a552764c0c76db4805"
+    },
+    "/wardrobe/final/0000033-c.png": {
+      "bounds": [
+        0.114082,
+        0.082739,
+        0.771836,
+        0.807418
+      ],
+      "shoulderY": 0.144112,
+      "hemY": 0.886969,
+      "neckRise": 0.061373,
+      "sleeveBottoms": [
+        0.851898,
+        0.853492
+      ],
+      "bodyHeight": 0.742856,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "d68d0c86f0a9dad49df38a15fce0e3d5241181be3a5cdba9bdf848083886cef8"
+    },
+    "/wardrobe/final/0000034.png": {
+      "bounds": [
+        0.035156,
+        0.135156,
+        0.949219,
+        0.75625
+      ],
+      "shoulderY": 0.232422,
+      "hemY": 0.839844,
+      "neckRise": 0.097266,
+      "sleeveBottoms": [
+        0.890625,
+        0.8875
+      ],
+      "bodyHeight": 0.607422,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "bdea2017c20a54334ce687f20b35e55d76f28d5c05291b79eb6fc44ba952a153"
+    },
+    "/wardrobe/final/0000034-c.png": {
+      "bounds": [
+        0.032977,
+        0.127675,
+        0.944742,
+        0.749643
+      ],
+      "shoulderY": 0.224091,
+      "hemY": 0.826206,
+      "neckRise": 0.096416,
+      "sleeveBottoms": [
+        0.876544,
+        0.873446
+      ],
+      "bodyHeight": 0.602115,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "0f0193eefedab23e3c3fd8716afd549f6c9c8b4566e2680f3b24dc2b4be6d684"
+    },
+    "/wardrobe/final/0000035.png": {
+      "bounds": [
+        0.095703,
+        0.105469,
+        0.813477,
+        0.782813
+      ],
+      "shoulderY": 0.177344,
+      "hemY": 0.846875,
+      "neckRise": 0.071875,
+      "sleeveBottoms": [
+        0.8875,
+        0.8875
+      ],
+      "bodyHeight": 0.669531,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "e783b06e6fa91b72a561e0583210c9253dcfc7aea2e90b3fce11848debc04d4a"
+    },
+    "/wardrobe/final/0000035-c.png": {
+      "bounds": [
+        0.066845,
+        0.106277,
+        0.848485,
+        0.780314
+      ],
+      "shoulderY": 0.177922,
+      "hemY": 0.845316,
+      "neckRise": 0.071646,
+      "sleeveBottoms": [
+        0.885812,
+        0.885812
+      ],
+      "bodyHeight": 0.667394,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d6f1e13d29a544c917cd24be5db61a29e0064f729f3017f10f052e515c9f3b7a"
+    },
+    "/wardrobe/final/0000036.png": {
+      "bounds": [
+        0.118164,
+        0.0625,
+        0.772461,
+        0.873437
+      ],
+      "shoulderY": 0.117188,
+      "hemY": 0.917969,
+      "neckRise": 0.054688,
+      "sleeveBottoms": [
+        0.724219,
+        0.857031
+      ],
+      "bodyHeight": 0.800781,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "ce094a4d7aac77afbed0bdb1ebe3da3014a395b8b5889a24c90200d36050388c"
+    },
+    "/wardrobe/final/0000036-c.png": {
+      "bounds": [
+        0.124777,
+        0.048502,
+        0.763815,
+        0.872325
+      ],
+      "shoulderY": 0.10312,
+      "hemY": 0.902882,
+      "neckRise": 0.054618,
+      "sleeveBottoms": [
+        0.709378,
+        0.842022
+      ],
+      "bodyHeight": 0.799762,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "df92771e1f48ddc0c91d83ad9912326aa528f886f70b75be4a5d2bc8b4617c32"
+    },
+    "/wardrobe/final/0000037.png": {
+      "bounds": [
+        0.085938,
+        0.097656,
+        0.827148,
+        0.798438
+      ],
+      "shoulderY": 0.163672,
+      "hemY": 0.84375,
+      "neckRise": 0.066016,
+      "sleeveBottoms": [
+        0.896094,
+        0.880469
+      ],
+      "bodyHeight": 0.680078,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "3709b02f7aa1acded3240251fa00e27796c3ff7469a789500a65e42dc179fe13"
+    },
+    "/wardrobe/final/0000037-c.png": {
+      "bounds": [
+        0.073975,
+        0.121969,
+        0.849376,
+        0.78388
+      ],
+      "shoulderY": 0.186781,
+      "hemY": 0.854459,
+      "neckRise": 0.064812,
+      "sleeveBottoms": [
+        0.905849,
+        0.890509
+      ],
+      "bodyHeight": 0.667679,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "98d1fa93e91a8232254c2d55f08088be715f99d23d1dc69ecc235365d7838b28"
+    },
+    "/wardrobe/final/0000038.png": {
+      "bounds": [
+        0.091797,
+        0.088281,
+        0.826172,
+        0.811719
+      ],
+      "shoulderY": 0.1625,
+      "hemY": 0.896094,
+      "neckRise": 0.074219,
+      "sleeveBottoms": [
+        0.754687,
+        0.764062
+      ],
+      "bodyHeight": 0.733594,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "46e277f84dab0da1a5b9ce92c2efe19c801e0bb0f718459dc8bd5529cd90e098"
+    },
+    "/wardrobe/final/0000039.png": {
+      "bounds": [
+        0.036111,
+        0.128889,
+        0.936111,
+        0.714444
+      ],
+      "shoulderY": 0.181667,
+      "hemY": 0.806667,
+      "neckRise": 0.052778,
+      "sleeveBottoms": [
+        0.843333,
+        0.841111
+      ],
+      "bodyHeight": 0.625,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "358c4f56e017828db2517e50af250ebdf11e52ddee2e6102fcc52196f898272c"
+    },
+    "/wardrobe/final/0000039-c.png": {
+      "bounds": [
+        0.036542,
+        0.131954,
+        0.928699,
+        0.711127
+      ],
+      "shoulderY": 0.184487,
+      "hemY": 0.806585,
+      "neckRise": 0.052533,
+      "sleeveBottoms": [
+        0.843081,
+        0.840869
+      ],
+      "bodyHeight": 0.622098,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "7b2fa39bb461f487d7d02035d09811c3225254a9ff9a305ed9689c4083c611ee"
+    },
+    "/wardrobe/final/0000040.png": {
+      "bounds": [
+        0.107422,
+        0.116406,
+        0.798828,
+        0.758594
+      ],
+      "shoulderY": 0.183203,
+      "hemY": 0.84375,
+      "neckRise": 0.066797,
+      "sleeveBottoms": [
+        0.874219,
+        0.872656
+      ],
+      "bodyHeight": 0.660547,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "4fa0cf791338304aed95963092a42ee7fb6ca08907c2a4f6c393d743852ddbe1"
+    },
+    "/wardrobe/final/0000040-c.png": {
+      "bounds": [
+        0.113191,
+        0.129101,
+        0.77451,
+        0.735378
+      ],
+      "shoulderY": 0.193854,
+      "hemY": 0.834186,
+      "neckRise": 0.064753,
+      "sleeveBottoms": [
+        0.863722,
+        0.862207
+      ],
+      "bodyHeight": 0.640332,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "98fb4b924d6a95cf75a15e541bd50e2aa6f8914696fa9e92bae84dc0a15fddd1"
+    },
+    "/wardrobe/final/0000041.png": {
+      "bounds": [
+        0.120117,
+        0.051562,
+        0.776367,
+        0.885938
+      ],
+      "shoulderY": 0.13125,
+      "hemY": 0.925781,
+      "neckRise": 0.079687,
+      "sleeveBottoms": [
+        0.6375,
+        0.636719
+      ],
+      "bodyHeight": 0.794531,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "bcd1b1bd6c46812645fffe82886cd27686649db96f55811ccf8d4c668a860a2a"
+    },
+    "/wardrobe/final/0000042.png": {
+      "bounds": [
+        0.074219,
+        0.119531,
+        0.851563,
+        0.772656
+      ],
+      "shoulderY": 0.176172,
+      "hemY": 0.891406,
+      "neckRise": 0.056641,
+      "sleeveBottoms": [
+        0.854688,
+        0.855469
+      ],
+      "bodyHeight": 0.715234,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "2e37b110de0ed69378e4733a5fda44aab48d539ae4bc45b4b0df8aba3add63e2"
+    },
+    "/wardrobe/final/0000042-c.png": {
+      "bounds": [
+        0.060606,
+        0.099857,
+        0.883244,
+        0.796006
+      ],
+      "shoulderY": 0.15821,
+      "hemY": 0.895058,
+      "neckRise": 0.058352,
+      "sleeveBottoms": [
+        0.85723,
+        0.858035
+      ],
+      "bodyHeight": 0.736849,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "8b965d40fbe9ea724dacae225f72d2d89c17825a48bf48a4f655411750d2eaa4"
+    },
+    "/wardrobe/final/0000043.png": {
+      "bounds": [
+        0.141602,
+        0.101563,
+        0.716797,
+        0.800781
+      ],
+      "shoulderY": 0.162891,
+      "hemY": 0.902344,
+      "neckRise": 0.061328,
+      "sleeveBottoms": [
+        0.8625,
+        0.8625
+      ],
+      "bodyHeight": 0.739453,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "22792a37d4c56d55de9f2d3a239f9e136b01be639e500fe15d9e75cf4dcb66d6"
+    },
+    "/wardrobe/final/0000044.png": {
+      "bounds": [
+        0.100586,
+        0.117188,
+        0.810547,
+        0.785937
+      ],
+      "shoulderY": 0.1625,
+      "hemY": 0.901563,
+      "neckRise": 0.045312,
+      "sleeveBottoms": [
+        0.851563,
+        0.851563
+      ],
+      "bodyHeight": 0.739062,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "3550dda5c4d18eaa94d42f577a3614b360f8e1f3594c19061f5692ff8d4dc7f5"
+    },
+    "/wardrobe/final/0000045.png": {
+      "bounds": [
+        0.036111,
+        0.166667,
+        0.920833,
+        0.668889
+      ],
+      "shoulderY": 0.240556,
+      "hemY": 0.823333,
+      "neckRise": 0.073889,
+      "sleeveBottoms": [
+        0.832222,
+        0.835556
+      ],
+      "bodyHeight": 0.582778,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "99dd877f8fa844d06b147dc8a08b5e0222b775c7e98a9ea0af19b4c07ff5a710"
+    },
+    "/wardrobe/final/0000045-c.png": {
+      "bounds": [
+        0.036542,
+        0.151213,
+        0.917112,
+        0.691869
+      ],
+      "shoulderY": 0.22764,
+      "hemY": 0.830439,
+      "neckRise": 0.076427,
+      "sleeveBottoms": [
+        0.839633,
+        0.843081
+      ],
+      "bodyHeight": 0.602799,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "582fcc30b5bf3be3826d20dbb8367c4c5bf256eb8ebbc41137b1907fcc0a91d9"
+    },
+    "/wardrobe/final/0000046.png": {
+      "bounds": [
+        0.078125,
+        0.167969,
+        0.84375,
+        0.639844
+      ],
+      "shoulderY": 0.267969,
+      "hemY": 0.769531,
+      "neckRise": 0.1,
+      "sleeveBottoms": [
+        0.80625,
+        0.807031
+      ],
+      "bodyHeight": 0.501563,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "68b7662c43d02851d0c11e40f3895b39c80d6e4f0b852d47abfbd623eb05a418"
+    },
+    "/wardrobe/final/0000046-c.png": {
+      "bounds": [
+        0.064171,
+        0.109843,
+        0.870766,
+        0.767475
+      ],
+      "shoulderY": 0.22979,
+      "hemY": 0.831401,
+      "neckRise": 0.119947,
+      "sleeveBottoms": [
+        0.875444,
+        0.876381
+      ],
+      "bodyHeight": 0.60161,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "fb89ba540f72ec8851503298d6a67b0b9af17981e9491e5dcfbe677891833197"
+    },
+    "/wardrobe/final/0000047.png": {
+      "bounds": [
+        0.052778,
+        0.124444,
+        0.890278,
+        0.747778
+      ],
+      "shoulderY": 0.161111,
+      "hemY": 0.804444,
+      "neckRise": 0.036667,
+      "sleeveBottoms": [
+        0.871111,
+        0.871111
+      ],
+      "bodyHeight": 0.643333,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "56b4be27c6ce619e635e49de46f4b54b72200bbe411e6b6e8f0a187bbbc2e847"
+    },
+    "/wardrobe/final/0000047-c.png": {
+      "bounds": [
+        0.050802,
+        0.116976,
+        0.897504,
+        0.751783
+      ],
+      "shoulderY": 0.153839,
+      "hemY": 0.800618,
+      "neckRise": 0.036863,
+      "sleeveBottoms": [
+        0.867642,
+        0.867642
+      ],
+      "bodyHeight": 0.646779,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1dd21cace238eeb8ee24c6c71a15427a930ccb5f3d753b5c692e0ea560bcf4a0"
+    },
+    "/wardrobe/final/0000048.png": {
+      "bounds": [
+        0.058333,
+        0.126667,
+        0.877778,
+        0.752222
+      ],
+      "shoulderY": 0.205556,
+      "hemY": 0.864444,
+      "neckRise": 0.078889,
+      "sleeveBottoms": [
+        0.876667,
+        0.873333
+      ],
+      "bodyHeight": 0.658889,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "67e842d762bfc32fc89f19e80409b733dde8da9ccfd0f0e94b7d9ee870c4c745"
+    },
+    "/wardrobe/final/0000048-c.png": {
+      "bounds": [
+        0.065062,
+        0.131954,
+        0.871658,
+        0.747504
+      ],
+      "shoulderY": 0.210348,
+      "hemY": 0.865104,
+      "neckRise": 0.078394,
+      "sleeveBottoms": [
+        0.87725,
+        0.873937
+      ],
+      "bodyHeight": 0.654756,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "95c23f52b72e8b873f150bd8f25f62c0bace5defc38ae5aec13f0211b35cf40b"
+    },
+    "/wardrobe/final/0000049.png": {
+      "bounds": [
+        0.036111,
+        0.136667,
+        0.919444,
+        0.754444
+      ],
+      "shoulderY": 0.193333,
+      "hemY": 0.76,
+      "neckRise": 0.056667,
+      "sleeveBottoms": [
+        0.812222,
+        0.813333
+      ],
+      "bodyHeight": 0.566667,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "f517d8fd235fc1e4e4714303504c2e73849e8fc3bbc2f93dfc91f388cc6652b9"
+    },
+    "/wardrobe/final/0000049-c.png": {
+      "bounds": [
+        0.02852,
+        0.114123,
+        0.947415,
+        0.784593
+      ],
+      "shoulderY": 0.173054,
+      "hemY": 0.762366,
+      "neckRise": 0.058931,
+      "sleeveBottoms": [
+        0.816675,
+        0.81783
+      ],
+      "bodyHeight": 0.589312,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "27aff86d5496103e8a470d435934f5b8c8a8062180c4e2344e46492a55b8c072"
+    },
+    "/wardrobe/final/0000050.png": {
+      "bounds": [
+        0.054688,
+        0.121094,
+        0.90332,
+        0.746875
+      ],
+      "shoulderY": 0.202344,
+      "hemY": 0.744531,
+      "neckRise": 0.08125,
+      "sleeveBottoms": [
+        0.865625,
+        0.865625
+      ],
+      "bodyHeight": 0.542188,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "7a8f42afb0cca0836f23d203bc2df6255f2e4115d203b210d72ebd82cbeeee63"
+    },
+    "/wardrobe/final/0000050-c.png": {
+      "bounds": [
+        0.052585,
+        0.133381,
+        0.893939,
+        0.729672
+      ],
+      "shoulderY": 0.212759,
+      "hemY": 0.742458,
+      "neckRise": 0.079379,
+      "sleeveBottoms": [
+        0.860763,
+        0.860763
+      ],
+      "bodyHeight": 0.529699,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "0b81285ff001c18fad9e1d86d26368d90b43baa8eca16ff0a710bb5bb55a6d61"
+    },
+    "/wardrobe/final/0000051.png": {
+      "bounds": [
+        0.099609,
+        0.260156,
+        0.800781,
+        0.479687
+      ],
+      "shoulderY": 0.269531,
+      "hemY": 0.729688,
+      "neckRise": 0.009375,
+      "sleeveBottoms": [
+        0.683594,
+        0.680469
+      ],
+      "bodyHeight": 0.460156,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "560be55d7036779d1af3806ffd0d8529c645c79d5825ccebab102399937eff78"
+    },
+    "/wardrobe/final/0000052.png": {
+      "bounds": [
+        0.099609,
+        0.205469,
+        0.800781,
+        0.589063
+      ],
+      "shoulderY": 0.220703,
+      "hemY": 0.785156,
+      "neckRise": 0.015234,
+      "sleeveBottoms": [
+        0.758594,
+        0.751563
+      ],
+      "bodyHeight": 0.564453,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "fd56c0cd2b4e44eb2c3a12413f8541731b15dd848ec377894220e83f7dd4d8cf"
+    },
+    "/wardrobe/final/0000053.png": {
+      "bounds": [
+        0.099609,
+        0.242188,
+        0.800781,
+        0.514844
+      ],
+      "shoulderY": 0.262109,
+      "hemY": 0.733594,
+      "neckRise": 0.019922,
+      "sleeveBottoms": [
+        0.68125,
+        0.684375
+      ],
+      "bodyHeight": 0.471484,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "a119daba05fc7d41317b70e76a1b75cfbef9fa6131b916e1d6e1d57853e505fe"
+    },
+    "/wardrobe/final/0000054.png": {
+      "bounds": [
+        0.099609,
+        0.200781,
+        0.800781,
+        0.597656
+      ],
+      "shoulderY": 0.268359,
+      "hemY": 0.798438,
+      "neckRise": 0.067578,
+      "sleeveBottoms": [
+        0.547656,
+        0.544531
+      ],
+      "bodyHeight": 0.530078,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "f739ab01ed04fefd4699606f817faba2062a0772c6d32dcdd7416312c6e7fccf"
+    },
+    "/wardrobe/final/0000055.png": {
+      "bounds": [
+        0.099609,
+        0.246875,
+        0.800781,
+        0.507031
+      ],
+      "shoulderY": 0.265234,
+      "hemY": 0.748437,
+      "neckRise": 0.018359,
+      "sleeveBottoms": [
+        0.707031,
+        0.709375
+      ],
+      "bodyHeight": 0.483203,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "5035efe2ea399336754b4758687f241002a0cc797043903d88a29b339b677ed2"
+    },
+    "/wardrobe/final/0000056.png": {
+      "bounds": [
+        0.099609,
+        0.147656,
+        0.800781,
+        0.703906
+      ],
+      "shoulderY": 0.183594,
+      "hemY": 0.779687,
+      "neckRise": 0.035937,
+      "sleeveBottoms": [
+        0.851563,
+        0.850781
+      ],
+      "bodyHeight": 0.596094,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "5e3e77182c67de52664290fcfea0da604bf4cfbdc131f61275de5ea76ef6eace"
+    },
+    "/wardrobe/final/0000057.png": {
+      "bounds": [
+        0.25293,
+        0.101563,
+        0.493164,
+        0.796875
+      ],
+      "shoulderY": 0.102344,
+      "hemY": 0.796094,
+      "neckRise": 0.000781,
+      "sleeveBottoms": [
+        0.897656,
+        0.897656
+      ],
+      "bodyHeight": 0.69375,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "1f446c13d66a81213d27b0216906e0f8a2e147c237cc41b706ea3c5d3b597910"
+    },
+    "/wardrobe/final/0000058.png": {
+      "bounds": [
+        0.099609,
+        0.130469,
+        0.800781,
+        0.738281
+      ],
+      "shoulderY": 0.134766,
+      "hemY": 0.867188,
+      "neckRise": 0.004297,
+      "sleeveBottoms": [
+        0.846875,
+        0.853906
+      ],
+      "bodyHeight": 0.732422,
+      "slots": 2.5,
+      "region": "lower",
+      "sha256": "9deb8a3f73bbf2128a2d7b60dcfbf0ec95a21cdaa69c817f3a71ce9a27fbcb5d"
+    },
+    "/wardrobe/final/0000059.png": {
+      "bounds": [
+        0.129883,
+        0.101563,
+        0.740234,
+        0.796875
+      ],
+      "shoulderY": 0.120313,
+      "hemY": 0.890625,
+      "neckRise": 0.01875,
+      "sleeveBottoms": [
+        0.860156,
+        0.875781
+      ],
+      "bodyHeight": 0.770312,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "5f78bc447a2d3b19e45dda77a2e1cf42b9ad76b01418657e47bbdc9715b51198"
+    },
+    "/wardrobe/final/0000060.png": {
+      "bounds": [
+        0.242188,
+        0.101563,
+        0.515625,
+        0.796875
+      ],
+      "shoulderY": 0.106641,
+      "hemY": 0.577344,
+      "neckRise": 0.005078,
+      "sleeveBottoms": [
+        0.892969,
+        0.895312
+      ],
+      "bodyHeight": 0.470703,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "f776268953d56f5fe1792d7dcdea1b718102972f52c90c10c8a6912297644a90"
+    },
+    "/wardrobe/final/0000061.png": {
+      "bounds": [
+        0.099609,
+        0.104688,
+        0.800781,
+        0.790625
+      ],
+      "shoulderY": 0.141016,
+      "hemY": 0.885938,
+      "neckRise": 0.036328,
+      "sleeveBottoms": [
+        0.858594,
+        0.892188
+      ],
+      "bodyHeight": 0.744922,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "e11bf933154b3bdd05bc8bdb9a4ebacbd182a7f5f04f7843f37cb356cfb1e35f"
+    },
+    "/wardrobe/final/0000062.png": {
+      "bounds": [
+        0.099609,
+        0.2375,
+        0.800781,
+        0.525
+      ],
+      "shoulderY": 0.257031,
+      "hemY": 0.759375,
+      "neckRise": 0.019531,
+      "sleeveBottoms": [
+        0.728906,
+        0.721875
+      ],
+      "bodyHeight": 0.502344,
+      "slots": 2,
+      "region": "lower",
+      "sha256": "819b95b82ea279edb5c31e473eadd8d8b03fb9925c22824da419bc2588d09358"
+    },
+    "/wardrobe/final/0000063.png": {
+      "bounds": [
+        0.099609,
+        0.2,
+        0.800781,
+        0.6
+      ],
+      "shoulderY": 0.291797,
+      "hemY": 0.7375,
+      "neckRise": 0.091797,
+      "sleeveBottoms": [
+        0.771094,
+        0.7625
+      ],
+      "bodyHeight": 0.445703,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "493cdaaa4aaf69e57b6a6e55c1e0446c1dc2c728d08a6cc30f8e9cf4fc497c8d"
+    },
+    "/wardrobe/final/0000064.png": {
+      "bounds": [
+        0.126953,
+        0.101563,
+        0.745117,
+        0.796875
+      ],
+      "shoulderY": 0.110937,
+      "hemY": 0.894531,
+      "neckRise": 0.009375,
+      "sleeveBottoms": [
+        0.8625,
+        0.8625
+      ],
+      "bodyHeight": 0.783594,
+      "slots": 3,
+      "region": "lower",
+      "sha256": "7f9656def0b05a36fb633f97b92c61a92d2263236ebf19d54676e3953b4731d0"
+    },
+    "/wardrobe/final/0000065.png": {
+      "bounds": [
+        0.353516,
+        0.126562,
+        0.291992,
+        0.751563
+      ],
+      "shoulderY": 0.144141,
+      "hemY": 0.766406,
+      "neckRise": 0.017578,
+      "sleeveBottoms": [
+        0.877344,
+        0.878125
+      ],
+      "bodyHeight": 0.622266,
+      "slots": 6.5,
+      "region": "full",
+      "sha256": "84a51da8368e2de53037498a2d5764d559da62dfce54d8f184d262e104859ef8"
+    },
+    "/wardrobe/final/0000066.png": {
+      "bounds": [
+        0.063477,
+        0.2125,
+        0.873047,
+        0.575
+      ],
+      "shoulderY": 0.425781,
+      "hemY": 0.776563,
+      "neckRise": 0.213281,
+      "sleeveBottoms": [
+        0.753125,
+        0.705469
+      ],
+      "bodyHeight": 0.350781,
+      "slots": 1.5,
+      "region": "feet",
+      "sha256": "51523b381dbd86b5155f31793ee2a1187bd8e8fffcdff881587eb46109b0dbc5"
+    },
+    "/wardrobe/final/0000067.png": {
+      "bounds": [
+        0.099609,
+        0.227344,
+        0.800781,
+        0.544531
+      ],
+      "shoulderY": 0.275,
+      "hemY": 0.771875,
+      "neckRise": 0.047656,
+      "sleeveBottoms": [
+        0.528906,
+        0.528125
+      ],
+      "bodyHeight": 0.496875,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ae5fe4acc15e7f816090123b03f613627109cb27fd5f63616e3ea4f4c03e7209"
+    },
+    "/wardrobe/final/0000068.png": {
+      "bounds": [
+        0.125,
+        0.101563,
+        0.749023,
+        0.796094
+      ],
+      "shoulderY": 0.123047,
+      "hemY": 0.896094,
+      "neckRise": 0.021484,
+      "sleeveBottoms": [
+        0.896875,
+        0.897656
+      ],
+      "bodyHeight": 0.773047,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "f88f6b04d7baae67eb78e3f28203152c876c05e259452b9c5477b181e1ddc887"
+    },
+    "/wardrobe/final/0000069.png": {
+      "bounds": [
+        0.099609,
+        0.220312,
+        0.800781,
+        0.558594
+      ],
+      "shoulderY": 0.292187,
+      "hemY": 0.778906,
+      "neckRise": 0.071875,
+      "sleeveBottoms": [
+        0.759375,
+        0.760156
+      ],
+      "bodyHeight": 0.486719,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "7c1ac93e30f5b65aceb398fc06954f0d3e5ed2880062f5d00ba2a14ac19b3f18"
+    },
+    "/wardrobe/final/0000070.png": {
+      "bounds": [
+        0.147461,
+        0.183594,
+        0.703125,
+        0.632813
+      ],
+      "shoulderY": 0.238281,
+      "hemY": 0.815625,
+      "neckRise": 0.054688,
+      "sleeveBottoms": [
+        0.532813,
+        0.532813
+      ],
+      "bodyHeight": 0.577344,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "55af082c314758e1e35caff403704e02b50352f3c5f9f82c95ba6129d5d9908e"
+    },
+    "/wardrobe/final/0000071.png": {
+      "bounds": [
+        0.099609,
+        0.1875,
+        0.800781,
+        0.625
+      ],
+      "shoulderY": 0.225781,
+      "hemY": 0.8125,
+      "neckRise": 0.038281,
+      "sleeveBottoms": [
+        0.533594,
+        0.532813
+      ],
+      "bodyHeight": 0.586719,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "6b01e1046b6f96d30beb0db6b63f5aa78b726b7c05d83ad31d660f64a9927528"
+    },
+    "/wardrobe/final/0000072.png": {
+      "bounds": [
+        0.208984,
+        0.101563,
+        0.581055,
+        0.796875
+      ],
+      "shoulderY": 0.11875,
+      "hemY": 0.898438,
+      "neckRise": 0.017188,
+      "sleeveBottoms": [
+        0.890625,
+        0.890625
+      ],
+      "bodyHeight": 0.779687,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "94d33c7df219da40eaa5de000616c5932b95c878280401a6a3ae6d9c66bfa405"
+    },
+    "/wardrobe/final/0000073.png": {
+      "bounds": [
+        0.099609,
+        0.114844,
+        0.800781,
+        0.771094
+      ],
+      "shoulderY": 0.138281,
+      "hemY": 0.884375,
+      "neckRise": 0.023438,
+      "sleeveBottoms": [
+        0.5375,
+        0.541406
+      ],
+      "bodyHeight": 0.746094,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d5c92b95285d724414e51f4bc499ad365174dea4e1350e6eea9d557b8b58e5e4"
+    },
+    "/wardrobe/final/0000074.png": {
+      "bounds": [
+        0.15918,
+        0.101563,
+        0.681641,
+        0.796875
+      ],
+      "shoulderY": 0.212891,
+      "hemY": 0.858594,
+      "neckRise": 0.111328,
+      "sleeveBottoms": [
+        0.898438,
+        0.898438
+      ],
+      "bodyHeight": 0.645703,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "3d41b2e0a8fca714779acccbac45a31e84b60934471a0f03a1bdc27ae2b4d31e"
+    },
+    "/wardrobe/final/0000075.png": {
+      "bounds": [
+        0.099609,
+        0.138281,
+        0.800781,
+        0.723437
+      ],
+      "shoulderY": 0.171094,
+      "hemY": 0.861719,
+      "neckRise": 0.032813,
+      "sleeveBottoms": [
+        0.45,
+        0.45
+      ],
+      "bodyHeight": 0.690625,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "a85e644bcce8a2b01a9becbcaeaa9c6d0e70cda491e2abaf29f4e801a62d86d3"
+    },
+    "/wardrobe/final/0000076.png": {
+      "bounds": [
+        0.099609,
+        0.207813,
+        0.800781,
+        0.584375
+      ],
+      "shoulderY": 0.248438,
+      "hemY": 0.792188,
+      "neckRise": 0.040625,
+      "sleeveBottoms": [
+        0.503906,
+        0.502344
+      ],
+      "bodyHeight": 0.54375,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "8a23711166398f6a2d6b152a330e495c14e3cfb994b80620ea32e8f67e698e8c"
+    },
+    "/wardrobe/final/0000077.png": {
+      "bounds": [
+        0.099609,
+        0.117188,
+        0.800781,
+        0.765625
+      ],
+      "shoulderY": 0.154688,
+      "hemY": 0.882031,
+      "neckRise": 0.0375,
+      "sleeveBottoms": [
+        0.429688,
+        0.421875
+      ],
+      "bodyHeight": 0.727344,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "3afc787bf8dec1ca5aee0a44e66447044a46dea2b3df17389400d25906bc4253"
+    },
+    "/wardrobe/final/0000078.png": {
+      "bounds": [
+        0.139648,
+        0.24375,
+        0.720703,
+        0.5125
+      ],
+      "shoulderY": 0.287109,
+      "hemY": 0.752344,
+      "neckRise": 0.043359,
+      "sleeveBottoms": [
+        0.464844,
+        0.471875
+      ],
+      "bodyHeight": 0.465234,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "f8de98873f1554c16b7a4c5344326305f1eff38a9392a020b9e592853c807a3b"
+    },
+    "/wardrobe/final/0000079.png": {
+      "bounds": [
+        0.100586,
+        0.103906,
+        0.799805,
+        0.790625
+      ],
+      "shoulderY": 0.171094,
+      "hemY": 0.882813,
+      "neckRise": 0.067187,
+      "sleeveBottoms": [
+        0.873437,
+        0.873437
+      ],
+      "bodyHeight": 0.711719,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "351e8a800faeefd8bb9443b8dd2f1a06931f6ab99137d2f1cfc80cc2f5d133fe"
+    },
+    "/wardrobe/final/0000080.png": {
+      "bounds": [
+        0.099609,
+        0.121875,
+        0.800781,
+        0.75625
+      ],
+      "shoulderY": 0.197266,
+      "hemY": 0.878125,
+      "neckRise": 0.075391,
+      "sleeveBottoms": [
+        0.871875,
+        0.871875
+      ],
+      "bodyHeight": 0.680859,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "e897de8893785cc21228616427e6337c12ad42cb43378b4af2a6e2ef1752218b"
+    },
+    "/wardrobe/final/0000081.png": {
+      "bounds": [
+        0.099609,
+        0.114844,
+        0.800781,
+        0.769531
+      ],
+      "shoulderY": 0.174219,
+      "hemY": 0.884375,
+      "neckRise": 0.059375,
+      "sleeveBottoms": [
+        0.538281,
+        0.539063
+      ],
+      "bodyHeight": 0.710156,
+      "slots": 4,
+      "region": "upper",
+      "sha256": "6b8feffb6df85110563b9aad5a6bfc02e712d19e984950d210f48c8a63af57c0"
+    },
+    "/wardrobe/final/0000082.png": {
+      "bounds": [
+        0.1875,
+        0.172656,
+        0.62207,
+        0.651563
+      ],
+      "shoulderY": 0.244141,
+      "hemY": 0.778125,
+      "neckRise": 0.071484,
+      "sleeveBottoms": [
+        0.824219,
+        0.824219
+      ],
+      "bodyHeight": 0.533984,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "58455be65016717f81ba0a81233b450857eca75842a89362b100592ce318e9f6"
+    },
+    "/wardrobe/final/0000083.png": {
+      "bounds": [
+        0.104492,
+        0.101563,
+        0.790039,
+        0.796875
+      ],
+      "shoulderY": 0.319141,
+      "hemY": 0.883594,
+      "neckRise": 0.217578,
+      "sleeveBottoms": [
+        0.894531,
+        0.898438
+      ],
+      "bodyHeight": 0.564453,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "50cc1b52993f9007ff064ff26b777272931c519f55632a4af99f2e6ce91b8a75"
+    },
+    "/wardrobe/final/0000084.png": {
+      "bounds": [
+        0.166992,
+        0.184375,
+        0.665039,
+        0.628906
+      ],
+      "shoulderY": 0.277344,
+      "hemY": 0.763281,
+      "neckRise": 0.092969,
+      "sleeveBottoms": [
+        0.813281,
+        0.813281
+      ],
+      "bodyHeight": 0.485938,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ceb6115ae932cfd1a37556abe0cda7bc3855645b43cfb8ad2f003f24a861ef7c"
+    },
+    "/wardrobe/final/0000085.png": {
+      "bounds": [
+        0.099609,
+        0.151562,
+        0.800781,
+        0.696094
+      ],
+      "shoulderY": 0.188281,
+      "hemY": 0.813281,
+      "neckRise": 0.036719,
+      "sleeveBottoms": [
+        0.846875,
+        0.847656
+      ],
+      "bodyHeight": 0.625,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "40378a02bd2cc06f573d25655e13da5d628aaa5b452fde94a426793b32360263"
+    },
+    "/wardrobe/final/0000086.png": {
+      "bounds": [
+        0.099609,
+        0.258594,
+        0.800781,
+        0.483594
+      ],
+      "shoulderY": 0.29375,
+      "hemY": 0.714844,
+      "neckRise": 0.035156,
+      "sleeveBottoms": [
+        0.741406,
+        0.741406
+      ],
+      "bodyHeight": 0.421094,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "a01c1677b6d6838a2c4374eb721a972584ef90dbfc981467edfa61435efd8fd2"
+    },
+    "/wardrobe/final/0000087.png": {
+      "bounds": [
+        0.099609,
+        0.121094,
+        0.800781,
+        0.757031
+      ],
+      "shoulderY": 0.353125,
+      "hemY": 0.830469,
+      "neckRise": 0.232031,
+      "sleeveBottoms": [
+        0.877344,
+        0.877344
+      ],
+      "bodyHeight": 0.477344,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "949c3f8b93fa1896f5297fb6997710fe0cb8adb465a1b0758b9f7f8638245ea8"
+    },
+    "/wardrobe/final/0000088.png": {
+      "bounds": [
+        0.212891,
+        0.214844,
+        0.567383,
+        0.570313
+      ],
+      "shoulderY": 0.291406,
+      "hemY": 0.748437,
+      "neckRise": 0.076563,
+      "sleeveBottoms": [
+        0.784375,
+        0.785156
+      ],
+      "bodyHeight": 0.457031,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "51bd776f4f41245c183142be25654a7bd94d14c5c830d12bdd1bb34998552353"
+    },
+    "/wardrobe/final/0000089.png": {
+      "bounds": [
+        0.166992,
+        0.155469,
+        0.665039,
+        0.688281
+      ],
+      "shoulderY": 0.159766,
+      "hemY": 0.775,
+      "neckRise": 0.004297,
+      "sleeveBottoms": [
+        0.842969,
+        0.84375
+      ],
+      "bodyHeight": 0.615234,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "dd8286878b73babf29cf0eb3ed165c8f2a9d1f974464936a9d8ba2af47a5270c"
+    },
+    "/wardrobe/final/0000090.png": {
+      "bounds": [
+        0.099609,
+        0.147656,
+        0.800781,
+        0.703906
+      ],
+      "shoulderY": 0.359766,
+      "hemY": 0.840625,
+      "neckRise": 0.212109,
+      "sleeveBottoms": [
+        0.842969,
+        0.847656
+      ],
+      "bodyHeight": 0.480859,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "964404b6996f1967f160679d7bfae0bcb8999df7fe03460e24d75f5ed56c3919"
+    },
+    "/wardrobe/final/0000091.png": {
+      "bounds": [
+        0.099609,
+        0.199219,
+        0.800781,
+        0.601563
+      ],
+      "shoulderY": 0.252344,
+      "hemY": 0.8,
+      "neckRise": 0.053125,
+      "sleeveBottoms": [
+        0.489063,
+        0.489844
+      ],
+      "bodyHeight": 0.547656,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "4692b6239f981a87640209da16784cf967837744ba6823bd403c1c3ffabd1fff"
+    },
+    "/wardrobe/final/0000092.png": {
+      "bounds": [
+        0.099609,
+        0.246094,
+        0.800781,
+        0.507031
+      ],
+      "shoulderY": 0.285547,
+      "hemY": 0.753125,
+      "neckRise": 0.039453,
+      "sleeveBottoms": [
+        0.703125,
+        0.703125
+      ],
+      "bodyHeight": 0.467578,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ed996e3af1c06960d929c6f54f16235c05e5939a45ca46cb0b42f50751c02f7e"
+    },
+    "/wardrobe/final/0000093.png": {
+      "bounds": [
+        0.201172,
+        0.208594,
+        0.597656,
+        0.58125
+      ],
+      "shoulderY": 0.279687,
+      "hemY": 0.746875,
+      "neckRise": 0.071094,
+      "sleeveBottoms": [
+        0.789844,
+        0.789844
+      ],
+      "bodyHeight": 0.467187,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "1d46e1317e68bead67c5571a10cab8dbbcadb4c98f88fcfb4e812b1bc3e2b3ec"
+    },
+    "/wardrobe/final/0000094.png": {
+      "bounds": [
+        0.146484,
+        0.176563,
+        0.705078,
+        0.646094
+      ],
+      "shoulderY": 0.23125,
+      "hemY": 0.821094,
+      "neckRise": 0.054688,
+      "sleeveBottoms": [
+        0.503906,
+        0.503125
+      ],
+      "bodyHeight": 0.589844,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d66c30f789d7ccf047beb615ee710d1e68f74b594c0c53f6dec49c061f41adec"
+    },
+    "/wardrobe/final/0000095.png": {
+      "bounds": [
+        0.099609,
+        0.179688,
+        0.800781,
+        0.640625
+      ],
+      "shoulderY": 0.243359,
+      "hemY": 0.820313,
+      "neckRise": 0.063672,
+      "sleeveBottoms": [
+        0.767188,
+        0.766406
+      ],
+      "bodyHeight": 0.576953,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "e6019d0c6eb97bcbde3c9cc5977747b2052a3915bcd314e7789c04a5e09b470e"
+    },
+    "/wardrobe/final/0000096.png": {
+      "bounds": [
+        0.099609,
+        0.203125,
+        0.800781,
+        0.59375
+      ],
+      "shoulderY": 0.242188,
+      "hemY": 0.796875,
+      "neckRise": 0.039063,
+      "sleeveBottoms": [
+        0.494531,
+        0.494531
+      ],
+      "bodyHeight": 0.554688,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "9e0972d546ea58b3367a536e2e9e327e142241537b4359328e7d4a8b0ccadf13"
+    },
+    "/wardrobe/final/0000097.png": {
+      "bounds": [
+        0.0625,
+        0.309375,
+        0.875,
+        0.382813
+      ],
+      "shoulderY": 0.385547,
+      "hemY": 0.689844,
+      "neckRise": 0.076172,
+      "sleeveBottoms": [
+        0.628125,
+        0.621094
+      ],
+      "bodyHeight": 0.304297,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "4a9db242857458530dbf61644fa1e8d2ac9d7c315ddbd482d34bad1894f057e0"
+    },
+    "/wardrobe/final/0000098.png": {
+      "bounds": [
+        0.074219,
+        0.1875,
+        0.853516,
+        0.624219
+      ],
+      "shoulderY": 0.429688,
+      "hemY": 0.807031,
+      "neckRise": 0.242188,
+      "sleeveBottoms": [
+        0.742969,
+        0.704688
+      ],
+      "bodyHeight": 0.377344,
+      "slots": 1.5,
+      "region": "feet",
+      "sha256": "bb9df45fa1c2d26a6653cd213a214e51aba0115daf19a9ccf6afd5db5e81cbb9"
+    },
+    "/wardrobe/final/0000099.png": {
+      "bounds": [
+        0.0625,
+        0.31875,
+        0.874023,
+        0.363281
+      ],
+      "shoulderY": 0.406641,
+      "hemY": 0.680469,
+      "neckRise": 0.087891,
+      "sleeveBottoms": [
+        0.628906,
+        0.613281
+      ],
+      "bodyHeight": 0.273828,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "a523317bc07d0aabb3557d4efb3a29db7970cc8e3450ef2d384f004964bb8384"
+    },
+    "/wardrobe/final/0000100.png": {
+      "bounds": [
+        0.0625,
+        0.250781,
+        0.875,
+        0.498437
+      ],
+      "shoulderY": 0.408594,
+      "hemY": 0.745313,
+      "neckRise": 0.157812,
+      "sleeveBottoms": [
+        0.69375,
+        0.658594
+      ],
+      "bodyHeight": 0.336719,
+      "slots": 1.5,
+      "region": "feet",
+      "sha256": "50808efb862d9923a4709315b00a5e373036874f5e27b9e026605b511f955b5e"
+    },
+    "/wardrobe/final/0000101.png": {
+      "bounds": [
+        0.063477,
+        0.285156,
+        0.874023,
+        0.43125
+      ],
+      "shoulderY": 0.391797,
+      "hemY": 0.714844,
+      "neckRise": 0.106641,
+      "sleeveBottoms": [
+        0.650781,
+        0.626563
+      ],
+      "bodyHeight": 0.323047,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "be71ac35601f79b7161c371c8c42ae2d90bf79bfb44d6a009b44d8c778353093"
+    },
+    "/wardrobe/final/0000102.png": {
+      "bounds": [
+        0.063477,
+        0.2875,
+        0.874023,
+        0.425781
+      ],
+      "shoulderY": 0.395313,
+      "hemY": 0.708594,
+      "neckRise": 0.107813,
+      "sleeveBottoms": [
+        0.645312,
+        0.61875
+      ],
+      "bodyHeight": 0.313281,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "3a23f1c73ad194505790732571623b153f0c9d0dd74780431179d419a2f40840"
+    },
+    "/wardrobe/final/0000103.png": {
+      "bounds": [
+        0.063477,
+        0.282031,
+        0.874023,
+        0.435937
+      ],
+      "shoulderY": 0.401953,
+      "hemY": 0.715625,
+      "neckRise": 0.119922,
+      "sleeveBottoms": [
+        0.65625,
+        0.664844
+      ],
+      "bodyHeight": 0.313672,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "b72496f9c37e266250919b6482b9571ddc8d62759c5369bb87c63d260931ba99"
+    },
+    "/wardrobe/final/0000104.png": {
+      "bounds": [
+        0.0625,
+        0.324219,
+        0.875,
+        0.352344
+      ],
+      "shoulderY": 0.396484,
+      "hemY": 0.673438,
+      "neckRise": 0.072266,
+      "sleeveBottoms": [
+        0.613281,
+        0.609375
+      ],
+      "bodyHeight": 0.276953,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "3409f60866543d5bb398455c4c3a04f3cb479df2e38d194d68b825594d8cdb5e"
+    },
+    "/wardrobe/final/0000105.png": {
+      "bounds": [
+        0.063477,
+        0.327344,
+        0.874023,
+        0.346094
+      ],
+      "shoulderY": 0.412891,
+      "hemY": 0.671875,
+      "neckRise": 0.085547,
+      "sleeveBottoms": [
+        0.629687,
+        0.609375
+      ],
+      "bodyHeight": 0.258984,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "500e14acdf53e41e2f1b803d99c860e2ba4027a6b80608bbaf8422e559fa048f"
+    },
+    "/wardrobe/final/0000106.png": {
+      "bounds": [
+        0.063477,
+        0.275,
+        0.873047,
+        0.450781
+      ],
+      "shoulderY": 0.411719,
+      "hemY": 0.720313,
+      "neckRise": 0.136719,
+      "sleeveBottoms": [
+        0.675,
+        0.621094
+      ],
+      "bodyHeight": 0.308594,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "c14931c049e5caa089263250843e4ea2247e77b4fc3b90a2209e56108410b7ed"
+    },
+    "/wardrobe/final/0000107.png": {
+      "bounds": [
+        0.0625,
+        0.313281,
+        0.875,
+        0.374219
+      ],
+      "shoulderY": 0.400391,
+      "hemY": 0.684375,
+      "neckRise": 0.087109,
+      "sleeveBottoms": [
+        0.638281,
+        0.5625
+      ],
+      "bodyHeight": 0.283984,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "651ca53f5b21c58a9a7d9a701cd67977e017c1991c48d1dcad63c9f5e618ecbc"
+    },
+    "/wardrobe/final/0000108.png": {
+      "bounds": [
+        0.063477,
+        0.282813,
+        0.874023,
+        0.434375
+      ],
+      "shoulderY": 0.397266,
+      "hemY": 0.713281,
+      "neckRise": 0.114453,
+      "sleeveBottoms": [
+        0.691406,
+        0.596094
+      ],
+      "bodyHeight": 0.316016,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "89cbe6a744955589485a133275be23c2d567da842f622fd77fca2f8831ac620a"
+    },
+    "/wardrobe/final/0000109.png": {
+      "bounds": [
+        0.063477,
+        0.260156,
+        0.874023,
+        0.480469
+      ],
+      "shoulderY": 0.392188,
+      "hemY": 0.7375,
+      "neckRise": 0.132031,
+      "sleeveBottoms": [
+        0.671094,
+        0.578906
+      ],
+      "bodyHeight": 0.345313,
+      "slots": 1.5,
+      "region": "feet",
+      "sha256": "0721201e5c393a490cc0a254f472cc83055b5dbac2b4970a7a8d59f00325c24b"
+    },
+    "/wardrobe/final/0000110.png": {
+      "bounds": [
+        0.0625,
+        0.278906,
+        0.874023,
+        0.442188
+      ],
+      "shoulderY": 0.384375,
+      "hemY": 0.717187,
+      "neckRise": 0.105469,
+      "sleeveBottoms": [
+        0.645312,
+        0.677344
+      ],
+      "bodyHeight": 0.332813,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "0451947ce2425b6e4360d7ffea81029d9cf33020fb5c3ca5f0bd2fbf5f907b1a"
+    },
+    "/wardrobe/final/0000111.png": {
+      "bounds": [
+        0.063477,
+        0.324219,
+        0.873047,
+        0.352344
+      ],
+      "shoulderY": 0.367188,
+      "hemY": 0.674219,
+      "neckRise": 0.042969,
+      "sleeveBottoms": [
+        0.592969,
+        0.54375
+      ],
+      "bodyHeight": 0.307031,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "a7f7f5977c7ccfb15ba0fbc99f9ca3f10cfb997d7ead1714e497620c8b880fb3"
+    },
+    "/wardrobe/final/0000112.png": {
+      "bounds": [
+        0.063477,
+        0.244531,
+        0.874023,
+        0.511719
+      ],
+      "shoulderY": 0.364453,
+      "hemY": 0.746875,
+      "neckRise": 0.119922,
+      "sleeveBottoms": [
+        0.634375,
+        0.597656
+      ],
+      "bodyHeight": 0.382422,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "d011f718f0d2a914fa03a1132d34e54e8ca1615dff8cd89aee921d7173696ba6"
+    },
+    "/wardrobe/final/0000113.png": {
+      "bounds": [
+        0.063477,
+        0.297656,
+        0.873047,
+        0.403906
+      ],
+      "shoulderY": 0.403125,
+      "hemY": 0.7,
+      "neckRise": 0.105469,
+      "sleeveBottoms": [
+        0.654687,
+        0.589063
+      ],
+      "bodyHeight": 0.296875,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "d172c6e000a34a862250aef6e3efe0440eab9618d02dd3ba5ae1ef6691911a33"
+    },
+    "/wardrobe/final/0000114.png": {
+      "bounds": [
+        0.0625,
+        0.260156,
+        0.874023,
+        0.479687
+      ],
+      "shoulderY": 0.401953,
+      "hemY": 0.735938,
+      "neckRise": 0.141797,
+      "sleeveBottoms": [
+        0.630469,
+        0.59375
+      ],
+      "bodyHeight": 0.333984,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "6f56907908cb2b628269ce364d043e27be64acf33ccdd4436bf702be57f4d9f4"
+    },
+    "/wardrobe/final/0000115.png": {
+      "bounds": [
+        0.0625,
+        0.31875,
+        0.874023,
+        0.361719
+      ],
+      "shoulderY": 0.337109,
+      "hemY": 0.678906,
+      "neckRise": 0.018359,
+      "sleeveBottoms": [
+        0.667969,
+        0.602344
+      ],
+      "bodyHeight": 0.341797,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "3cd8483d647976222ebdb568355297258fbca6c00061c31127ef0c788731e245"
+    },
+    "/wardrobe/final/0000116.png": {
+      "bounds": [
+        0.0625,
+        0.278906,
+        0.875,
+        0.442188
+      ],
+      "shoulderY": 0.410547,
+      "hemY": 0.71875,
+      "neckRise": 0.131641,
+      "sleeveBottoms": [
+        0.661719,
+        0.651563
+      ],
+      "bodyHeight": 0.308203,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "1bb3aa4b1d8358d4e4a2ec95471de54ba9ea2f9c38a1312fa35941dc61a8b808"
+    },
+    "/wardrobe/final/0000117.png": {
+      "bounds": [
+        0.063477,
+        0.265625,
+        0.873047,
+        0.470313
+      ],
+      "shoulderY": 0.354687,
+      "hemY": 0.73125,
+      "neckRise": 0.089063,
+      "sleeveBottoms": [
+        0.627344,
+        0.636719
+      ],
+      "bodyHeight": 0.376563,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "a4b768c6c41146bfe0d9f10f0f7dd5d5f29d61ff9f5ccde4c2dee4c9809d8505"
+    },
+    "/wardrobe/final/0000118.png": {
+      "bounds": [
+        0.0625,
+        0.25625,
+        0.874023,
+        0.488281
+      ],
+      "shoulderY": 0.380859,
+      "hemY": 0.739844,
+      "neckRise": 0.124609,
+      "sleeveBottoms": [
+        0.58125,
+        0.699219
+      ],
+      "bodyHeight": 0.358984,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "e6ea82c0dacb1a1c8d4f0837203c78c38cd174f3b9b40455d1948ea1691cf361"
+    },
+    "/wardrobe/final/0000119.png": {
+      "bounds": [
+        0.0625,
+        0.285156,
+        0.875,
+        0.429688
+      ],
+      "shoulderY": 0.384375,
+      "hemY": 0.705469,
+      "neckRise": 0.099219,
+      "sleeveBottoms": [
+        0.614062,
+        0.64375
+      ],
+      "bodyHeight": 0.321094,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "ff8e58610b30809c2df036a29c68c7261581f7f2de7ee10319ac402392fe5148"
+    },
+    "/wardrobe/final/0000120.png": {
+      "bounds": [
+        0.0625,
+        0.272656,
+        0.874023,
+        0.455469
+      ],
+      "shoulderY": 0.379688,
+      "hemY": 0.726563,
+      "neckRise": 0.107031,
+      "sleeveBottoms": [
+        0.678125,
+        0.624219
+      ],
+      "bodyHeight": 0.346875,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "8f351cc8a5b3c4d039a637243ecad652013e1bf9d302df6d868d4421adf42982"
+    },
+    "/wardrobe/final/0000121.png": {
+      "bounds": [
+        0.216797,
+        0.295312,
+        0.55957,
+        0.377344
+      ],
+      "shoulderY": 0.317578,
+      "hemY": 0.671875,
+      "neckRise": 0.022266,
+      "sleeveBottoms": [
+        0.633594,
+        0.644531
+      ],
+      "bodyHeight": 0.354297,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "b16cd7ef9e2afb7527586029e6de236a2ca96b841ca0745d5c6fb2e11783598a"
+    },
+    "/wardrobe/final/0000122.png": {
+      "bounds": [
+        0.189453,
+        0.307812,
+        0.624023,
+        0.363281
+      ],
+      "shoulderY": 0.333203,
+      "hemY": 0.670312,
+      "neckRise": 0.025391,
+      "sleeveBottoms": [
+        0.646094,
+        0.653906
+      ],
+      "bodyHeight": 0.337109,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "4237ffb19f8e14067f308a12b55b0c059733924991c4013ca31b6745ca363f91"
+    },
+    "/wardrobe/final/0000123.png": {
+      "bounds": [
+        0.310547,
+        0.136719,
+        0.378906,
+        0.726563
+      ],
+      "shoulderY": 0.139063,
+      "hemY": 0.833594,
+      "neckRise": 0.002344,
+      "sleeveBottoms": [
+        0.8625,
+        0.8625
+      ],
+      "bodyHeight": 0.694531,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "a1235df3c7aaa09f47ec8d0a124108346ca2ea17aa955ee1bbcbd5bfaac31ce5"
+    },
+    "/wardrobe/final/0000124.png": {
+      "bounds": [
+        0.275391,
+        0.134375,
+        0.447266,
+        0.73125
+      ],
+      "shoulderY": 0.134375,
+      "hemY": 0.864844,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.860938,
+        0.860938
+      ],
+      "bodyHeight": 0.730469,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "4a786e2e5ef6d415e706205c5bba090b303f9668befcdc2918fb9e34de5777be"
+    },
+    "/wardrobe/final/0000125.png": {
+      "bounds": [
+        0.307617,
+        0.136719,
+        0.385742,
+        0.717969
+      ],
+      "shoulderY": 0.14375,
+      "hemY": 0.839063,
+      "neckRise": 0.007031,
+      "sleeveBottoms": [
+        0.85,
+        0.850781
+      ],
+      "bodyHeight": 0.695313,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "b188242f2cccc534010264d289e8aa317b040c5efb5647480eb621903791371c"
+    },
+    "/wardrobe/final/0000126.png": {
+      "bounds": [
+        0.320313,
+        0.135937,
+        0.358398,
+        0.728125
+      ],
+      "shoulderY": 0.1375,
+      "hemY": 0.839063,
+      "neckRise": 0.001563,
+      "sleeveBottoms": [
+        0.858594,
+        0.858594
+      ],
+      "bodyHeight": 0.701562,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "f960f14b7bd4428b81f58d891a3599fac6014dd050fb0b05fe290b97e07ecd7f"
+    },
+    "/wardrobe/final/0000127.png": {
+      "bounds": [
+        0.313477,
+        0.114062,
+        0.371094,
+        0.769531
+      ],
+      "shoulderY": 0.117969,
+      "hemY": 0.878125,
+      "neckRise": 0.003906,
+      "sleeveBottoms": [
+        0.880469,
+        0.878906
+      ],
+      "bodyHeight": 0.760156,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "d1fa5ea8994cf5407dc8bb7cef3e97c1b571b4ce736e04b0a17c5f1355aa4353"
+    },
+    "/wardrobe/final/0000128.png": {
+      "bounds": [
+        0.328125,
+        0.11875,
+        0.34082,
+        0.757813
+      ],
+      "shoulderY": 0.121094,
+      "hemY": 0.867188,
+      "neckRise": 0.002344,
+      "sleeveBottoms": [
+        0.875,
+        0.875
+      ],
+      "bodyHeight": 0.746094,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "a0deb856853f8aded5d0ec04ef282d29cd79ab9eb71c6c3a29f6063a61f6ce94"
+    },
+    "/wardrobe/final/0000129.png": {
+      "bounds": [
+        0.333984,
+        0.103906,
+        0.328125,
+        0.794531
+      ],
+      "shoulderY": 0.108984,
+      "hemY": 0.492969,
+      "neckRise": 0.005078,
+      "sleeveBottoms": [
+        0.896875,
+        0.895312
+      ],
+      "bodyHeight": 0.383984,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "53e73f148b8b564b0f3432e007cb80d8117a2c1bddb2aa6c6b4405583def5f5f"
+    },
+    "/wardrobe/final/0000130.png": {
+      "bounds": [
+        0.320313,
+        0.095312,
+        0.352539,
+        0.808594
+      ],
+      "shoulderY": 0.101563,
+      "hemY": 0.899219,
+      "neckRise": 0.00625,
+      "sleeveBottoms": [
+        0.901563,
+        0.901563
+      ],
+      "bodyHeight": 0.797656,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "48521d3a2ca3361a27cfb48cbe72821429f0468000bdee607bc286f9f4137641"
+    },
+    "/wardrobe/final/0000131.png": {
+      "bounds": [
+        0.349609,
+        0.142969,
+        0.298828,
+        0.713281
+      ],
+      "shoulderY": 0.144141,
+      "hemY": 0.533594,
+      "neckRise": 0.001172,
+      "sleeveBottoms": [
+        0.85625,
+        0.855469
+      ],
+      "bodyHeight": 0.389453,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "f40d372a2faeebc41d6f22e887a66227ccfddc4036e7cd9d3b83fa74dfb52c00"
+    },
+    "/wardrobe/final/0000132.png": {
+      "bounds": [
+        0.310547,
+        0.096875,
+        0.373047,
+        0.804688
+      ],
+      "shoulderY": 0.099609,
+      "hemY": 0.889062,
+      "neckRise": 0.002734,
+      "sleeveBottoms": [
+        0.900781,
+        0.899219
+      ],
+      "bodyHeight": 0.789453,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "0e7e10d1ab518c9b19ea71fff923b23b05714095d6660394f7f62fe9d2e19733"
+    },
+    "/wardrobe/final/0000133.png": {
+      "bounds": [
+        0.282227,
+        0.105469,
+        0.427734,
+        0.769531
+      ],
+      "shoulderY": 0.105469,
+      "hemY": 0.798438,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.873437,
+        0.874219
+      ],
+      "bodyHeight": 0.692969,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "2f55c9d7ae56c136cae67f15c2161e333e2206727544de05006f6d48ff50c5c1"
+    },
+    "/wardrobe/final/0000134.png": {
+      "bounds": [
+        0.317383,
+        0.135156,
+        0.364258,
+        0.729688
+      ],
+      "shoulderY": 0.141406,
+      "hemY": 0.757813,
+      "neckRise": 0.00625,
+      "sleeveBottoms": [
+        0.861719,
+        0.861719
+      ],
+      "bodyHeight": 0.616406,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "24d74f9df7dbfc234f10f8654c1227b096b14da9d144e8212c5771d033b956d1"
+    },
+    "/wardrobe/final/0000135.png": {
+      "bounds": [
+        0.177734,
+        0.267969,
+        0.637695,
+        0.464844
+      ],
+      "shoulderY": 0.277344,
+      "hemY": 0.71875,
+      "neckRise": 0.009375,
+      "sleeveBottoms": [
+        0.701562,
+        0.714844
+      ],
+      "bodyHeight": 0.441406,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "41f2318afcc3dd44df470b9f1f07ee54ac1230979bf27784240ee1659e2e4603"
+    },
+    "/wardrobe/final/0000136.png": {
+      "bounds": [
+        0.176758,
+        0.311719,
+        0.646484,
+        0.41875
+      ],
+      "shoulderY": 0.316406,
+      "hemY": 0.726563,
+      "neckRise": 0.004687,
+      "sleeveBottoms": [
+        0.719531,
+        0.71875
+      ],
+      "bodyHeight": 0.410156,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "87b0a67e3a59dc48f4104bd026b66ce3dfd688a93fe9840b35fe73a450dec7e6"
+    },
+    "/wardrobe/final/0000137.png": {
+      "bounds": [
+        0.157227,
+        0.282031,
+        0.685547,
+        0.430469
+      ],
+      "shoulderY": 0.289453,
+      "hemY": 0.702344,
+      "neckRise": 0.007422,
+      "sleeveBottoms": [
+        0.671094,
+        0.670312
+      ],
+      "bodyHeight": 0.412891,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "048cd4eadce4ff6e9c142b9f980f5529bfa281bf98655b5d81a5f757ea738f8c"
+    },
+    "/wardrobe/final/0000138.png": {
+      "bounds": [
+        0.152344,
+        0.257813,
+        0.694336,
+        0.484375
+      ],
+      "shoulderY": 0.267969,
+      "hemY": 0.735156,
+      "neckRise": 0.010156,
+      "sleeveBottoms": [
+        0.703906,
+        0.703906
+      ],
+      "bodyHeight": 0.467187,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "df18950c08f2f4999a9bd1fd096853d8c97618a5605b2d3eb6824e8ba0ea5020"
+    },
+    "/wardrobe/final/0000139.png": {
+      "bounds": [
+        0.173828,
+        0.240625,
+        0.65332,
+        0.511719
+      ],
+      "shoulderY": 0.253516,
+      "hemY": 0.750781,
+      "neckRise": 0.012891,
+      "sleeveBottoms": [
+        0.739062,
+        0.739062
+      ],
+      "bodyHeight": 0.497266,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "0c0a3f3b15cd5e7f3ac7b2c402c9c80dcf098cd49b7ba8fc08ca40850fe3c13d"
+    },
+    "/wardrobe/final/0000140.png": {
+      "bounds": [
+        0.181641,
+        0.24375,
+        0.634766,
+        0.515625
+      ],
+      "shoulderY": 0.258203,
+      "hemY": 0.754687,
+      "neckRise": 0.014453,
+      "sleeveBottoms": [
+        0.732031,
+        0.732031
+      ],
+      "bodyHeight": 0.496484,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "2480434d76a2c791e29434c88118ca767e411c44476944b2e38804e4a65accfb"
+    },
+    "/wardrobe/final/0000141.png": {
+      "bounds": [
+        0.186523,
+        0.203906,
+        0.628906,
+        0.580469
+      ],
+      "shoulderY": 0.216797,
+      "hemY": 0.78125,
+      "neckRise": 0.012891,
+      "sleeveBottoms": [
+        0.767188,
+        0.771094
+      ],
+      "bodyHeight": 0.564453,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "7cb8f42d9dffd6f0669cbe9008d2b8a4e40ce240ab2eaa1c894a9fdf8cb53833"
+    },
+    "/wardrobe/final/0000142.png": {
+      "bounds": [
+        0.164063,
+        0.225781,
+        0.667969,
+        0.542188
+      ],
+      "shoulderY": 0.238281,
+      "hemY": 0.764844,
+      "neckRise": 0.0125,
+      "sleeveBottoms": [
+        0.74375,
+        0.744531
+      ],
+      "bodyHeight": 0.526563,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "84069c0a11a54cf8b86b69275332acbdc7e84854aea96d9c540ddde2f6f276d4"
+    },
+    "/wardrobe/final/0000143.png": {
+      "bounds": [
+        0.287109,
+        0.127344,
+        0.424805,
+        0.744531
+      ],
+      "shoulderY": 0.127344,
+      "hemY": 0.814844,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.869531,
+        0.869531
+      ],
+      "bodyHeight": 0.6875,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "bb42fbc93584396da88b94e9ff00b76a95f3e84652ad646d8c26420eb68c2b1d"
+    },
+    "/wardrobe/final/0000144.png": {
+      "bounds": [
+        0.333984,
+        0.132813,
+        0.331055,
+        0.733594
+      ],
+      "shoulderY": 0.133594,
+      "hemY": 0.542969,
+      "neckRise": 0.000781,
+      "sleeveBottoms": [
+        0.864062,
+        0.864062
+      ],
+      "bodyHeight": 0.409375,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "ba9707813fddb55d8bfe1aa4d6f09e007ff2119000b2aba296af98d62a1f72b5"
+    },
+    "/wardrobe/final/0000145.png": {
+      "bounds": [
+        0.317383,
+        0.128125,
+        0.363281,
+        0.742188
+      ],
+      "shoulderY": 0.135156,
+      "hemY": 0.650781,
+      "neckRise": 0.007031,
+      "sleeveBottoms": [
+        0.86875,
+        0.86875
+      ],
+      "bodyHeight": 0.515625,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "16a32f6010d1ef3387200da3bdb5c12781d697c06aa3a9c22f0bc44225797e5c"
+    },
+    "/wardrobe/final/0000146.png": {
+      "bounds": [
+        0.350586,
+        0.132813,
+        0.297852,
+        0.732812
+      ],
+      "shoulderY": 0.1375,
+      "hemY": 0.5375,
+      "neckRise": 0.004687,
+      "sleeveBottoms": [
+        0.860938,
+        0.860156
+      ],
+      "bodyHeight": 0.4,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "c4a68005daca202de1c61eeabffbc68731c4eb6e79d68795c1a7478f8a468bf6"
+    },
+    "/wardrobe/final/0000147.png": {
+      "bounds": [
+        0.34082,
+        0.138281,
+        0.317383,
+        0.722656
+      ],
+      "shoulderY": 0.139063,
+      "hemY": 0.50625,
+      "neckRise": 0.000781,
+      "sleeveBottoms": [
+        0.860156,
+        0.859375
+      ],
+      "bodyHeight": 0.367188,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "482126594c0d46021b4cac4094bf96f2ccb8d0b8e8250a9b55fda0ebafc878cf"
+    },
+    "/wardrobe/final/0000148.png": {
+      "bounds": [
+        0.328125,
+        0.157812,
+        0.331055,
+        0.679688
+      ],
+      "shoulderY": 0.158594,
+      "hemY": 0.685156,
+      "neckRise": 0.000781,
+      "sleeveBottoms": [
+        0.835938,
+        0.835156
+      ],
+      "bodyHeight": 0.526563,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "00c3657f5e5222ac87db870c04f2c8da3f3f1062228f0d53736ae51447d598cc"
+    },
+    "/wardrobe/final/0000149.png": {
+      "bounds": [
+        0.313477,
+        0.142187,
+        0.37207,
+        0.714063
+      ],
+      "shoulderY": 0.144922,
+      "hemY": 0.760156,
+      "neckRise": 0.002734,
+      "sleeveBottoms": [
+        0.85625,
+        0.85625
+      ],
+      "bodyHeight": 0.615234,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "a6c2f07950130872cd4c6026a140703e3c32281a53d7f7dc04f7c841f62a5064"
+    },
+    "/wardrobe/final/0000150.png": {
+      "bounds": [
+        0.316406,
+        0.127344,
+        0.367188,
+        0.745313
+      ],
+      "shoulderY": 0.133203,
+      "hemY": 0.755469,
+      "neckRise": 0.005859,
+      "sleeveBottoms": [
+        0.869531,
+        0.86875
+      ],
+      "bodyHeight": 0.622266,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "c0a43f7ed5872fe8ec6606b6c6cd7c83205e5b10eb7ef58fcf6f94ca1b42c7f5"
+    },
+    "/wardrobe/final/0000151.png": {
+      "bounds": [
+        0.298828,
+        0.132813,
+        0.40332,
+        0.733594
+      ],
+      "shoulderY": 0.136328,
+      "hemY": 0.736719,
+      "neckRise": 0.003516,
+      "sleeveBottoms": [
+        0.865625,
+        0.865625
+      ],
+      "bodyHeight": 0.600391,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "02c67eadbe79c2bce89cef297100e37a2e1c82323334051a9f66abf8f0ec0977"
+    },
+    "/wardrobe/final/0000152.png": {
+      "bounds": [
+        0.304688,
+        0.147656,
+        0.389648,
+        0.703125
+      ],
+      "shoulderY": 0.149609,
+      "hemY": 0.744531,
+      "neckRise": 0.001953,
+      "sleeveBottoms": [
+        0.849219,
+        0.848437
+      ],
+      "bodyHeight": 0.594922,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "d3a871e8ec98b099d2107e8812495c7f59f99a2ae641e270bd0911dd912e5e00"
+    },
+    "/wardrobe/final/0000153.png": {
+      "bounds": [
+        0.217773,
+        0.210938,
+        0.564453,
+        0.567969
+      ],
+      "shoulderY": 0.221484,
+      "hemY": 0.774219,
+      "neckRise": 0.010547,
+      "sleeveBottoms": [
+        0.771094,
+        0.771094
+      ],
+      "bodyHeight": 0.552734,
+      "slots": 1.5,
+      "region": "lower",
+      "sha256": "e9adf238504c79f1d0816c943621c6949199c12d4154d7358c1242d3dae0f29c"
+    },
+    "/wardrobe/final/0000154.png": {
+      "bounds": [
+        0.152344,
+        0.177344,
+        0.689453,
+        0.611719
+      ],
+      "shoulderY": 0.205078,
+      "hemY": 0.786719,
+      "neckRise": 0.027734,
+      "sleeveBottoms": [
+        0.771875,
+        0.771875
+      ],
+      "bodyHeight": 0.581641,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "4f2cd909192bf9465e8c35d801548d326c5fc3ad19d466215d380721ef6a3c3d"
+    },
+    "/wardrobe/final/0000155.png": {
+      "bounds": [
+        0.261111,
+        0.047778,
+        0.472222,
+        0.897778
+      ],
+      "shoulderY": 0.055,
+      "hemY": 0.833333,
+      "neckRise": 0.007222,
+      "sleeveBottoms": [
+        0.944444,
+        0.943333
+      ],
+      "bodyHeight": 0.778333,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "c8d9c573118270c1c64fc73295e4b6631f9bb5952695d8fd4d9bb6ac57e4e2bc"
+    },
+    "/wardrobe/final/0000156.png": {
+      "bounds": [
+        0.247222,
+        0.048889,
+        0.5,
+        0.902222
+      ],
+      "shoulderY": 0.056667,
+      "hemY": 0.896667,
+      "neckRise": 0.007778,
+      "sleeveBottoms": [
+        0.95,
+        0.95
+      ],
+      "bodyHeight": 0.84,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "170336dc3bd0dbc405332508de6e5ee6ae150fd69d8c85b407a036e69276b51c"
+    },
+    "/wardrobe/final/0000157.png": {
+      "bounds": [
+        0.247222,
+        0.038889,
+        0.497222,
+        0.921111
+      ],
+      "shoulderY": 0.043333,
+      "hemY": 0.951111,
+      "neckRise": 0.004444,
+      "sleeveBottoms": [
+        0.954444,
+        0.954444
+      ],
+      "bodyHeight": 0.907778,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "b3db8dfa98b30b162f7bd78a80687f94251945ed6746bf31dd90b821722395e6"
+    },
+    "/wardrobe/final/0000158.png": {
+      "bounds": [
+        0.238889,
+        0.057778,
+        0.515278,
+        0.881111
+      ],
+      "shoulderY": 0.065,
+      "hemY": 0.87,
+      "neckRise": 0.007222,
+      "sleeveBottoms": [
+        0.933333,
+        0.934444
+      ],
+      "bodyHeight": 0.805,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "2415d3483b4e016444c5da7a9febad4cec28f5616204f1475c3c47bbc7198a93"
+    },
+    "/wardrobe/final/0000159.png": {
+      "bounds": [
+        0.042781,
+        0.097004,
+        0.91533,
+        0.808131
+      ],
+      "shoulderY": 0.148716,
+      "hemY": 0.905136,
+      "neckRise": 0.051712,
+      "sleeveBottoms": [
+        0.476462,
+        0.476462
+      ],
+      "bodyHeight": 0.756419,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "cf9a8ba61afe12a4c22b70f6692776f0813bdd5f0199809b196aa221adc29753"
+    },
+    "/wardrobe/final/0000160.png": {
+      "bounds": [
+        0.039216,
+        0.134094,
+        0.920677,
+        0.722539
+      ],
+      "shoulderY": 0.195078,
+      "hemY": 0.853067,
+      "neckRise": 0.060984,
+      "sleeveBottoms": [
+        0.578459,
+        0.578459
+      ],
+      "bodyHeight": 0.657989,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "c2782518ee3c497303c68e3bb708d77b8050af584ec287fb81ebe32876834c67"
+    },
+    "/wardrobe/final/0000161.png": {
+      "bounds": [
+        0.107843,
+        0.064194,
+        0.77451,
+        0.835949
+      ],
+      "shoulderY": 0.139444,
+      "hemY": 0.898003,
+      "neckRise": 0.07525,
+      "sleeveBottoms": [
+        0.835235,
+        0.836662
+      ],
+      "bodyHeight": 0.758559,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "ae9c0d7c3bfa8cfb7ceba6b0a931f8779ff34ac1442a7ac9871fee2fce0e4459"
+    },
+    "/wardrobe/final/0000162.png": {
+      "bounds": [
+        0.059715,
+        0.10271,
+        0.88057,
+        0.774608
+      ],
+      "shoulderY": 0.177603,
+      "hemY": 0.876605,
+      "neckRise": 0.074893,
+      "sleeveBottoms": [
+        0.507846,
+        0.508559
+      ],
+      "bodyHeight": 0.699001,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "a6bc654aaf88d1bc17037f35cc118c340da53828d4bdc83c96fc3eb3742b1189"
+    },
+    "/wardrobe/final/0000163.png": {
+      "bounds": [
+        0.067783,
+        0.286284,
+        0.864434,
+        0.464115
+      ],
+      "shoulderY": 0.387161,
+      "hemY": 0.748006,
+      "neckRise": 0.100877,
+      "sleeveBottoms": [
+        0.64992,
+        0.680223
+      ],
+      "bodyHeight": 0.360845,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "e7215165c6d0386463dc14d216c988fccb51e5f4c82f03b9695b40ba2739f37a"
+    },
+    "/wardrobe/final/0000164.png": {
+      "bounds": [
+        0.123604,
+        0.27193,
+        0.784689,
+        0.452951
+      ],
+      "shoulderY": 0.395136,
+      "hemY": 0.720096,
+      "neckRise": 0.123206,
+      "sleeveBottoms": [
+        0.601276,
+        0.638756
+      ],
+      "bodyHeight": 0.32496,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "e431b254ee59e2b4e3e05b95cba30b0ca560947eb96fc31df999e417d9038111"
+    },
+    "/wardrobe/final/0000165.png": {
+      "bounds": [
+        0.077352,
+        0.26236,
+        0.844498,
+        0.468102
+      ],
+      "shoulderY": 0.393541,
+      "hemY": 0.726475,
+      "neckRise": 0.13118,
+      "sleeveBottoms": [
+        0.614833,
+        0.631579
+      ],
+      "bodyHeight": 0.332935,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "36c190d8f9972f6d50b22ca4a2326cb765c0814076c76f0f61d430bd376ab682"
+    },
+    "/wardrobe/final/0000166.png": {
+      "bounds": [
+        0.090909,
+        0.220096,
+        0.825359,
+        0.539075
+      ],
+      "shoulderY": 0.42185,
+      "hemY": 0.759171,
+      "neckRise": 0.201754,
+      "sleeveBottoms": [
+        0.668262,
+        0.69378
+      ],
+      "bodyHeight": 0.337321,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "9d2ae7f87d99ac4a3ecebe6e16469229e3ae38e9f91daa5f640245dbeb1e31a4"
+    },
+    "/wardrobe/final/0000167.png": {
+      "bounds": [
+        0.128389,
+        0.131579,
+        0.742424,
+        0.711324
+      ],
+      "shoulderY": 0.194179,
+      "hemY": 0.785486,
+      "neckRise": 0.0626,
+      "sleeveBottoms": [
+        0.835726,
+        0.842105
+      ],
+      "bodyHeight": 0.591308,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "4bc0b0fc582218b069f4d73f97895ce42815d9a3aa74bc39677fc3ca7c83c892"
+    },
+    "/wardrobe/final/0000168.png": {
+      "bounds": [
+        0.161882,
+        0.128389,
+        0.675439,
+        0.679426
+      ],
+      "shoulderY": 0.199761,
+      "hemY": 0.807815,
+      "neckRise": 0.071372,
+      "sleeveBottoms": [
+        0.80622,
+        0.807018
+      ],
+      "bodyHeight": 0.608054,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "f23d216135f2d0427f049a57021d73d0613e600308fbd3e6fbaf2e7cf031d459"
+    },
+    "/wardrobe/final/0000169.png": {
+      "bounds": [
+        0.060606,
+        0.38118,
+        0.87799,
+        0.248006
+      ],
+      "shoulderY": 0.385965,
+      "hemY": 0.597289,
+      "neckRise": 0.004785,
+      "sleeveBottoms": [
+        0.622807,
+        0.622807
+      ],
+      "bodyHeight": 0.211324,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "1d657204725087438e4424f568e2a9db21594436ebbb3bc92012b9593fb20509"
+    },
+    "/wardrobe/final/0000170.png": {
+      "bounds": [
+        0.192982,
+        0.047847,
+        0.610845,
+        0.873206
+      ],
+      "shoulderY": 0.374402,
+      "hemY": 0.908293,
+      "neckRise": 0.326555,
+      "sleeveBottoms": [
+        0.908293,
+        0.891547
+      ],
+      "bodyHeight": 0.533892,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "3d2de6b341e765076531270708f34a106db29e3de31965528bdba31f7b679650"
+    },
+    "/wardrobe/final/0000171.png": {
+      "bounds": [
+        0.110352,
+        0.105469,
+        0.780273,
+        0.789844
+      ],
+      "shoulderY": 0.185938,
+      "hemY": 0.689063,
+      "neckRise": 0.080469,
+      "sleeveBottoms": [
+        0.895312,
+        0.895312
+      ],
+      "bodyHeight": 0.503125,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "9222c5e63f25d3a965c2f555ae285d71595f21522ac2e7425a8a8ed9a20cb4c8"
+    },
+    "/wardrobe/final/0000172.png": {
+      "bounds": [
+        0.210938,
+        0.080469,
+        0.579102,
+        0.839844
+      ],
+      "shoulderY": 0.139063,
+      "hemY": 0.920312,
+      "neckRise": 0.058594,
+      "sleeveBottoms": [
+        0.608594,
+        0.608594
+      ],
+      "bodyHeight": 0.78125,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "8eaed901a173ea08c5d180df47b42e6268bbe373c02ba7975f2e63fb1ccfd653"
+    },
+    "/wardrobe/final/0000173.png": {
+      "bounds": [
+        0.110352,
+        0.128125,
+        0.780273,
+        0.744531
+      ],
+      "shoulderY": 0.155078,
+      "hemY": 0.66875,
+      "neckRise": 0.026953,
+      "sleeveBottoms": [
+        0.872656,
+        0.872656
+      ],
+      "bodyHeight": 0.513672,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "42756de8aa949fe658d268533dfe9f1b8e5687b629cdf423a85af3742248176e"
+    },
+    "/wardrobe/final/0000174.png": {
+      "bounds": [
+        0.110352,
+        0.085156,
+        0.780273,
+        0.829688
+      ],
+      "shoulderY": 0.159766,
+      "hemY": 0.667188,
+      "neckRise": 0.074609,
+      "sleeveBottoms": [
+        0.914844,
+        0.914844
+      ],
+      "bodyHeight": 0.507422,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "b1efa60c86b104429f5a4291cfbe0e8447a096d02e72c31ff279a6c8cefa9f2d"
+    },
+    "/wardrobe/final/0000175.png": {
+      "bounds": [
+        0.110352,
+        0.132813,
+        0.780273,
+        0.734375
+      ],
+      "shoulderY": 0.202344,
+      "hemY": 0.810937,
+      "neckRise": 0.069531,
+      "sleeveBottoms": [
+        0.867188,
+        0.866406
+      ],
+      "bodyHeight": 0.608594,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "61902d15b79949c2dd1a90cd1231f113a9bcf014eaea613c6c7056954f561889"
+    },
+    "/wardrobe/final/0000176.png": {
+      "bounds": [
+        0.214844,
+        0.080469,
+        0.571289,
+        0.839844
+      ],
+      "shoulderY": 0.132813,
+      "hemY": 0.91875,
+      "neckRise": 0.052344,
+      "sleeveBottoms": [
+        0.899219,
+        0.899219
+      ],
+      "bodyHeight": 0.785937,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "8e3f9cbe024f8078cc2cd780c58537ae7977e92fa852e73e3f5621d0c7234b3f"
+    },
+    "/wardrobe/final/0000177.png": {
+      "bounds": [
+        0.110352,
+        0.123438,
+        0.780273,
+        0.753906
+      ],
+      "shoulderY": 0.198828,
+      "hemY": 0.665625,
+      "neckRise": 0.075391,
+      "sleeveBottoms": [
+        0.877344,
+        0.877344
+      ],
+      "bodyHeight": 0.466797,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "4496a43013d9a864bd5773dd0544ee7eb3b7c34de690294d1527b5d4ba4f76cc"
+    },
+    "/wardrobe/final/0000178.png": {
+      "bounds": [
+        0.110352,
+        0.125,
+        0.780273,
+        0.750781
+      ],
+      "shoulderY": 0.239063,
+      "hemY": 0.73125,
+      "neckRise": 0.114062,
+      "sleeveBottoms": [
+        0.875781,
+        0.875781
+      ],
+      "bodyHeight": 0.492188,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "29091a3d51299eea397e0461f07ffc95986bcd30641e570a0eb7885f26c030ec"
+    },
+    "/wardrobe/final/0000179.png": {
+      "bounds": [
+        0.271484,
+        0.080469,
+        0.458008,
+        0.839844
+      ],
+      "shoulderY": 0.130469,
+      "hemY": 0.920312,
+      "neckRise": 0.05,
+      "sleeveBottoms": [
+        0.903906,
+        0.903906
+      ],
+      "bodyHeight": 0.789844,
+      "slots": 5,
+      "region": "upper",
+      "sha256": "8bc15ddae609326b2d6256819ba5408d5d07dda08bdb41224a2ac97b5386d17a"
+    },
+    "/wardrobe/final/0000180.png": {
+      "bounds": [
+        0.110352,
+        0.125,
+        0.780273,
+        0.75
+      ],
+      "shoulderY": 0.217188,
+      "hemY": 0.632813,
+      "neckRise": 0.092188,
+      "sleeveBottoms": [
+        0.875,
+        0.875
+      ],
+      "bodyHeight": 0.415625,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "bbbcd05f532a7218a451e83ee35fea275fecf0c97bc129e33b0d3e34cc777186"
+    },
+    "/wardrobe/final/0000181.png": {
+      "bounds": [
+        0.160156,
+        0.188281,
+        0.679688,
+        0.582812
+      ],
+      "shoulderY": 0.211328,
+      "hemY": 0.771094,
+      "neckRise": 0.023047,
+      "sleeveBottoms": [
+        0.422656,
+        0.421875
+      ],
+      "bodyHeight": 0.559766,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "f1257d603fbf1255431932203ab6b6ab350203e53092c4ac481d1add59f4d399"
+    },
+    "/wardrobe/final/0000182.png": {
+      "bounds": [
+        0.160156,
+        0.216406,
+        0.679688,
+        0.526563
+      ],
+      "shoulderY": 0.236719,
+      "hemY": 0.742969,
+      "neckRise": 0.020313,
+      "sleeveBottoms": [
+        0.419531,
+        0.419531
+      ],
+      "bodyHeight": 0.50625,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "288f1f680b2ecda958a30176d398963ed090af93827529f0d5dcde8f82a84918"
+    },
+    "/wardrobe/final/0000183.png": {
+      "bounds": [
+        0.198242,
+        0.139844,
+        0.604492,
+        0.679688
+      ],
+      "shoulderY": 0.198437,
+      "hemY": 0.819531,
+      "neckRise": 0.058594,
+      "sleeveBottoms": [
+        0.777344,
+        0.777344
+      ],
+      "bodyHeight": 0.621094,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "d97aac124991aa4ff197a29691777a229880b461d6fc38cf72bb4aba9aa27713"
+    },
+    "/wardrobe/final/0000184.png": {
+      "bounds": [
+        0.160156,
+        0.175781,
+        0.679688,
+        0.607812
+      ],
+      "shoulderY": 0.239844,
+      "hemY": 0.742969,
+      "neckRise": 0.064062,
+      "sleeveBottoms": [
+        0.783594,
+        0.783594
+      ],
+      "bodyHeight": 0.503125,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "bb66941b0299c7231549c41a132be1b5b35de409f28d31cc0e2a56f0d4db9d6b"
+    },
+    "/wardrobe/final/0000185.png": {
+      "bounds": [
+        0.25293,
+        0.139844,
+        0.495117,
+        0.679688
+      ],
+      "shoulderY": 0.233984,
+      "hemY": 0.819531,
+      "neckRise": 0.094141,
+      "sleeveBottoms": [
+        0.807031,
+        0.807031
+      ],
+      "bodyHeight": 0.585547,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "a93ef5ff0cabe98350a9dffb360f31cd3941a3e33d2edd61d3e8b935e46396a6"
+    },
+    "/wardrobe/final/0000186.png": {
+      "bounds": [
+        0.179688,
+        0.139844,
+        0.641602,
+        0.679688
+      ],
+      "shoulderY": 0.182812,
+      "hemY": 0.819531,
+      "neckRise": 0.042969,
+      "sleeveBottoms": [
+        0.419531,
+        0.419531
+      ],
+      "bodyHeight": 0.636719,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "bdc8b317880079a7498c932ad3c449127ec59e5f702498d3e54b135fbd09df94"
+    },
+    "/wardrobe/final/0000187.png": {
+      "bounds": [
+        0.253906,
+        0.139844,
+        0.493164,
+        0.679688
+      ],
+      "shoulderY": 0.314063,
+      "hemY": 0.819531,
+      "neckRise": 0.174219,
+      "sleeveBottoms": [
+        0.803906,
+        0.803906
+      ],
+      "bodyHeight": 0.505469,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "83ff390f8d2029e9889ebb1721f0977a42e3eadd52a7001a53c64603817b8b8e"
+    },
+    "/wardrobe/final/0000188.png": {
+      "bounds": [
+        0.160156,
+        0.146875,
+        0.679688,
+        0.666406
+      ],
+      "shoulderY": 0.159375,
+      "hemY": 0.813281,
+      "neckRise": 0.0125,
+      "sleeveBottoms": [
+        0.382813,
+        0.382813
+      ],
+      "bodyHeight": 0.653906,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "2e9c342c60c5fca7c25f2818cf9f0799cbecb8dd1666ba2e8d79815191c0efa9"
+    },
+    "/wardrobe/final/0000189.png": {
+      "bounds": [
+        0.177734,
+        0.139844,
+        0.644531,
+        0.679688
+      ],
+      "shoulderY": 0.153906,
+      "hemY": 0.750781,
+      "neckRise": 0.014063,
+      "sleeveBottoms": [
+        0.81875,
+        0.819531
+      ],
+      "bodyHeight": 0.596875,
+      "slots": 3,
+      "region": "upper",
+      "sha256": "8db9ea96b0780ee41677312c18b25aaf41e1c50d08a3f1676c6e5cc56625fe8c"
+    },
+    "/wardrobe/final/0000190.png": {
+      "bounds": [
+        0.176758,
+        0.139844,
+        0.647461,
+        0.679688
+      ],
+      "shoulderY": 0.154688,
+      "hemY": 0.578125,
+      "neckRise": 0.014844,
+      "sleeveBottoms": [
+        0.819531,
+        0.819531
+      ],
+      "bodyHeight": 0.423438,
+      "slots": 2,
+      "region": "upper",
+      "sha256": "d18b3e8bd5b184b3af48a2c4e2c96e2eab4f3b56cb419904e2c3518fe6870a9f"
+    },
+    "/wardrobe/final/0000191.png": {
+      "bounds": [
+        0.329102,
+        0.110156,
+        0.341797,
+        0.8
+      ],
+      "shoulderY": 0.1125,
+      "hemY": 0.905469,
+      "neckRise": 0.002344,
+      "sleeveBottoms": [
+        0.909375,
+        0.909375
+      ],
+      "bodyHeight": 0.792969,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "2de04b60b09539d8029aa23b85cb600fd45043a069f94c0c1d7b59eb5ca0523e"
+    },
+    "/wardrobe/final/0000192.png": {
+      "bounds": [
+        0.273438,
+        0.110156,
+        0.454102,
+        0.8
+      ],
+      "shoulderY": 0.115625,
+      "hemY": 0.905469,
+      "neckRise": 0.005469,
+      "sleeveBottoms": [
+        0.905469,
+        0.90625
+      ],
+      "bodyHeight": 0.789844,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "d08421a9c2e7bf921206b8525e7182797f87cf859be82cf6d3f75a573befffdd"
+    },
+    "/wardrobe/final/0000193.png": {
+      "bounds": [
+        0.329102,
+        0.110156,
+        0.342773,
+        0.8
+      ],
+      "shoulderY": 0.1125,
+      "hemY": 0.905469,
+      "neckRise": 0.002344,
+      "sleeveBottoms": [
+        0.907813,
+        0.907813
+      ],
+      "bodyHeight": 0.792969,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "b3ecf83dd7691bd9aac70a93f1aa3f8495416fd248fc00471a4a0da592c15ff2"
+    },
+    "/wardrobe/final/0000194.png": {
+      "bounds": [
+        0.292969,
+        0.110156,
+        0.415039,
+        0.8
+      ],
+      "shoulderY": 0.110156,
+      "hemY": 0.904687,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.907813,
+        0.907813
+      ],
+      "bodyHeight": 0.794531,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "98c80ef8eb8e3bdac861ca1175b671fc69ec2ae3dd157bfc51d6d3adea660176"
+    },
+    "/wardrobe/final/0000195.png": {
+      "bounds": [
+        0.25,
+        0.110156,
+        0.500977,
+        0.8
+      ],
+      "shoulderY": 0.111328,
+      "hemY": 0.90625,
+      "neckRise": 0.001172,
+      "sleeveBottoms": [
+        0.890625,
+        0.890625
+      ],
+      "bodyHeight": 0.794922,
+      "slots": 3,
+      "region": "lower",
+      "sha256": "51ea13ca0eda84649623610770bc9b04447f65f5480b3dada1e66f0e0aa10e6b"
+    },
+    "/wardrobe/final/0000196.png": {
+      "bounds": [
+        0.180664,
+        0.24375,
+        0.639648,
+        0.532813
+      ],
+      "shoulderY": 0.245312,
+      "hemY": 0.776563,
+      "neckRise": 0.001563,
+      "sleeveBottoms": [
+        0.760156,
+        0.760156
+      ],
+      "bodyHeight": 0.53125,
+      "slots": 2,
+      "region": "lower",
+      "sha256": "da136d3a9b95683c5657a19657db5cf3e79414d9ab36b046d7b4775d5e05d41f"
+    },
+    "/wardrobe/final/0000197.png": {
+      "bounds": [
+        0.180664,
+        0.182031,
+        0.639648,
+        0.655469
+      ],
+      "shoulderY": 0.182031,
+      "hemY": 0.836719,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.825,
+        0.825
+      ],
+      "bodyHeight": 0.654687,
+      "slots": 2.5,
+      "region": "lower",
+      "sha256": "7472a5c56420bddcae8ec9da16b9683bb63d8ba35c4d57ece584e3f6787714fc"
+    },
+    "/wardrobe/final/0000198.png": {
+      "bounds": [
+        0.236328,
+        0.110156,
+        0.52832,
+        0.8
+      ],
+      "shoulderY": 0.116016,
+      "hemY": 0.907031,
+      "neckRise": 0.005859,
+      "sleeveBottoms": [
+        0.904687,
+        0.904687
+      ],
+      "bodyHeight": 0.791016,
+      "slots": 3,
+      "region": "lower",
+      "sha256": "ba869b8eb3b432702f9ca67769b78e7f770802ed329dbbe00cc28722780dc82b"
+    },
+    "/wardrobe/final/0000199.png": {
+      "bounds": [
+        0.180664,
+        0.244531,
+        0.639648,
+        0.53125
+      ],
+      "shoulderY": 0.251953,
+      "hemY": 0.775,
+      "neckRise": 0.007422,
+      "sleeveBottoms": [
+        0.76875,
+        0.769531
+      ],
+      "bodyHeight": 0.523047,
+      "slots": 2,
+      "region": "lower",
+      "sha256": "1537809c648a3c4f8ae2c87cb185f8dbeb0ff5cf856b4ead97b636037c689211"
+    },
+    "/wardrobe/final/0000200.png": {
+      "bounds": [
+        0.262695,
+        0.110156,
+        0.475586,
+        0.8
+      ],
+      "shoulderY": 0.113281,
+      "hemY": 0.910156,
+      "neckRise": 0.003125,
+      "sleeveBottoms": [
+        0.905469,
+        0.905469
+      ],
+      "bodyHeight": 0.796875,
+      "slots": 3.5,
+      "region": "lower",
+      "sha256": "e378d77ea387a1ce2aa4f9a56f40ff455e94d8ba58a2f0ae7f5f9958d087cdf5"
+    },
+    "/wardrobe/final/0000201.png": {
+      "bounds": [
+        0.194336,
+        0.355469,
+        0.612305,
+        0.429688
+      ],
+      "shoulderY": 0.359375,
+      "hemY": 0.773438,
+      "neckRise": 0.003906,
+      "sleeveBottoms": [
+        0.776563,
+        0.777344
+      ],
+      "bodyHeight": 0.414063,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "243bcc724c0dd89281c1b2492a47e397946122918804269d3a093b286e3bc28a"
+    },
+    "/wardrobe/final/0000202.png": {
+      "bounds": [
+        0.21875,
+        0.355469,
+        0.563477,
+        0.429688
+      ],
+      "shoulderY": 0.384375,
+      "hemY": 0.782813,
+      "neckRise": 0.028906,
+      "sleeveBottoms": [
+        0.783594,
+        0.783594
+      ],
+      "bodyHeight": 0.398438,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "00503eb9633f9b80457617d8ed38c661e651ae7f572381f0a47477c02d985191"
+    },
+    "/wardrobe/final/0000203.png": {
+      "bounds": [
+        0.256836,
+        0.355469,
+        0.486328,
+        0.429688
+      ],
+      "shoulderY": 0.371484,
+      "hemY": 0.767969,
+      "neckRise": 0.016016,
+      "sleeveBottoms": [
+        0.778906,
+        0.778906
+      ],
+      "bodyHeight": 0.396484,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "e390f49174a9b1da8bcd9817358e631df18d3fa1f0738a0985557f3747771e51"
+    },
+    "/wardrobe/final/0000204.png": {
+      "bounds": [
+        0.279297,
+        0.355469,
+        0.441406,
+        0.429688
+      ],
+      "shoulderY": 0.378125,
+      "hemY": 0.744531,
+      "neckRise": 0.022656,
+      "sleeveBottoms": [
+        0.744531,
+        0.744531
+      ],
+      "bodyHeight": 0.366406,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "b5789e0a46072d5368d6804e88d8b1b926ff3c774e6d4458a08d626bf948b345"
+    },
+    "/wardrobe/final/0000205.png": {
+      "bounds": [
+        0.282227,
+        0.355469,
+        0.436523,
+        0.429688
+      ],
+      "shoulderY": 0.35625,
+      "hemY": 0.777344,
+      "neckRise": 0.000781,
+      "sleeveBottoms": [
+        0.783594,
+        0.783594
+      ],
+      "bodyHeight": 0.421094,
+      "slots": 1.5,
+      "region": "feet",
+      "sha256": "71dc0bc696822e081a27fa51989bf24beaf4b2a138f20e11ec77c0fea64850a6"
+    },
+    "/wardrobe/final/0000206.png": {
+      "bounds": [
+        0.25,
+        0.355469,
+        0.500977,
+        0.429688
+      ],
+      "shoulderY": 0.365625,
+      "hemY": 0.782813,
+      "neckRise": 0.010156,
+      "sleeveBottoms": [
+        0.776563,
+        0.776563
+      ],
+      "bodyHeight": 0.417187,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "5063d6afe68b1fa05906f43ed9a4cbfe53e1468dfac9d135973fa8ed7237a87a"
+    },
+    "/wardrobe/final/0000207.png": {
+      "bounds": [
+        0.297852,
+        0.355469,
+        0.404297,
+        0.429688
+      ],
+      "shoulderY": 0.364063,
+      "hemY": 0.730469,
+      "neckRise": 0.008594,
+      "sleeveBottoms": [
+        0.746875,
+        0.746094
+      ],
+      "bodyHeight": 0.366406,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "8587cd9192ba4dce96091dc79abb6a0b4e4030aeeb0108627b2f426e1b9c85ff"
+    },
+    "/wardrobe/final/0000208.png": {
+      "bounds": [
+        0.194336,
+        0.355469,
+        0.612305,
+        0.429688
+      ],
+      "shoulderY": 0.367578,
+      "hemY": 0.775,
+      "neckRise": 0.012109,
+      "sleeveBottoms": [
+        0.778125,
+        0.778906
+      ],
+      "bodyHeight": 0.407422,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "060fe64658ec16ed311ba6a3849b9d14bbc8b7fbf3c97265e6779b8df9f09e58"
+    },
+    "/wardrobe/final/0000209.png": {
+      "bounds": [
+        0.191406,
+        0.355469,
+        0.618164,
+        0.429688
+      ],
+      "shoulderY": 0.371875,
+      "hemY": 0.773438,
+      "neckRise": 0.016406,
+      "sleeveBottoms": [
+        0.778906,
+        0.778906
+      ],
+      "bodyHeight": 0.401562,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "b8cda156f4dbe8076f228475225da568393057c16c8b73b78ada76e0f50f3427"
+    },
+    "/wardrobe/final/0000210.png": {
+      "bounds": [
+        0.207031,
+        0.355469,
+        0.585938,
+        0.429688
+      ],
+      "shoulderY": 0.360938,
+      "hemY": 0.779687,
+      "neckRise": 0.005469,
+      "sleeveBottoms": [
+        0.778906,
+        0.778906
+      ],
+      "bodyHeight": 0.41875,
+      "slots": 1,
+      "region": "feet",
+      "sha256": "ad287188c1395a45254fc1ab03aff030167945f6fdb804cd98ef541403b6fd99"
+    },
+    "/wardrobe/final/0000211.png": {
+      "bounds": [
+        0.220703,
+        0.442188,
+        0.55957,
+        0.116406
+      ],
+      "shoulderY": 0.446875,
+      "hemY": 0.549219,
+      "neckRise": 0.004687,
+      "sleeveBottoms": [
+        0.55625,
+        0.55625
+      ],
+      "bodyHeight": 0.102344,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "f5300aaf38eb3fe5567cc4087fa039eb5628fae9ed76edd314609912c066fa40"
+    },
+    "/wardrobe/final/0000212.png": {
+      "bounds": [
+        0.220703,
+        0.427344,
+        0.55957,
+        0.146094
+      ],
+      "shoulderY": 0.434375,
+      "hemY": 0.548438,
+      "neckRise": 0.007031,
+      "sleeveBottoms": [
+        0.5625,
+        0.563281
+      ],
+      "bodyHeight": 0.114062,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "b6df4c5c66940c986804a9017d048a82482d4584ef692d3b4f4bb7b32e417121"
+    },
+    "/wardrobe/final/0000213.png": {
+      "bounds": [
+        0.350586,
+        0.310156,
+        0.298828,
+        0.379688
+      ],
+      "shoulderY": 0.371875,
+      "hemY": 0.689844,
+      "neckRise": 0.061719,
+      "sleeveBottoms": [
+        0.671094,
+        0.671094
+      ],
+      "bodyHeight": 0.317969,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "b63ce35e686de40250e2b2323b56d91554ca4bdf3c0f84f8b0a09b95a6c6498c"
+    },
+    "/wardrobe/final/0000214.png": {
+      "bounds": [
+        0.277344,
+        0.310156,
+        0.446289,
+        0.379688
+      ],
+      "shoulderY": 0.357031,
+      "hemY": 0.689844,
+      "neckRise": 0.046875,
+      "sleeveBottoms": [
+        0.689844,
+        0.689844
+      ],
+      "bodyHeight": 0.332813,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "6535f48ab3ddc8436043ebb7d7f0db75d541ec4d7e3cc4a1db872ca725c7e9aa"
+    },
+    "/wardrobe/final/0000215.png": {
+      "bounds": [
+        0.316406,
+        0.310156,
+        0.368164,
+        0.379688
+      ],
+      "shoulderY": 0.470313,
+      "hemY": 0.689844,
+      "neckRise": 0.160156,
+      "sleeveBottoms": [
+        0.689844,
+        0.689844
+      ],
+      "bodyHeight": 0.219531,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "67650fdc9a27ba595b8ea0d92863cecbf7f45a3646f5236ac52bb4da9b5ce144"
+    },
+    "/wardrobe/final/0000216.png": {
+      "bounds": [
+        0.359375,
+        0.310156,
+        0.28125,
+        0.379688
+      ],
+      "shoulderY": 0.371875,
+      "hemY": 0.689844,
+      "neckRise": 0.061719,
+      "sleeveBottoms": [
+        0.689063,
+        0.689063
+      ],
+      "bodyHeight": 0.317969,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "de0a95bdf6b81bc4d56d75a91ec668ec6c5da76e9f0f7ba3aab0bdc0eb8cbdff"
+    },
+    "/wardrobe/final/0000217.png": {
+      "bounds": [
+        0.271484,
+        0.310156,
+        0.457031,
+        0.379688
+      ],
+      "shoulderY": 0.340625,
+      "hemY": 0.658594,
+      "neckRise": 0.030469,
+      "sleeveBottoms": [
+        0.688281,
+        0.689844
+      ],
+      "bodyHeight": 0.317969,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "556d449fcce78637fd588a194c170de834bdf799d9518422927aac7de30eb91d"
+    },
+    "/wardrobe/final/0000218.png": {
+      "bounds": [
+        0.220703,
+        0.354687,
+        0.55957,
+        0.290625
+      ],
+      "shoulderY": 0.367969,
+      "hemY": 0.645312,
+      "neckRise": 0.013281,
+      "sleeveBottoms": [
+        0.630469,
+        0.630469
+      ],
+      "bodyHeight": 0.277344,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "917b8802bdba66f633867aaae6e52f07348cca8599365c28d81196b7d66e682c"
+    },
+    "/wardrobe/final/0000219.png": {
+      "bounds": [
+        0.220703,
+        0.471875,
+        0.55957,
+        0.057031
+      ],
+      "shoulderY": 0.480859,
+      "hemY": 0.525,
+      "neckRise": 0.008984,
+      "sleeveBottoms": [
+        0.519531,
+        0.519531
+      ],
+      "bodyHeight": 0.044141,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "ec6e07ae75cd6b8051d7980df7a29ce6b6cdc045c41270c2b49f8c81cf424918"
+    },
+    "/wardrobe/final/0000220.png": {
+      "bounds": [
+        0.260742,
+        0.310156,
+        0.478516,
+        0.379688
+      ],
+      "shoulderY": 0.310156,
+      "hemY": 0.689844,
+      "neckRise": 0,
+      "sleeveBottoms": [
+        0.689844,
+        0.689844
+      ],
+      "bodyHeight": 0.379688,
+      "slots": 1,
+      "region": "accessory",
+      "sha256": "3927ec890de08e632f4366969d0ad225055c1498b9a9be8f93fa65df23cdf6db"
+    }
+  }
+}

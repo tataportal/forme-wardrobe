@@ -1,6 +1,8 @@
 import decodePng, { init as initPngDecode } from "@jsquash/png/decode";
 import encodePng, { init as initPngEncode } from "@jsquash/png/encode";
 import PNG_CODEC_WASM from "@jsquash/png/codec/pkg/squoosh_png_bg.wasm";
+import { measureCutoutAnatomy, type GarmentMeasurements } from "../shared/garment-anatomy";
+import { traceInteriorEdges } from "./interior-edge-trace";
 import {
   pixelMaskPolygon,
   planInteriorOpening,
@@ -9,6 +11,7 @@ import {
 } from "./layering-mask";
 
 type ContourCutout = {
+  layout: GarmentMeasurements | null;
   png: ArrayBuffer;
   coverage: number;
   passed: boolean;
@@ -74,6 +77,7 @@ function opaqueTransparencyPreview(
 export async function contourCutoutPng(
   bytes: Uint8Array,
   layeringPolygon: NormalizedMaskPoint[] = [],
+  anatomy?: unknown,
 ): Promise<ContourCutout> {
   await initializeCodec();
   const image = await decodePng(exactBuffer(bytes));
@@ -144,6 +148,9 @@ export async function contourCutoutPng(
     ? "Silueta completa, márgenes correctos y fondo exterior transparente."
     : "El control automático del calado detectó una silueta vacía, desproporcionada o demasiado cerca del borde.";
   const closetData = new Uint8ClampedArray(data);
+  // The cutouts retain the master's dimensions. Measure the complete contour
+  // BEFORE removing the lining; both variants keep these same anatomy anchors.
+  const layout = passed && anatomy !== undefined ? measureCutoutAnatomy(closetData, width, height, anatomy) : null;
   let canvasPng: ArrayBuffer | null = null;
   let canvasCoverage: number | null = null;
   let canvasPassed = layeringPolygon.length === 0;
@@ -156,6 +163,7 @@ export async function contourCutoutPng(
     const plan = planInteriorOpening(proposedPolygon, width, height, { minX, minY, maxX, maxY });
     if (!plan.passed) {
       return {
+        layout,
         png: await encodePng({ data: closetData, width, height } as ImageData),
         coverage,
         passed,
@@ -167,7 +175,8 @@ export async function contourCutoutPng(
         canvasQaPng: null,
       };
     }
-    const { removed, maskPixels } = clearOpeningAlpha(data, width, plan.spans);
+    const spans = traceInteriorEdges(closetData, width, height, plan.spans, { minX, minY, maxX, maxY }) ?? plan.spans;
+    const { removed, maskPixels } = clearOpeningAlpha(data, width, spans);
     const removedCoverage = removed / total;
     const overlap = maskPixels ? removed / maskPixels : 0;
     canvasCoverage = (foreground - removed) / total;
@@ -188,6 +197,7 @@ export async function contourCutoutPng(
   }
 
   return {
+    layout,
     png: await encodePng({ data: closetData, width, height } as ImageData),
     coverage,
     passed,

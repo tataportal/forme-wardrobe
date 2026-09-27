@@ -11,13 +11,13 @@ export function FormeLanding() {
 
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-hero-copy">
-          <p>Closet visual y asistente de estilo</p>
+
           <h1 id="landing-title">
             <span className="landing-title-line landing-title-line-one">Tu ropa ya</span>
             {" "}
             <span className="landing-title-line landing-title-line-two"><em>sabe</em> quién eres.</span>
           </h1>
-          <span>Digitaliza lo que tienes, crea looks y entiende mejor tu forma de vestir.</span>
+          <span>Añade tus prendas, combínalas y guarda tus looks.</span>
           <Link className="landing-primary" href="/closet">Abrir mi closet</Link>
         </div>
 
