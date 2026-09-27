@@ -204,3 +204,74 @@ export const styleFamilyRatings = sqliteTable("style_family_ratings", {
   index("style_family_ratings_owner_idx").on(table.ownerId),
   index("style_family_ratings_affinity_idx").on(table.ownerId, table.affinity),
 ]);
+
+export const billingAccounts = sqliteTable("billing_accounts", {
+  ownerId: text("owner_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  planId: text("plan_id").notNull().default("trial"),
+  status: text("status").notNull().default("active"),
+  billingCycle: text("billing_cycle"),
+  provider: text("provider"),
+  providerCustomerId: text("provider_customer_id"),
+  providerSubscriptionId: text("provider_subscription_id"),
+  currentPeriodStart: text("current_period_start"),
+  currentPeriodEnd: text("current_period_end"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("billing_provider_customer_unique").on(table.provider, table.providerCustomerId),
+]);
+
+export const digitizationCreditEvents = sqliteTable("digitization_credit_events", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  garmentId: text("garment_id").references(() => garments.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(),
+  amount: integer("amount").notNull(),
+  source: text("source").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("digitization_credit_idempotency_unique").on(table.idempotencyKey),
+  index("digitization_credit_owner_idx").on(table.ownerId, table.createdAt),
+]);
+
+export const aiUsageEvents = sqliteTable("ai_usage_events", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  garmentId: text("garment_id").references(() => garments.id, { onDelete: "set null" }),
+  jobId: text("job_id").references(() => processingJobs.id, { onDelete: "set null" }),
+  operation: text("operation").notNull(),
+  provider: text("provider").notNull().default("openai"),
+  model: text("model").notNull(),
+  requestId: text("request_id"),
+  inputTokens: integer("input_tokens"),
+  cachedInputTokens: integer("cached_input_tokens"),
+  imageInputTokens: integer("image_input_tokens"),
+  textInputTokens: integer("text_input_tokens"),
+  outputTokens: integer("output_tokens"),
+  costMicrousd: integer("cost_microusd"),
+  attempt: integer("attempt").notNull().default(1),
+  metadataJson: text("metadata_json"),
+  idempotencyKey: text("idempotency_key").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("ai_usage_idempotency_unique").on(table.idempotencyKey),
+  index("ai_usage_owner_idx").on(table.ownerId, table.createdAt),
+  index("ai_usage_job_idx").on(table.jobId),
+]);
+
+export const salesLeads = sqliteTable("sales_leads", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  name: text("name").notNull().default(""),
+  planId: text("plan_id").notNull(),
+  billingCycle: text("billing_cycle").notNull(),
+  status: text("status").notNull().default("new"),
+  source: text("source").notNull().default("pricing"),
+  dedupeKey: text("dedupe_key").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("sales_leads_dedupe_unique").on(table.dedupeKey),
+  index("sales_leads_status_idx").on(table.status, table.createdAt),
+]);

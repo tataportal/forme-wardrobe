@@ -31,6 +31,13 @@ export interface WardrobeEnv {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   SESSION_SECRET?: string;
+  FORME_CHECKOUT_PERSONAL_MONTHLY?: string;
+  FORME_CHECKOUT_PERSONAL_ANNUAL?: string;
+  FORME_CHECKOUT_CLUB_MONTHLY?: string;
+  FORME_CHECKOUT_CLUB_ANNUAL?: string;
+  FORME_CHECKOUT_PACK_10?: string;
+  FORME_CHECKOUT_PACK_50?: string;
+  FORME_BILLING_ENFORCED?: string;
 }
 
 export interface WardrobeExecutionContext {
@@ -527,6 +534,18 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
       avatar_url = excluded.avatar_url,
       updated_at = CURRENT_TIMESTAMP
   `).bind(identity.id, identity.email, identity.displayName, handle, identity.avatarUrl).run();
+  await db.prepare(`INSERT OR IGNORE INTO billing_accounts (owner_id, plan_id, status) VALUES (?, 'trial', 'active')`)
+    .bind(identity.id).run();
+  await db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
+    (id, owner_id, event_type, amount, source, idempotency_key)
+    VALUES (?, ?, 'grant', 10, 'trial', ?)`)
+    .bind(crypto.randomUUID(), identity.id, `trial-grant:${identity.id}`).run();
+}
+
+async function creditBalance(db: D1Database, ownerId: string): Promise<number> {
+  const row = await db.prepare("SELECT COALESCE(SUM(amount), 0) AS balance FROM digitization_credit_events WHERE owner_id = ?")
+    .bind(ownerId).first<{ balance: number }>();
+  return Number(row?.balance || 0);
 }
 
 async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: D1Database; identity: Identity } | Response> {
@@ -785,6 +804,9 @@ async function uploadGarment(
   identity: Identity,
 ): Promise<Response> {
   if (!env.WARDROBE_MEDIA) return apiError("No se pueden subir fotos en este momento. Vuelve a intentarlo más tarde.", 503);
+  if (env.FORME_BILLING_ENFORCED === "true" && await creditBalance(db, identity.id) <= 0) {
+    return apiError("Ya usaste tus digitalizaciones. Elige un plan o agrega créditos para continuar.", 402);
+  }
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File) || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) return apiError("No se pudo convertir la foto. Usa JPG, PNG o WebP.", 400);
@@ -937,7 +959,7 @@ async function recognizeGarment(env: WardrobeEnv, db: D1Database, garment: Garme
     });
   } catch { throw new RetryableProcessingError("Se interrumpió el reconocimiento de la foto."); }
   if (response.status === 429 || response.status >= 500) throw new RetryableProcessingError(`Reconocimiento temporalmente no disponible (${response.status}).`);
-  const body = await response.json() as { status?: string; output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
+  const body = await response.json() as { status?: string; output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; usage?: ResponsesUsage };
   if (!response.ok || body.status === "incomplete") throw new Error("No se pudo completar el reconocimiento de la foto.");
   const raw = body.output_text || body.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
   const result = parseRecognition(JSON.parse(raw));
@@ -947,6 +969,15 @@ async function recognizeGarment(env: WardrobeEnv, db: D1Database, garment: Garme
     model, requestId: response.headers.get("x-request-id"), recognizedAt: new Date().toISOString(),
     metadataRevision: garment.metadata_revision || 0, result, prompt: recognitionPrompt(result), promptVersion,
   };
+  await recordAiUsage(db, {
+    ownerId: garment.owner_id,
+    garmentId: garment.id,
+    operation: "garment_recognition",
+    model,
+    requestId: record.requestId,
+    usage: body.usage,
+    idempotencyKey: `recognition:${garment.id}:${record.sourceSha256}:${model}`,
+  });
   // Durable common checkpoint. Neither branch needs the other's output.
   const saved = await db.prepare(`UPDATE garments SET recognition_json = ?, recognition_status = 'ready',
     metadata_status = 'pending', updated_at = CURRENT_TIMESTAMP
@@ -1104,12 +1135,28 @@ async function recordImageGenerationUsage(
     image_output_tokens = ?, generation_cost_microusd = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND owner_id = ?`)
     .bind(model, imageInput, textInput, imageOutput, imageGenerationCostMicrousd(model, usage), jobId, ownerId).run();
+  const job = await db.prepare("SELECT garment_id, attempt, provider_request_id FROM processing_jobs WHERE id = ? AND owner_id = ?")
+    .bind(jobId, ownerId).first<{ garment_id: string; attempt: number; provider_request_id: string | null }>();
+  if (job) await recordAiUsage(db, {
+    ownerId,
+    garmentId: job.garment_id,
+    jobId,
+    operation: "garment_generation",
+    model,
+    requestId: job.provider_request_id,
+    usage,
+    costMicrousd: imageGenerationCostMicrousd(model, usage),
+    attempt: Math.max(1, job.attempt || 1),
+    idempotencyKey: `generation:${jobId}:${Math.max(1, job.attempt || 1)}`,
+  });
 }
 
 type GeneratedReview = { passed: boolean; retryable: boolean; score: number; notes: string; layeringPolygon: Array<{ x: number; y: number }>; anatomy: unknown };
 
 async function reviewGeneratedGarment(
   env: WardrobeEnv,
+  db: D1Database,
+  jobId: string,
   garment: GarmentRow,
   sourceBytes: ArrayBuffer,
   sourceContentType: string,
@@ -1120,6 +1167,7 @@ async function reviewGeneratedGarment(
     return { passed: false, retryable: true, score: 0, notes: "El control visual no está disponible.", layeringPolygon: [], anatomy: null };
   }
   try {
+    const model = env.OPENAI_QA_MODEL || "gpt-5-mini";
     const retryInstruction = maskAttempt > 0
       ? "A previous mask was rejected for cutting garment fabric. Make this retry more conservative and keep every boundary farther inside the lining."
       : "";
@@ -1131,7 +1179,7 @@ async function reviewGeneratedGarment(
       headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
       signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
       body: JSON.stringify({
-        model: env.OPENAI_QA_MODEL || "gpt-5-mini",
+        model,
         store: false,
         input: [{
           role: "user",
@@ -1193,8 +1241,20 @@ async function reviewGeneratedGarment(
       output_text?: string;
       output?: Array<{ content?: Array<{ text?: string }> }>;
       error?: { message?: string };
+      usage?: ResponsesUsage;
     };
     if (!response.ok) throw new Error(result.error?.message || `Control visual ${response.status}`);
+    await recordAiUsage(db, {
+      ownerId: garment.owner_id,
+      garmentId: garment.id,
+      jobId,
+      operation: "visual_qa",
+      model,
+      requestId: response.headers.get("x-request-id"),
+      usage: result.usage,
+      attempt: maskAttempt + 1,
+      idempotencyKey: `visual-qa:${jobId}:${maskAttempt + 1}`,
+    });
     const raw = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "";
     const parsed = JSON.parse(raw) as {
       anatomy?: unknown;
@@ -1245,16 +1305,17 @@ async function reviewGeneratedGarment(
   }
 }
 
-async function reviewAnatomyOnly(env: WardrobeEnv, generated: Uint8Array, reason: string, contourGuide = "", candidates: AnatomyCandidate[] = []): Promise<unknown> {
+async function reviewAnatomyOnly(env: WardrobeEnv, db: D1Database, garment: GarmentRow, jobId: string, generated: Uint8Array, reason: string, contourGuide = "", candidates: AnatomyCandidate[] = []): Promise<unknown> {
   if (!candidates.length) throw new InvalidAnatomyError("No hay puntos de contorno suficientes para repetir la medición.");
   const { coordinateGuidePng } = await import("./coordinate-guide");
   const guide = await coordinateGuidePng(generated);
+  const model = env.OPENAI_QA_MODEL || "gpt-5-mini";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
     signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
     body: JSON.stringify({
-      model: env.OPENAI_QA_MODEL || "gpt-5-mini", store: false,
+      model, store: false,
       input: [{ role: "user", content: [
         { type: "input_text", text: `This OUTPUT is already approved. Remeasure anatomy only; do not regenerate or reassess fidelity. Previous measurement failed: ${reason}. ${anatomyInstruction} ${contourGuide}` },
         { type: "input_image", image_url: `data:image/png;base64,${encodeBase64(generated)}`, detail: "high" },
@@ -1264,13 +1325,15 @@ async function reviewAnatomyOnly(env: WardrobeEnv, generated: Uint8Array, reason
       text: { format: { type: "json_schema", name: "garment_anatomy", strict: true, schema: anatomySelectionSchema(candidates) } },
     }),
   });
-  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } };
+  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string }; usage?: ResponsesUsage };
   if (!response.ok) throw new InvalidAnatomyError(result.error?.message || `No se pudo repetir la medición (${response.status}).`);
+  await recordAiUsage(db, { ownerId: garment.owner_id, garmentId: garment.id, jobId, operation: "anatomy_retry", model,
+    requestId: response.headers.get("x-request-id"), usage: result.usage, idempotencyKey: `anatomy-retry:${jobId}` });
   const raw = result.output_text || result.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
   try { return resolveAnatomySelection(JSON.parse(raw), candidates); } catch { throw new InvalidAnatomyError("La segunda medición no eligió puntos válidos del contorno."); }
 }
 
-async function reviewLayeringMaskOnly(env: WardrobeEnv, generated: Uint8Array, previous: GeneratedReview): Promise<GeneratedReview> {
+async function reviewLayeringMaskOnly(env: WardrobeEnv, db: D1Database, garment: GarmentRow, jobId: string, generated: Uint8Array, previous: GeneratedReview): Promise<GeneratedReview> {
   const { coordinateGuidePng } = await import("./coordinate-guide");
   const { contourCutoutPng } = await import("./contour-cutout");
   const [guide, rejected] = await Promise.all([coordinateGuidePng(generated), contourCutoutPng(generated, previous.layeringPolygon, previous.anatomy)]);
@@ -1279,11 +1342,12 @@ async function reviewLayeringMaskOnly(env: WardrobeEnv, generated: Uint8Array, p
   const top = Math.max(shoulderY, bounds[1] + bounds[3] * 0.06) * 1000;
   const bottom = (bounds[1] + bounds[3]) * 1000;
   const rows = Array.from({ length: 12 }, (_, i) => Math.round(top + (bottom - top) * i / 11));
+  const model = env.OPENAI_QA_MODEL || "gpt-5-mini";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
     signal: AbortSignal.timeout(90 * 1000),
     body: JSON.stringify({
-      model: env.OPENAI_QA_MODEL || "gpt-5-mini", store: false,
+      model, store: false,
       input: [{ role: "user", content: [
         { type: "input_text", text: "The master is already approved; repair ONLY its interior layering mask. IMAGE 1 is the master; IMAGE 2 adds a numbered 0..1000 grid (x along top, y down left). IMAGE 3, when present, shows the REJECTED mask in magenta. Follow the actual inner panel edges, safely inside the lining. Preserve the complete back-neck collar band, lapels, buttons, graphics and outer panels. At the hem join the already-empty central gap without widening into fabric. Coordinates cover the WHOLE image, not the garment bounding box. Confidence is a percentage 0..100: 95, NOT 9.5 or 9. Preserve the approved anatomy." },
         { type: "input_text", text: `Return the opening as exactly 12 horizontal sections, in top-to-bottom order, at these FIXED normalized y positions: ${JSON.stringify(rows)}. For each section return ONLY left_x and right_x (0..1000 over whole image width). Do NOT return or convert y coordinates. The first section is below the back collar and the last is at the hem. Follow the actual inner panel edges; the opening usually narrows downwards. Sections are converted to a polygon by code, so no point list is needed.` },
@@ -1301,8 +1365,10 @@ async function reviewLayeringMaskOnly(env: WardrobeEnv, generated: Uint8Array, p
       } } },
     }),
   }).catch(() => { throw new RetryableProcessingError("Se interrumpió la corrección de la máscara; se conservará la maestra y se reintentará el calado."); });
-  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } };
+  const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string }; usage?: ResponsesUsage };
   if (!response.ok) throw new RetryableProcessingError(result.error?.message || `No se pudo recalcular la máscara (${response.status}).`);
+  await recordAiUsage(db, { ownerId: garment.owner_id, garmentId: garment.id, jobId, operation: "layering_mask_retry", model,
+    requestId: response.headers.get("x-request-id"), usage: result.usage, idempotencyKey: `layering-mask-retry:${jobId}` });
   const raw = result.output_text || result.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
   const parsed = JSON.parse(raw) as { confidence: number; sections?: Array<{ left_x: number; right_x: number }> };
   const sections = parsed.sections;
@@ -1317,6 +1383,9 @@ async function reviewLayeringMaskOnly(env: WardrobeEnv, generated: Uint8Array, p
 
 async function reviewLayeringCutout(
   env: WardrobeEnv,
+  db: D1Database,
+  garment: GarmentRow,
+  jobId: string,
   generated: Uint8Array,
   canvasQaPng: ArrayBuffer,
 ): Promise<{ passed: boolean; retryable: boolean; score: number; notes: string }> {
@@ -1324,12 +1393,13 @@ async function reviewLayeringCutout(
     return { passed: false, retryable: true, score: 0, notes: "El control visual del calado no está disponible." };
   }
   try {
+    const model = env.OPENAI_QA_MODEL || "gpt-5-mini";
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
       signal: AbortSignal.timeout(VISUAL_QA_TIMEOUT_MS),
       body: JSON.stringify({
-        model: env.OPENAI_QA_MODEL || "gpt-5-mini",
+        model,
         store: false,
         input: [{
           role: "user",
@@ -1366,8 +1436,11 @@ async function reviewLayeringCutout(
       output_text?: string;
       output?: Array<{ content?: Array<{ text?: string }> }>;
       error?: { message?: string };
+      usage?: ResponsesUsage;
     };
     if (!response.ok) throw new Error(result.error?.message || `Control visual del calado ${response.status}`);
+    await recordAiUsage(db, { ownerId: garment.owner_id, garmentId: garment.id, jobId, operation: "cutout_qa", model,
+      requestId: response.headers.get("x-request-id"), usage: result.usage, idempotencyKey: `cutout-qa:${jobId}` });
     const raw = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "";
     const parsed = JSON.parse(raw) as { passed?: boolean; score?: number; summary?: string; issues?: string[] };
     const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
@@ -1396,6 +1469,8 @@ type StoredCutouts = {
 
 async function storeGeneratedCutouts(
   env: WardrobeEnv,
+  db: D1Database,
+  jobId: string,
   garment: GarmentRow,
   generated: Uint8Array,
   quality: ImageQuality,
@@ -1428,7 +1503,7 @@ async function storeGeneratedCutouts(
     throw new Error(contour.canvasNotes);
   }
 
-  const cutoutQa = await reviewLayeringCutout(env, generated, contour.canvasQaPng);
+  const cutoutQa = await reviewLayeringCutout(env, db, garment, jobId, generated, contour.canvasQaPng);
   if (!cutoutQa.passed) {
     if (cutoutQa.retryable) throw new RetryableProcessingError(cutoutQa.notes);
     throw new Error(cutoutQa.notes);
@@ -1579,8 +1654,8 @@ async function finalizeGeneratedGarment(
   const cached = cachedObject ? await cachedObject.json<GeneratedReview>().catch(() => null) : null;
   const approved = cached?.passed === true && cached.score >= 85 ? cached : null;
   const visualQa = approved
-    ? maskAttempt > 0 && needsLayeringCutout(garment) ? await reviewLayeringMaskOnly(env, generated, approved) : approved
-    : await reviewGeneratedGarment(env, garment, sourceBytes, sourceContentType, generated, maskAttempt);
+    ? maskAttempt > 0 && needsLayeringCutout(garment) ? await reviewLayeringMaskOnly(env, db, garment, jobId, generated, approved) : approved
+    : await reviewGeneratedGarment(env, db, jobId, garment, sourceBytes, sourceContentType, generated, maskAttempt);
   if (!visualQa.passed) {
     if (visualQa.retryable) throw new RetryableProcessingError(visualQa.notes);
     if (approved) {
@@ -1610,17 +1685,17 @@ async function finalizeGeneratedGarment(
   let cutouts: StoredCutouts;
   try {
     try {
-      cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
+      cutouts = await storeGeneratedCutouts(env, db, jobId, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
     } catch (error) {
       if (!(error instanceof InvalidAnatomyError)) throw error;
       // One bounded measurement-only retry. No second generation, no human gate.
       try {
-        visualQa.anatomy = await reviewAnatomyOnly(env, generated, error.message, error.contourGuide, error.candidates);
+        visualQa.anatomy = await reviewAnatomyOnly(env, db, garment, jobId, generated, error.message, error.contourGuide, error.candidates);
       } catch (retryError) {
         throw new InvalidAnatomyError(retryError instanceof Error ? retryError.message : "No se pudo repetir la medición.");
       }
       await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
-      cutouts = await storeGeneratedCutouts(env, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
+      cutouts = await storeGeneratedCutouts(env, db, jobId, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
     }
   } catch (error) {
     if (error instanceof RetryableProcessingError) throw error;
@@ -1690,6 +1765,10 @@ async function finalizeGeneratedGarment(
         updated_at = CURRENT_TIMESTAMP, error = NULL
       WHERE id = ? AND owner_id = ?
     `).bind(jobId, garment.owner_id),
+    db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
+      (id, owner_id, garment_id, event_type, amount, source, idempotency_key)
+      VALUES (?, ?, ?, 'accepted', -1, 'pipeline', ?)`)
+      .bind(crypto.randomUUID(), garment.owner_id, garment.id, `accepted:${garment.id}`),
   ]);
   await syncIntakeItem(db, garment.id, "passed");
 }
@@ -2731,6 +2810,59 @@ type CanvasPlacementUsage = {
   output_tokens?: number;
 };
 
+type ResponsesUsage = {
+  input_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number; image_tokens?: number; text_tokens?: number };
+  output_tokens?: number;
+};
+
+export function textModelCostMicrousd(model: string, usage: ResponsesUsage | null | undefined): number | null {
+  const input = Number(usage?.input_tokens);
+  const output = Number(usage?.output_tokens);
+  const cached = Math.min(input, Math.max(0, Number(usage?.input_tokens_details?.cached_tokens) || 0));
+  if (![input, output].every(Number.isFinite)) return null;
+  const rates = model.startsWith("gpt-5-mini")
+    ? { input: 0.25, cached: 0.025, output: 2 }
+    : model.startsWith("gpt-5.6-luna")
+      ? { input: 0.2, cached: 0.02, output: 1.2 }
+      : null;
+  if (!rates) return null;
+  return Math.round((input - cached) * rates.input + cached * rates.cached + output * rates.output);
+}
+
+async function recordAiUsage(
+  db: D1Database,
+  entry: {
+    ownerId: string;
+    garmentId?: string | null;
+    jobId?: string | null;
+    operation: string;
+    model: string;
+    requestId?: string | null;
+    usage?: ResponsesUsage | ImageGenerationUsage | null;
+    costMicrousd?: number | null;
+    attempt?: number;
+    metadata?: Record<string, unknown>;
+    idempotencyKey: string;
+  },
+): Promise<void> {
+  const details = entry.usage?.input_tokens_details;
+  const input = Number.isFinite(Number(entry.usage?.input_tokens)) ? Number(entry.usage?.input_tokens) : null;
+  const output = Number.isFinite(Number(entry.usage?.output_tokens)) ? Number(entry.usage?.output_tokens) : null;
+  const cached = Number.isFinite(Number(details?.cached_tokens)) ? Number(details?.cached_tokens) : null;
+  const imageInput = Number.isFinite(Number(details?.image_tokens)) ? Number(details?.image_tokens) : null;
+  const textInput = Number.isFinite(Number(details?.text_tokens)) ? Number(details?.text_tokens) : null;
+  await db.prepare(`INSERT OR IGNORE INTO ai_usage_events
+    (id, owner_id, garment_id, job_id, operation, provider, model, request_id, input_tokens,
+      cached_input_tokens, image_input_tokens, text_input_tokens, output_tokens, cost_microusd,
+      attempt, metadata_json, idempotency_key)
+    VALUES (?, ?, ?, ?, ?, 'openai', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), entry.ownerId, entry.garmentId ?? null, entry.jobId ?? null, entry.operation,
+      entry.model, entry.requestId ?? null, input, cached, imageInput, textInput, output,
+      entry.costMicrousd ?? textModelCostMicrousd(entry.model, entry.usage), entry.attempt ?? 1,
+      entry.metadata ? JSON.stringify(entry.metadata) : null, entry.idempotencyKey).run();
+}
+
 export function canvasPlacementCostUsd(model: string, usage: CanvasPlacementUsage | null | undefined): number | null {
   const input = Number(usage?.input_tokens);
   const output = Number(usage?.output_tokens);
@@ -2829,6 +2961,16 @@ async function suggestCanvasPlacement(request: Request, env: WardrobeEnv, db: D1
   }
   const ordered = [...placements].sort((a, b) => Number(a.layer) - Number(b.layer));
   const zById = new Map(ordered.map((item, index) => [item.instanceId, index + 1]));
+  const requestId = response.headers.get("x-request-id");
+  await recordAiUsage(db, {
+    ownerId: identity.id,
+    operation: "canvas_placement",
+    model,
+    requestId,
+    usage: result.usage,
+    metadata: { itemCount: items.length },
+    idempotencyKey: requestId ? `canvas:${requestId}` : `canvas:${identity.id}:${crypto.randomUUID()}`,
+  });
   return json({
     model,
     costUsd: canvasPlacementCostUsd(model, result.usage),
@@ -3298,6 +3440,46 @@ export async function handleWardrobeApi(
   if (url.pathname === "/api/internal/garment-operation") {
     return internalGarmentOperation(request, env, ctx);
   }
+  if (url.pathname === "/api/sales-interest" && request.method === "POST") {
+    if (!env.DB) return apiError("Formé no está disponible en este momento.", 503);
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 8_192) return apiError("Solicitud demasiado grande.", 413);
+    const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (!payload) return apiError("Solicitud inválida.", 400);
+    if (typeof payload.company === "string" && payload.company.trim()) return json({ ok: true }, 201);
+    const email = typeof payload.email === "string" ? payload.email.trim().toLocaleLowerCase() : "";
+    const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 100) : "";
+    const planId = typeof payload.planId === "string" ? payload.planId : "";
+    const billingCycle = typeof payload.billingCycle === "string" ? payload.billingCycle : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return apiError("Escribe un correo válido.", 400);
+    if (!["personal", "club", "pack-10", "pack-50"].includes(planId)) return apiError("El plan no es válido.", 400);
+    if (!["monthly", "annual", "once"].includes(billingCycle)) return apiError("El periodo no es válido.", 400);
+    const dedupeKey = `${email}:${planId}:${billingCycle}`;
+    await env.DB.prepare(`INSERT INTO sales_leads
+      (id, email, name, plan_id, billing_cycle, status, source, dedupe_key)
+      VALUES (?, ?, ?, ?, ?, 'new', 'pricing', ?)
+      ON CONFLICT(dedupe_key) DO UPDATE SET name = excluded.name, status = 'new', updated_at = CURRENT_TIMESTAMP`)
+      .bind(crypto.randomUUID(), email, name, planId, billingCycle, dedupeKey).run();
+    return json({ ok: true }, 201);
+  }
+  if (url.pathname === "/api/checkout" && request.method === "GET") {
+    const plan = url.searchParams.get("plan") || "";
+    const cycle = url.searchParams.get("cycle") || "";
+    const checkoutUrls: Record<string, string | undefined> = {
+      "personal:monthly": env.FORME_CHECKOUT_PERSONAL_MONTHLY,
+      "personal:annual": env.FORME_CHECKOUT_PERSONAL_ANNUAL,
+      "club:monthly": env.FORME_CHECKOUT_CLUB_MONTHLY,
+      "club:annual": env.FORME_CHECKOUT_CLUB_ANNUAL,
+      "pack-10:once": env.FORME_CHECKOUT_PACK_10,
+      "pack-50:once": env.FORME_CHECKOUT_PACK_50,
+    };
+    const checkout = checkoutUrls[`${plan}:${cycle}`];
+    if (!checkout) return apiError("El cobro en línea todavía no está conectado.", 503);
+    let destination: URL;
+    try { destination = new URL(checkout); } catch { return apiError("El checkout no está configurado correctamente.", 503); }
+    if (destination.protocol !== "https:") return apiError("El checkout no está configurado correctamente.", 503);
+    return Response.redirect(destination, 302);
+  }
   const publicProfileMatch = url.pathname.match(/^\/api\/public-profile\/([^/]+)$/);
   if (publicProfileMatch && request.method === "GET") {
     if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
@@ -3325,6 +3507,21 @@ export async function handleWardrobeApi(
     if (url.pathname === "/api/profile" && request.method === "PUT") {
       const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
       return saveAccountProfile(request, db, identity, Boolean(ownerEmail && identity.email === ownerEmail));
+    }
+    if (url.pathname === "/api/billing" && request.method === "GET") {
+      const account = await db.prepare(`SELECT plan_id, status, billing_cycle, current_period_start, current_period_end
+        FROM billing_accounts WHERE owner_id = ? LIMIT 1`).bind(identity.id).first<{
+        plan_id: string; status: string; billing_cycle: string | null; current_period_start: string | null; current_period_end: string | null;
+      }>();
+      return json({
+        planId: account?.plan_id || "trial",
+        status: account?.status || "active",
+        billingCycle: account?.billing_cycle || null,
+        currentPeriodStart: account?.current_period_start || null,
+        currentPeriodEnd: account?.current_period_end || null,
+        credits: await creditBalance(db, identity.id),
+        enforced: env.FORME_BILLING_ENFORCED === "true",
+      });
     }
     if (url.pathname === "/api/wardrobe" && request.method === "GET") return getWardrobe(db, identity.id);
     if (url.pathname === "/api/intake-batches" && request.method === "POST") return createIntakeBatch(request, db, identity);

@@ -178,6 +178,42 @@ async function generations(env: WardrobeEnv): Promise<Response> {
   });
 }
 
+async function commerce(env: WardrobeEnv): Promise<Response> {
+  if (!env.DB) return json({ error: "La base de datos no está conectada." }, 503);
+  const [leads, costs] = await Promise.all([
+    env.DB.prepare(`SELECT id, email, name, plan_id, billing_cycle, status, created_at, updated_at
+      FROM sales_leads ORDER BY updated_at DESC LIMIT 100`).all<{
+      id: string; email: string; name: string; plan_id: string; billing_cycle: string;
+      status: string; created_at: string; updated_at: string;
+    }>(),
+    env.DB.prepare(`SELECT operation, COUNT(*) AS event_count,
+      SUM(CASE WHEN cost_microusd IS NOT NULL THEN 1 ELSE 0 END) AS measured_count,
+      COALESCE(SUM(cost_microusd), 0) AS cost_microusd
+      FROM ai_usage_events GROUP BY operation ORDER BY cost_microusd DESC`).all<{
+      operation: string; event_count: number; measured_count: number; cost_microusd: number;
+    }>(),
+  ]);
+  return json({
+    leadCount: leads.results.length,
+    leads: leads.results.map((lead) => ({
+      id: lead.id,
+      email: lead.email,
+      name: lead.name,
+      planId: lead.plan_id,
+      billingCycle: lead.billing_cycle,
+      status: lead.status,
+      createdAt: lead.created_at,
+      updatedAt: lead.updated_at,
+    })),
+    usage: costs.results.map((entry) => ({
+      operation: entry.operation,
+      eventCount: Number(entry.event_count),
+      measuredCount: Number(entry.measured_count),
+      costUsd: Number(entry.cost_microusd) / 1_000_000,
+    })),
+  });
+}
+
 async function media(request: Request, env: WardrobeEnv): Promise<Response> {
   if (!env.WARDROBE_MEDIA) return new Response("Not found", { status: 404 });
   const key = new URL(request.url).searchParams.get("key")?.trim();
@@ -196,6 +232,7 @@ export async function handleAdminApi(request: Request, env: WardrobeEnv): Promis
   if (!url.pathname.startsWith("/api/admin/")) return null;
   if (!await isOwner(request, env)) return json({ error: "Admin no autorizado." }, 403);
   if (request.method === "GET" && url.pathname === "/api/admin/generations") return generations(env);
+  if (request.method === "GET" && url.pathname === "/api/admin/commerce") return commerce(env);
   if (request.method === "GET" && url.pathname === "/api/admin/media") return media(request, env);
   return json({ error: "Ruta admin inexistente." }, 404);
 }

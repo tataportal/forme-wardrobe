@@ -69,7 +69,7 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(about, /Formé® convierte tu closet/);
   assert.match(about, /about\.forme-f18\.js/);
   assert.match(about, /forme-social-instagram-v1\.gif/);
-  assert.match(pricing, /Gratis durante la beta/);
+  assert.match(pricing, /Tu closet,/);
   const assistant = await render("/asistente");
   assert.equal(assistant.status, 307);
   assert.equal(new URL(assistant.headers.get("location")).pathname, "/canvas");
@@ -82,10 +82,10 @@ test("keeps the main product areas on stable routes", async () => {
     readFile(new URL("../app/canvas/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/perfil/page.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(pricingSource, /name: "Personal", monthlyPrice: 7\.99/);
-  assert.match(pricingSource, /name: "Club", monthlyPrice: 12\.99/);
-  assert.match(pricingSource, /Pago anual único/);
-  assert.match(pricingSource, /Cobro único de US\$\{annualTotal\.toFixed\(2\)\} por todo el año/);
+  assert.match(pricingSource, /name: "Personal", monthly: 7\.99, annual: 79\.99/);
+  assert.match(pricingSource, /name: "Club", monthly: 12\.99, annual: 129\.99/);
+  assert.match(pricingSource, /10 prendas de por vida y hasta 5 looks guardados/);
+  assert.match(pricingSource, /\/api\/sales-interest/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /Aún no hay prendas ni looks publicados\./);
   assert.doesNotMatch(publicProfileSource, /join\(" · "\)/);
@@ -250,9 +250,10 @@ test("Looks has its own primary navigation state and creates a new document", as
   assert.match(html, /Crear look/);
 });
 
-test("beta pricing does not promise disabled product features", async () => {
+test("pricing sells only implemented product capabilities", async () => {
   const html = await (await render("/pricing")).text();
-  assert.match(html, /Planes previstos/);
-  assert.match(html, /sin tarjeta ni cobros/);
+  assert.match(html, /Empieza gratis/);
+  assert.match(html, /Cuando tu closet crece/);
+  assert.match(html, /Un crédito se descuenta solo cuando la prenda queda lista/);
   assert.doesNotMatch(html, /planificación semanal|Asistente según|insights avanzados/);
 });

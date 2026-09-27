@@ -50,6 +50,12 @@ type GenerationBatch = {
   items: GenerationItem[];
 };
 
+type CommerceSnapshot = {
+  leadCount: number;
+  leads: Array<{ id: string; email: string; name: string; planId: string; billingCycle: string; status: string; createdAt: string; updatedAt: string }>;
+  usage: Array<{ operation: string; eventCount: number; measuredCount: number; costUsd: number }>;
+};
+
 const emptyBatch: GenerationBatch = {
   id: "PRODUCCIÓN LIVE",
   mode: "live-d1-r2",
@@ -110,6 +116,7 @@ export default function AdminGenerations() {
   const [account, setAccount] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ index: number; direction: "desc" | "asc" } | null>(null);
+  const [commerce, setCommerce] = useState<CommerceSnapshot>({ leadCount: 0, leads: [], usage: [] });
 
   useEffect(() => {
     let active = true;
@@ -127,6 +134,14 @@ export default function AdminGenerations() {
       .catch((error: unknown) => {
         if (active) setLoadError(error instanceof Error ? error.message : "No se pudo abrir producción.");
       });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/commerce", { credentials: "same-origin", cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload: CommerceSnapshot | null) => { if (active && payload) setCommerce(payload); })
+      .catch(() => undefined);
     return () => { active = false; };
   }, []);
   const filtered = useMemo(() => {
@@ -169,6 +184,17 @@ export default function AdminGenerations() {
     </section>
 
     {loadError && <p className="ops-error" role="alert">{loadError}</p>}
+
+    <section className="commerce-strip" aria-label="Ventas y costos">
+      <div><strong>{commerce.leadCount}</strong><span>solicitudes de activación</span></div>
+      <div><strong>US${commerce.usage.reduce((total, entry) => total + entry.costUsd, 0).toFixed(4)}</strong><span>costo IA registrado</span></div>
+      <div className="commerce-leads"><span>Últimas solicitudes</span>{commerce.leads.length
+        ? commerce.leads.slice(0, 4).map((lead) => <a key={lead.id} href={`mailto:${lead.email}`}><b>{lead.name || lead.email}</b><small>{lead.planId} · {lead.billingCycle}</small></a>)
+        : <small>Aún no hay solicitudes</small>}</div>
+      <div className="commerce-usage"><span>Costo por operación</span>{commerce.usage.length
+        ? commerce.usage.map((entry) => <p key={entry.operation}><b>{entry.operation.replaceAll("_", " ")}</b><small>{entry.eventCount} llamadas · US${entry.costUsd.toFixed(4)}</small></p>)
+        : <small>Se medirá desde el próximo uso</small>}</div>
+    </section>
 
     <section className="pipeline-table">
       <div className="pipeline-head">
