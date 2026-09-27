@@ -176,8 +176,6 @@ type ShareTemplateOptions = {
 };
 
 type ClosetReading = {
-  summary: string;
-  detail: string;
   categories: Array<[string, number]>;
   colors: Array<[string, number]>;
   materials: Array<[string, number]>;
@@ -1295,20 +1293,9 @@ function buildClosetReading(garments: Garment[], looks: SavedLook[]): ClosetRead
   const mostUsedGarments = mostUsed.map(item => item.garment);
   const visualGarments = [...mostUsedGarments, ...garments.filter(garment => !usage.has(garment.id))].slice(0, 4);
   if (!garments.length) return {
-    summary: "Tu lectura aparecerá cuando añadas tus primeras prendas.",
-    detail: "Formé usa la categoría, el color, el material y los looks guardados. No inventa un estilo sin evidencia.",
     categories, colors, materials, usedCount: 0, unusedCount: 0, mostUsed, visualGarments,
   };
-  const [mainCategory, mainCategoryCount] = categories[0];
-  const [secondCategory] = categories[1] ?? [];
-  const dominantShare = Math.round(mainCategoryCount / garments.length * 100);
-  const summary = dominantShare >= 45
-    ? `${translateValue(mainCategory)} concentra ${dominantShare}% de tu closet.`
-    : secondCategory
-      ? `Tu closet se apoya principalmente en ${translateValue(mainCategory).toLocaleLowerCase()}, seguido de ${translateValue(secondCategory).toLocaleLowerCase()}.`
-      : `${translateValue(mainCategory)} define la base de tu closet.`;
-  const detail = `${translateValue(colors[0]?.[0] ?? "varios colores")} es el color más presente. ${translateValue(materials[0]?.[0] ?? "Varios materiales")} es el material que más se repite.`;
-  return { summary, detail, categories, colors, materials, usedCount, unusedCount: Math.max(0, garments.length - usedCount), mostUsed, visualGarments };
+  return { categories, colors, materials, usedCount, unusedCount: Math.max(0, garments.length - usedCount), mostUsed, visualGarments };
 }
 
 function buildAssistantAnswer({
@@ -4111,16 +4098,14 @@ export function WardrobeApp({
         {profileShareNotice && <p className="profile-share-notice" role="status">{profileShareNotice}</p>}
         <section className="closet-reading" aria-labelledby="closet-reading-title">
           <header className="closet-reading-heading">
-            <span>LECTURA PRIVADA</span>
-            <h2 id="closet-reading-title">Lo que realmente hay en tu closet</h2>
-            <p>{closetReading.summary} {closetReading.detail}</p>
+            <h2 id="closet-reading-title">Análisis del closet</h2>
           </header>
           <div className="closet-reading-layout">
             <figure className="closet-reading-visual" aria-label="Prendas representativas del closet">
               {closetReading.visualGarments.map((garment) => <div key={garment.id}>
                 <img src={imageSrc(garmentPhotoFor(garment, "complete").image)} alt={translateGarmentName(garment.name)} loading="lazy" />
               </div>)}
-              {!closetReading.visualGarments.length && <p>Añade prendas para construir tu lectura.</p>}
+              {!closetReading.visualGarments.length && <p>Sin prendas</p>}
             </figure>
             <div className="closet-reading-data">
               <section className="closet-reading-composition">
@@ -4137,12 +4122,13 @@ export function WardrobeApp({
                   <div><dt>Ya combinadas</dt><dd>{closetReading.usedCount}</dd></div>
                   <div><dt>Por explorar</dt><dd>{closetReading.unusedCount}</dd></div>
                 </dl>
-                {closetReading.mostUsed.length > 0 ? <ol>{closetReading.mostUsed.slice(0, 3).map(({ garment, count }) => <li key={garment.id}><span>{translateGarmentName(garment.name)}</span><strong>{count} {count === 1 ? "look" : "looks"}</strong></li>)}</ol> : <p>Guarda looks para reconocer qué prendas sostienen más combinaciones.</p>}
+                {closetReading.mostUsed.length > 0 ? <ol>{closetReading.mostUsed.slice(0, 3).map(({ garment, count }) => <li key={garment.id}><span>{translateGarmentName(garment.name)}</span><strong>{count} {count === 1 ? "look" : "looks"}</strong></li>)}</ol> : <p>Sin looks guardados</p>}
                 <div><button type="button" onClick={newLook}>Crear look</button><button type="button" onClick={() => navigateWardrobeRoute("looks")}>Ver Looks</button></div>
               </section>
               <section className="closet-reading-materials">
-                <h3>Materiales que dominan</h3>
-                <p>{closetReading.materials.slice(0, 4).map(([material, count]) => `${translateValue(material)} ${count}`).join(" / ") || "Todavía sin datos"}</p>
+                <h3>Materiales</h3>
+                <ul>{closetReading.materials.slice(0, 4).map(([material, count]) => <li key={material}><span>{translateValue(material)}</span><strong>{count}</strong></li>)}</ul>
+                {!closetReading.materials.length && <p>Sin datos</p>}
               </section>
             </div>
           </div>

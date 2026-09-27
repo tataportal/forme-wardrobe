@@ -301,11 +301,11 @@ test("Closet and Looks expose bulk publishing plus configurable social exports",
 test("Profile exposes a private closet reading based on real garments and saved looks", async () => {
   const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
   assert.match(page, /buildClosetReading\(personalGarments, savedLooks\)/);
-  assert.match(page, /Lo que realmente hay en tu closet/);
+  assert.match(page, /Análisis del closet/);
   assert.match(page, /Composición/);
   assert.match(page, /Uso en looks/);
   assert.match(page, /Por explorar/);
-  assert.match(page, /Materials|Materiales que dominan/);
+  assert.match(page, /Materials|Materiales/);
 });
 
 test("pricing sells only implemented product capabilities", async () => {
