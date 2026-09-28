@@ -259,7 +259,10 @@ test("recent closet order includes uploads that are still processing or need rev
 
 test("Canvas switches between garment and look tabs while layers stay in the bottom toolbar", async () => {
   const html = await (await render("/canvas")).text();
-  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  const [page, styles] = await Promise.all([
+    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-pilot.css", import.meta.url), "utf8"),
+  ]);
   assert.match(html, /Nombre del look/);
   assert.match(html, /id="look-name"/);
   assert.match(html, /Guardar look/);
@@ -274,7 +277,11 @@ test("Canvas switches between garment and look tabs while layers stay in the bot
   assert.match(html, /role="tablist"[^>]*aria-label="Biblioteca del canvas"/);
   assert.match(html, /role="tab"[^>]*aria-selected="true"[^>]*>Prendas/);
   assert.match(page, /role="tab" id="canvas-looks-tab" aria-selected=\{savedLooksOpen\}/);
+  assert.match(page, /<span className="sr-only">Buscar en looks<\/span>/);
+  assert.match(page, /visibleCanvasLooks\.map/);
   assert.match(page, /className=\{`canvas-core-action layers-action/);
+  assert.match(styles, /\.canvas-column > \.canvas-layers-panel/);
+  assert.doesNotMatch(styles, /\.studio-library-column > \.canvas-layers-panel/);
   assert.match(html, /aria-controls="canvas-layers"/);
   assert.match(html, /aria-controls="canvas-saved-looks"/);
   assert.doesNotMatch(html, /<aside[^>]+id="canvas-(layers|saved-looks)"/);

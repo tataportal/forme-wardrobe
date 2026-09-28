@@ -2122,6 +2122,7 @@ export function WardrobeApp({
   const [closetGridSize, setClosetGridSize] = useGarmentGridSize("closet");
   const [canvasGridSize, setCanvasGridSize] = useGarmentGridSize("canvas");
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [savedLooksQuery, setSavedLooksQuery] = useState("");
   const [librarySource, setLibrarySource] = useState<"personal" | "basics">("personal");
   const history = useRef(new CanvasHistory());
   const documentGeneration = useRef(0);
@@ -2309,6 +2310,7 @@ export function WardrobeApp({
   };
   const studioPersonalGarments = personalGarments.filter(item => matchesStudioLibraryFilter(item) && matchesSearch(item, libraryQuery) && (!libraryFavoritesOnly || item.favorite));
   const studioBasicGarments = sharedBasics.filter(item => matchesStudioLibraryFilter(item) && matchesSearch(item, libraryQuery) && (!libraryFavoritesOnly || item.favorite));
+  const visibleCanvasLooks = savedLooks.filter(look => searchText(look.name).includes(searchText(savedLooksQuery)));
   const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
   const canRandomize = canvasPieces.length
     ? canvasPieces.some(piece => !lockedPieceIds.has(piece.instanceId))
@@ -4762,6 +4764,16 @@ export function WardrobeApp({
                 </div>
 
               </div>
+              {layersOpen && <aside className="canvas-layers-panel" id="canvas-layers" aria-label="Capas del look">
+                <h2>Capas <span>{canvasPieces.length}</span></h2>{canvasPieces.length > 1 && <p>Las de arriba quedan delante.</p>}
+                <button type="button" className="canvas-panel-close" onClick={() => setLayersOpen(false)} aria-label="Cerrar capas">×</button>
+                <ol>{orderedLayers.map((piece, index) => { const garment = garmentById.get(piece.garmentId); if (!garment) return null; return <li key={piece.instanceId} className={selectedId === piece.instanceId ? "active" : ""}>
+                  <button type="button" className="layer-select" aria-pressed={selectedId === piece.instanceId} onClick={() => { setSelectedId(piece.instanceId); setSelectedGroupIds([]); if (window.innerWidth <= 699) setLayersOpen(false); }}><img src={imageSrc(garment.image)} alt="" /><span>{translateGarmentName(garment.name)}{lockedPieceIds.has(piece.instanceId) && <small>Se mantiene al mezclar</small>}</span></button>
+                  <button type="button" aria-label={`Subir ${translateGarmentName(garment.name)} una capa`} disabled={index === 0} onClick={() => changeLayer(piece.instanceId, "up")}>↑</button>
+                  <button type="button" aria-label={`Bajar ${translateGarmentName(garment.name)} una capa`} disabled={index === orderedLayers.length - 1} onClick={() => changeLayer(piece.instanceId, "down")}>↓</button>
+                </li>; })}</ol>
+                {!canvasPieces.length && <p>Añade prendas para ordenarlas aquí.</p>}
+              </aside>}
             </div>
 
               <div className="studio-document-actions" role="group" aria-label="Crear y probar looks" data-piece-selected={selectedCanvasPiece ? "true" : undefined}>
@@ -4844,8 +4856,9 @@ export function WardrobeApp({
             }
 
             {savedLooksOpen && <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} id="canvas-saved-looks" role="tabpanel" aria-labelledby="canvas-looks-tab">
-              {savedLooks.length > 0
-                ? <div className="saved-look-panel-list">{savedLooks.map((look) => (
+              <label className="library-search looks-search"><span className="sr-only">Buscar en looks</span><input type="search" placeholder="Buscar" value={savedLooksQuery} onChange={event => setSavedLooksQuery(event.target.value)} /></label>
+              {visibleCanvasLooks.length > 0
+                ? <div className="saved-look-panel-list">{visibleCanvasLooks.map((look) => (
                   <article className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} key={look.id} aria-label={look.name}>
                     <button type="button" className="saved-look-panel-open" onClick={() => openSavedLook(look)} aria-label={`Abrir ${look.name}`} title={look.name} aria-pressed={activeOutfitId === look.id} disabled={savingOutfit || Boolean(deletingLookId)}>
                       <LookPreview look={look} garmentById={garmentById} />
@@ -4853,17 +4866,7 @@ export function WardrobeApp({
                     <span className="saved-look-panel-name">{look.name}</span>
                   </article>
                 ))}</div>
-                : <div className="saved-look-panel-empty"><p>Guarda tu primer look.</p></div>}
-            </aside>}
-            {layersOpen && <aside className="canvas-layers-panel" id="canvas-layers" aria-label="Capas del look">
-              <h2>Capas <span>{canvasPieces.length}</span></h2>{canvasPieces.length > 1 && <p>Las de arriba quedan delante.</p>}
-              <button type="button" className="canvas-panel-close" onClick={() => setLayersOpen(false)} aria-label="Cerrar capas">×</button>
-              <ol>{orderedLayers.map((piece, index) => { const garment = garmentById.get(piece.garmentId); if (!garment) return null; return <li key={piece.instanceId} className={selectedId === piece.instanceId ? "active" : ""}>
-                <button type="button" className="layer-select" aria-pressed={selectedId === piece.instanceId} onClick={() => { setSelectedId(piece.instanceId); setSelectedGroupIds([]); if (window.innerWidth <= 699) setLayersOpen(false); }}><img src={imageSrc(garment.image)} alt="" /><span>{translateGarmentName(garment.name)}{lockedPieceIds.has(piece.instanceId) && <small>Se mantiene al mezclar</small>}</span></button>
-                <button type="button" aria-label={`Subir ${translateGarmentName(garment.name)} una capa`} disabled={index === 0} onClick={() => changeLayer(piece.instanceId, "up")}>↑</button>
-                <button type="button" aria-label={`Bajar ${translateGarmentName(garment.name)} una capa`} disabled={index === orderedLayers.length - 1} onClick={() => changeLayer(piece.instanceId, "down")}>↓</button>
-              </li>; })}</ol>
-              {!canvasPieces.length && <p>Añade prendas para ordenarlas aquí.</p>}
+                : <div className="saved-look-panel-empty"><p>{savedLooks.length ? "No encontramos looks." : "Guarda tu primer look."}</p>{savedLooks.length > 0 && <button type="button" onClick={() => setSavedLooksQuery("")}>Limpiar búsqueda</button>}</div>}
             </aside>}
 
             </div>
