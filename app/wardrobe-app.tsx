@@ -2249,10 +2249,17 @@ export function WardrobeApp({
     () => autocompleteOptions(garments.map((item) => item.material), starterMaterialSuggestions),
     [garments],
   );
-  // Closet is the intake history as well as the usable wardrobe. Keep pending
-  // and failed uploads visible there so "Más recientes" reflects what the user
-  // actually uploaded; only validated garments continue into Canvas and styling.
-  const closetGarments = garments.filter((item) => item.collection !== "forme");
+  // Keep a failed upload visible only while it has no completed replacement.
+  // Older retries used to create a second garment row, so showing both leaves a
+  // stale "Necesita revisión" card beside the finished garment.
+  const completedClosetNames = new Set(garments
+    .filter((item) => item.collection !== "forme" && (item.status === "ready" || item.status === "ghosted"))
+    .map((item) => item.name.trim().toLocaleLowerCase("es")));
+  const closetGarments = garments.filter((item) => {
+    if (item.collection === "forme") return false;
+    const incomplete = item.status === "failed" || item.qaStatus === "review";
+    return !incomplete || !completedClosetNames.has(item.name.trim().toLocaleLowerCase("es"));
+  });
   const personalGarments = closetGarments.filter((item) => item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
   const closetReading = buildClosetReading(personalGarments, savedLooks);
   const basicsEnabled = demoMode || profile.includeFormeBasics === true;
