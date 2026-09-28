@@ -1819,7 +1819,7 @@ function ClosetGarmentGrid({ garments, emptyLabel, onOpen, onResetFilters, selec
           <img src={imageSrc(garmentPhotoFor(item, "complete").image)} alt="" loading="lazy" data-photo-role="complete" />
           {selecting && <span className="bulk-check" aria-hidden="true">{selected ? "✓" : ""}</span>}
           {(["queued", "processing", "uploaded", "batch_staged", "batch_processing", "cutout_pending"] as Garment["status"][]).includes(item.status) && <span className="processing-badge">Preparando</span>}
-          {item.status === "failed" && <span className="processing-badge failed">Necesita revisión</span>}
+          {(item.status === "failed" || item.qaStatus === "review") && <span className="processing-badge failed">Necesita revisión</span>}
         </span>
         <span className="garment-caption" title={translateGarmentName(item.name)}>{translateGarmentName(item.name)}</span>
       </button>
@@ -2249,7 +2249,11 @@ export function WardrobeApp({
     () => autocompleteOptions(garments.map((item) => item.material), starterMaterialSuggestions),
     [garments],
   );
-  const personalGarments = garments.filter((item) => item.collection !== "forme" && item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
+  // Closet is the intake history as well as the usable wardrobe. Keep pending
+  // and failed uploads visible there so "Más recientes" reflects what the user
+  // actually uploaded; only validated garments continue into Canvas and styling.
+  const closetGarments = garments.filter((item) => item.collection !== "forme");
+  const personalGarments = closetGarments.filter((item) => item.qaStatus !== "review" && (item.status === "ready" || item.status === "ghosted"));
   const closetReading = buildClosetReading(personalGarments, savedLooks);
   const basicsEnabled = demoMode || profile.includeFormeBasics === true;
   const sharedBasics = basicsEnabled ? garments.filter((item) => item.collection === "forme") : [];
@@ -2263,9 +2267,11 @@ export function WardrobeApp({
       }
       const aTime = Date.parse(a.createdAt ?? "");
       const bTime = Date.parse(b.createdAt ?? "");
-      return Number.isFinite(aTime) && Number.isFinite(bTime) ? bTime - aTime : 0;
+      const aRecent = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY;
+      const bRecent = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY;
+      return bRecent - aRecent || a.id.localeCompare(b.id);
     });
-  const visiblePersonalGarments = filterCatalog(personalGarments);
+  const visiblePersonalGarments = filterCatalog(closetGarments);
   const visibleFormeBasics = filterCatalog(sharedBasics);
   const showingBasics = demoMode || (basicsEnabled && catalogSource === "basics");
   const showingLibraryBasics = demoMode || (basicsEnabled && librarySource === "basics");
@@ -4409,7 +4415,7 @@ export function WardrobeApp({
                   {!showingBasics && catalogItems.length > 0 && <button type="button" className={`catalog-secondary-action${closetSelecting ? " active" : ""}`} aria-label={closetSelecting ? "Cancelar selección" : "Seleccionar prendas"} title={closetSelecting ? "Cancelar selección" : "Seleccionar prendas"} onClick={() => { setClosetSelecting((value) => !value); setSelectedGarmentIds(new Set()); }}><ClosetActionIcon action="select" /><span className="catalog-action-label">{closetSelecting ? "Cancelar" : "Seleccionar"}</span></button>}
                   {!showingBasics && personalGarments.length > 0 && <button type="button" className="catalog-secondary-action" aria-label="Compartir closet" title="Compartir closet" onClick={() => openShareTemplate({ kind: "closet", garments: personalGarments })}><ClosetActionIcon action="share" /><span className="catalog-action-label">Compartir closet</span></button>}
                 </div>
-                {(demoMode || showingBasics || personalGarments.length > 0) && <button className="closet-add" type="button" onClick={demoMode ? beginGoogleSignIn : openUpload} aria-label={demoMode ? "Crear mi closet" : "Añadir prendas"}><ClosetActionIcon /><span>{demoMode ? "Crear mi closet" : <>Añadir<span className="closet-add-context"> prendas</span></>}</span></button>}
+                {(demoMode || showingBasics || closetGarments.length > 0) && <button className="closet-add" type="button" onClick={demoMode ? beginGoogleSignIn : openUpload} aria-label={demoMode ? "Crear mi closet" : "Añadir prendas"}><ClosetActionIcon /><span>{demoMode ? "Crear mi closet" : <>Añadir<span className="closet-add-context"> prendas</span></>}</span></button>}
               </div>
               {closetSelecting && <div className="bulk-actionbar" role="toolbar" aria-label="Acciones para prendas seleccionadas">
                 <strong>{selectedGarmentIds.size} {selectedGarmentIds.size === 1 ? "seleccionada" : "seleccionadas"}</strong>
@@ -4425,7 +4431,7 @@ export function WardrobeApp({
                 <button className="primary-action" onClick={() => setFiltersOpen(false)}>Ver {catalogItems.length} prendas</button>
               </FormeDialog>}
               <div className="catalog-results">
-                {!showingBasics && personalGarments.length === 0 ? <div className="closet-empty-personal"><h2>Tu closet está vacío</h2><p>Añade tus prendas para empezar a combinarlas.</p><button className="primary-action" type="button" onClick={openUpload}>Añadir prendas</button></div> :
+                {!showingBasics && closetGarments.length === 0 ? <div className="closet-empty-personal"><h2>Tu closet está vacío</h2><p>Añade tus prendas para empezar a combinarlas.</p><button className="primary-action" type="button" onClick={openUpload}>Añadir prendas</button></div> :
                   <ClosetGarmentGrid garments={catalogItems} emptyLabel={favoritesOnly ? "No hay favoritas con estos filtros." : "No encontramos prendas con esta búsqueda."} onOpen={(item) => openGarmentEditor(item)} selecting={closetSelecting} selectedIds={selectedGarmentIds} onToggle={toggleGarmentSelection} onResetFilters={() => { setArchiveFilters(emptyFilters); setCatalogQuery(""); setFavoritesOnly(false); }} />}
               </div>
             </section>

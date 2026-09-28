@@ -245,6 +245,16 @@ test("the closet exposes search, collections and access to filters", async () =>
   assert.doesNotMatch(html, /closet-looks-nav/);
 });
 
+test("recent closet order includes uploads that are still processing or need review", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(page, /const closetGarments = garments\.filter\(\(item\) => item\.collection !== "forme"\)/);
+  assert.match(page, /const personalGarments = closetGarments\.filter/);
+  assert.match(page, /const visiblePersonalGarments = filterCatalog\(closetGarments\)/);
+  assert.match(page, /Number\.NEGATIVE_INFINITY/);
+  assert.match(page, /item\.status === "failed" \|\| item\.qaStatus === "review"/);
+  assert.match(page, /processing-badge failed">Necesita revisión/);
+});
+
 test("Canvas keeps its garment library and iteration actions visible; optional panels start closed", async () => {
   const html = await (await render("/canvas")).text();
   assert.match(html, /Nombre del look/);
