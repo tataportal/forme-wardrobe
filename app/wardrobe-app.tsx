@@ -4036,6 +4036,12 @@ export function WardrobeApp({
             </section>
 
             <section className="settings-account-links"><h2>Cuenta</h2><Link href="/perfil">Perfil y privacidad</Link><Link href="/pricing">Información de la beta</Link><Link href="/about">Manifiesto</Link><Link href="/terminos">Términos de uso</Link><Link href="/privacidad">Privacidad y fotos</Link></section>
+            {profile.referralCode && <section className="settings-account-links settings-referral">
+              <h2>Invitaciones</h2>
+              <strong>+5 créditos por cada registro</strong>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/ingresar?ref=${profile.referralCode}`)}>Copiar enlace de invitación</button>
+              {Boolean(profile.referralCount) && <small>{profile.referralCount} {profile.referralCount === 1 ? "persona invitada" : "personas invitadas"}. +{profile.referralCredits || 0} créditos.</small>}
+            </section>}
             {productFeatures.styleTest && <>
             <section className="profile-style-summary">
               <p>Tu lectura actual</p>
@@ -4088,19 +4094,13 @@ export function WardrobeApp({
           <div className="profile-page-intro">
             <span>{profileDraft.handle || "@tuusuario"}</span>
             <h1>{profileDraft.name || "Tu nombre"}</h1>
-            <div className="profile-account-details">
-              {profile.isTester && <span className="profile-tester-badge">Tester</span>}
-            </div>
+            {profile.isTester && <div className="profile-account-details"><span className="profile-tester-badge">Tester</span></div>}
             {profileJoinedDate && <p className="profile-joined-date">Se unió el <time dateTime={profile.joinedAt}>{profileJoinedDate}</time></p>}
             {profileDraft.bio.trim() ? <p>{profileDraft.bio}</p> : null}
-            <nav className="profile-page-links" aria-label="Acciones del perfil">
-              {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>Ver perfil público</button>}
-              {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>Compartir</button>}
-              <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>Ajustes</button>
-              {profile.referralCode && <button type="button" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/ingresar?ref=${profile.referralCode}`)}>Copiar invitación · +5 créditos</button>}
-              <button type="button" onClick={signOut}>Cerrar sesión</button>
-            </nav>
-            {Boolean(profile.referralCount) && <p className="profile-referral-summary">{profile.referralCount} {profile.referralCount === 1 ? "persona invitada" : "personas invitadas"} · +{profile.referralCredits || 0} créditos</p>}
+            {profile.profilePublic && <nav className="profile-page-links" aria-label="Acciones del perfil">
+              <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>Ver perfil público</button>
+              <button type="button" onClick={() => void sharePublicProfile()}>Compartir perfil</button>
+            </nav>}
           </div>
           <dl className="profile-page-stats">
             <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>

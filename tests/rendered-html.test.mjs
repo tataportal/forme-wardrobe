@@ -303,12 +303,16 @@ test("Closet and Looks expose bulk publishing plus configurable social exports",
 
 test("Profile exposes a private closet reading based on real garments and saved looks", async () => {
   const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  const hero = page.match(/<header className="profile-page-hero">([\s\S]*?)<\/header>/)?.[1] ?? "";
   assert.match(page, /buildClosetReading\(personalGarments, savedLooks\)/);
   assert.match(page, /Análisis del closet/);
   assert.match(page, /Composición/);
   assert.match(page, /Uso en looks/);
   assert.match(page, /Por explorar/);
   assert.match(page, /Materials|Materiales/);
+  assert.match(hero, /Ver perfil público/);
+  assert.match(hero, /Compartir perfil/);
+  assert.doesNotMatch(hero, /Ajustes|Cerrar sesión|Copiar invitación/);
 });
 
 test("pricing sells only implemented product capabilities", async () => {

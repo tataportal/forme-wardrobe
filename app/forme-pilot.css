@@ -450,8 +450,11 @@
 .forme-app .settings-identity .account-sign-out { display: block; margin-top: 8px; }
 .forme-app .settings-identity small { color: var(--fs-muted); }
 .forme-app .settings-account-links { display: grid; gap: 12px; }
-.forme-app .settings-account-links a { display: flex; align-items: center; min-height: 44px; color: inherit; font-size: 14px; }
-.forme-app .settings-account-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.forme-app .settings-account-links a,
+.forme-app .settings-account-links button { display: flex; align-items: center; width: fit-content; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font-size: 14px; }
+.forme-app .settings-account-links :is(a,button):hover { text-decoration: underline; text-underline-offset: 4px; }
+.forme-app .settings-referral strong { margin-top: 4px; font-size: 14px; font-weight: 500; }
+.forme-app .settings-referral small { color: var(--fs-muted); font-size: 12px; }
 .forme-app .account-page-gate { display: block; min-height: 0; max-width: 760px; margin: 0 auto; padding: 80px var(--fs-gutter); background: none; }
 .forme-app .account-page-gate aside { display: none; }
 .forme-app .account-page-gate h1 { margin: 14px 0; }
