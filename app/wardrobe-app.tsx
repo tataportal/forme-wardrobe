@@ -4090,7 +4090,6 @@ export function WardrobeApp({
             <h1>{profileDraft.name || "Tu nombre"}</h1>
             <div className="profile-account-details">
               {profile.isTester && <span className="profile-tester-badge">Tester</span>}
-              {typeof profile.credits === "number" && <span>{profile.credits} {profile.credits === 1 ? "crédito" : "créditos"}</span>}
             </div>
             {profileJoinedDate && <p className="profile-joined-date">Se unió el <time dateTime={profile.joinedAt}>{profileJoinedDate}</time></p>}
             {profileDraft.bio.trim() ? <p>{profileDraft.bio}</p> : null}
@@ -4106,6 +4105,7 @@ export function WardrobeApp({
           <dl className="profile-page-stats">
             <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
             <div><dt>Looks</dt><dd>{savedLooks.length}</dd></div>
+            {typeof profile.credits === "number" && <div><dt>Créditos</dt><dd>{profile.credits}</dd></div>}
             {productFeatures.weeklyPlanner && <div><dt>Días planeados</dt><dd>{weeklyPlan.length}</dd></div>}
           </dl>
         </header>

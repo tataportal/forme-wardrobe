@@ -359,21 +359,59 @@
 }
 /* Account and public collection share the same margins and type. */
 .forme-app :is(.profile-page,.settings-page) { width: min(var(--fs-page-width),100%); margin: 0 auto; padding: 40px var(--fs-gutter) 72px; }
-.forme-app .profile-page-hero { box-shadow: none; position: relative; display: grid; grid-template-columns: 96px minmax(0,1fr) auto; align-items: center; gap: 24px; padding: 0 0 32px; min-height: 0; border: 0; border-bottom: 1px solid var(--fs-line); border-radius: 0; background: none; }
-.forme-app .profile-page-hero::before { content: none; }
-.forme-app .profile-page-portrait { width: 96px; height: 112px; margin: 0; border-radius: 4px; overflow: hidden; }
+.forme-app :is(.profile-page-hero,.profile-page-loading-hero) {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(260px,.72fr) minmax(360px,1.38fr) minmax(170px,.5fr);
+  align-items: center;
+  gap: clamp(36px,4.5vw,76px);
+  min-height: clamp(500px,60dvh,650px);
+  padding: clamp(28px,3vw,48px);
+  overflow: hidden;
+  border: 1px solid rgba(72,75,70,.2);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 0 0,rgba(114,108,255,.12),transparent 34%),
+    linear-gradient(120deg,rgba(255,255,255,.32),rgba(230,233,229,.7));
+  box-shadow: 0 28px 70px rgba(30,33,29,.1),inset 0 1px rgba(255,255,255,.72);
+}
+.forme-app :is(.profile-page-hero,.profile-page-loading-hero)::before { content: none; }
+.forme-app .profile-page-portrait,
+.forme-app .profile-page-loading-portrait {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+  max-height: 540px;
+  aspect-ratio: 4 / 5;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: rgba(31,33,30,.07);
+  box-shadow: none;
+}
 .forme-app .profile-page-portrait img { width: 100%; height: 100%; object-fit: cover; }
-.forme-app .profile-page-intro > span { font: 12px/1.4 var(--fs-font); color: var(--fs-muted); }
-.forme-app .profile-page-intro h1 { text-transform: none; margin: 6px 0; font-size: 32px; }
-.forme-app .profile-page-intro > p { max-width: 500px; font: 14px/1.5 var(--fs-font); }
+.forme-app .profile-page-intro { min-width: 0; }
+.forme-app .profile-page-intro > span { font: 13px/1.4 var(--fs-font); color: var(--fs-muted); }
+.forme-app .profile-page-intro h1 { max-width: 680px; margin: 12px 0 0; text-transform: none; font-size: clamp(54px,5.8vw,88px); line-height: .9; overflow-wrap: anywhere; }
+.forme-app .profile-page-intro > p { max-width: 560px; font: 15px/1.55 var(--fs-font); }
 .forme-app .profile-account-details { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font: 13px/1.4 var(--fs-font); color: var(--fs-ink); }
 .forme-app .profile-tester-badge { padding: 3px 8px; border-radius: 4px; background: var(--fs-ink); color: var(--fs-canvas); font-weight: 500; }
-.forme-app .profile-page-intro > .profile-joined-date { margin: 8px 0 0; color: var(--fs-muted); font: 12px/1.5 var(--fs-font); }
-.forme-app .profile-page-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
+.forme-app .profile-page-intro > .profile-joined-date { margin: 14px 0 0; color: var(--fs-muted); font: 12px/1.5 var(--fs-font); }
+.forme-app .profile-page-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 24px; }
 .forme-app .profile-page-links button, .forme-app .account-sign-out { min-height: 44px; padding: 8px 0; border: 0; background: none; color: var(--fs-ink); font: 13px/1.3 var(--fs-font); letter-spacing: 0; text-transform: none; text-decoration: underline; text-underline-offset: 4px; }
-.forme-app .profile-page-stats { background: none; box-shadow: none; display: flex; gap: 24px; padding: 0; border: 0; }
+.forme-app .profile-page-stats,
+.forme-app .profile-page-loading-stats { align-self: center; display: grid; grid-template-columns: 1fr; gap: 30px; padding: 0; border: 0; background: none; box-shadow: none; }
+.forme-app .profile-page-stats > div { padding: 0 0 18px; border-bottom: 1px solid rgba(72,75,70,.18); }
+.forme-app .profile-page-stats > div:last-child { border-bottom: 0; }
 .forme-app .profile-page-stats dt { text-transform: none; letter-spacing: 0; color: var(--fs-muted); font: 12px/1.4 var(--fs-font); }
-.forme-app .profile-page-stats dd { margin: 4px 0 0; font: 500 26px/1.1 var(--fs-font); }
+.forme-app .profile-page-stats dd { margin: 6px 0 0; font: 500 clamp(28px,3vw,42px)/1 var(--fs-font); }
+.forme-app .profile-page-loading-copy { position: relative; z-index: 1; align-self: center; }
+.forme-app .profile-page-loading-copy > span,
+.forme-app .profile-page-loading-copy > strong,
+.forme-app .profile-page-loading-stats > span { border-radius: 0; background: rgba(31,33,30,.08); }
+.forme-app .profile-page-loading-stats > span { height: 78px; }
 .forme-app .profile-page-body { display: block; margin-top: 36px; }
 .forme-app .profile-page-editor { box-shadow: none; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; }
 .forme-app .profile-edit-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 64px; align-items: start; }
@@ -625,13 +663,13 @@
   .forme-app .dropzone-empty h3 { font-size: 24px; }
   .forme-app :is(.profile-page,.settings-page) { padding: 28px var(--fs-gutter) calc(100px + env(safe-area-inset-bottom)); }
   .forme-app .profile-edit-columns, .forme-app .settings-page-grid { grid-template-columns: minmax(0,1fr); gap: 36px; }
-  .forme-app .profile-page-hero { grid-template-columns: 72px minmax(0,1fr); gap: 20px; padding-bottom: 28px; }
-  .forme-app .profile-page-portrait { width: 72px; height: 88px; align-self: start; }
-  .forme-app .profile-page-intro h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .forme-app :is(.profile-page-hero,.profile-page-loading-hero) { grid-template-columns: minmax(0,1fr); gap: 28px; min-height: 0; padding: 16px; border-radius: 18px; }
+  .forme-app :is(.profile-page-portrait,.profile-page-loading-portrait) { width: 100%; height: auto; max-height: none; aspect-ratio: 4 / 5; align-self: auto; }
+  .forme-app .profile-page-intro h1 { font-size: clamp(44px,15vw,68px); overflow-wrap: anywhere; }
   .forme-app .profile-page-links { margin-top: 10px; gap: 0 16px; }
   .forme-app .profile-page-links button { font-size: 13px; }
-  .forme-app .profile-page-stats { grid-column: 1/-1; gap: 32px; }
-  .forme-app .profile-page-stats > div { flex-direction: row; text-transform: none; display: flex; align-items: baseline; gap: 8px; }
+  .forme-app :is(.profile-page-stats,.profile-page-loading-stats) { grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+  .forme-app .profile-page-stats > div { display: flex; flex-direction: column-reverse; gap: 7px; padding-bottom: 0; border-bottom: 0; }
   .forme-app .profile-page-stats dd { font-size: 22px; }
   .forme-app .profile-page-body { margin-top: 28px; }
   .forme-app .profile-page-fields { grid-template-columns: 1fr; gap: 22px; }
