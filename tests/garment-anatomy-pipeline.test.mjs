@@ -226,6 +226,19 @@ test("a white garment on real transparency is not erased as studio background", 
   assert.ok(result.layout);
 });
 
+test("transparent masters allow tight safe framing but still reject clipped edges", async () => {
+  const width = 200, height = 250;
+  const render = async (margin) => {
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 20; y < 220; y += 1) for (let x = margin; x < width - margin; x += 1) {
+      data.set([250, 250, 248, 255], (y * width + x) * 4);
+    }
+    return app.contourCutoutPng(new Uint8Array(await app.encodePng({ data, width, height })), []);
+  };
+  assert.equal((await render(2)).passed, true);
+  assert.equal((await render(1)).passed, false);
+});
+
 test("two failed measurements stop automatically and retain the approved master", async t => {
   const state = await runPipeline(t, { badFirst: true, badRetry: true });
   assert.equal(state.row().status, "failed");

@@ -152,7 +152,11 @@ export async function contourCutoutPng(
   const coverage = foreground / total;
   const marginX = foreground ? Math.min(minX, width - 1 - maxX) / width : 0;
   const marginY = foreground ? Math.min(minY, height - 1 - maxY) / height : 0;
-  const passed = foreground > 0 && coverage >= 0.055 && coverage <= 0.82 && marginX >= 0.012 && marginY >= 0.012;
+  // A native transparent master can safely use tighter framing than an opaque
+  // studio photo: there is no background matte to separate from the garment.
+  // Still require several pixels so genuinely clipped silhouettes fail.
+  const minimumMargin = hasTransparentBackground ? 0.006 : 0.012;
+  const passed = foreground > 0 && coverage >= 0.055 && coverage <= 0.82 && marginX >= minimumMargin && marginY >= minimumMargin;
   const notes = passed
     ? "Silueta completa, márgenes correctos y fondo exterior transparente."
     : "El control automático del calado detectó una silueta vacía, desproporcionada o demasiado cerca del borde.";
