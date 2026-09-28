@@ -189,6 +189,7 @@ type ShareTarget =
 type ShareTemplateOptions = {
   labelMode: ShareLabelMode;
   includeHandle: boolean;
+  includeGarmentList: boolean;
 };
 
 type ClosetReading = {
@@ -1442,6 +1443,26 @@ function shareHandle(value: string) {
   return normalized ? `@${normalized}` : "@FORME";
 }
 
+function shareLookGarments(look: SavedLook, garmentById: Map<string, Garment>) {
+  const seen = new Set<string>();
+  return [...look.items]
+    .sort((a, b) => a.z - b.z)
+    .flatMap((piece) => {
+      if (seen.has(piece.garmentId)) return [];
+      const garment = garmentById.get(piece.garmentId);
+      if (!garment) return [];
+      seen.add(piece.garmentId);
+      return [garment];
+    });
+}
+
+function fitCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number) {
+  if (context.measureText(value).width <= maxWidth) return value;
+  let fitted = value;
+  while (fitted.length > 1 && context.measureText(`${fitted}…`).width > maxWidth) fitted = fitted.slice(0, -1);
+  return `${fitted.trimEnd()}…`;
+}
+
 async function createInstagramStoryBlob(
   look: SavedLook,
   garmentById: Map<string, Garment>,
@@ -1514,16 +1535,54 @@ async function createInstagramStoryBlob(
   context.fillStyle = "#11110f";
   context.font = "400 36px Helvetica, Arial, sans-serif";
   context.letterSpacing = "-1px";
-  context.fillText("Vístete con lo que ya tienes.", 72, 1738);
+  const lookGarments = shareLookGarments(look, garmentById);
+  if (options.includeGarmentList && lookGarments.length) {
+    const visible = lookGarments.slice(0, 15);
+    const columns = visible.length > 8 ? 3 : 2;
+    const rows = Math.ceil(visible.length / columns);
+    const gap = 28;
+    const columnWidth = (width - 144 - gap * (columns - 1)) / columns;
+    const rowHeight = Math.min(44, 174 / Math.max(1, rows));
+    context.font = "600 13px Arial, sans-serif";
+    context.letterSpacing = "2px";
+    context.fillText("EN ESTE LOOK", 72, 1656);
+    visible.forEach((garment, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = 72 + column * (columnWidth + gap);
+      const y = 1692 + row * rowHeight;
+      context.fillStyle = "rgba(17,17,15,.42)";
+      context.font = "500 12px Arial, sans-serif";
+      context.letterSpacing = "1px";
+      context.fillText(String(index + 1).padStart(2, "0"), x, y);
+      context.fillStyle = "#11110f";
+      context.font = `${columns === 3 ? 15 : 17}px Helvetica, Arial, sans-serif`;
+      context.letterSpacing = "0px";
+      const brand = garment.brand?.trim();
+      const label = `${translateGarmentName(garment.name)}${brand ? ` / ${brand}` : ""}`;
+      context.fillText(fitCanvasText(context, label, columnWidth - 30), x + 30, y);
+    });
+    if (lookGarments.length > visible.length) {
+      context.fillStyle = "rgba(17,17,15,.55)";
+      context.font = "500 13px Arial, sans-serif";
+      context.fillText(`+${lookGarments.length - visible.length} PRENDAS`, width - 230, 1842);
+    }
+  } else {
+    context.fillStyle = "#11110f";
+    context.font = "400 36px Helvetica, Arial, sans-serif";
+    context.letterSpacing = "-1px";
+    context.fillText("Vístete con lo que ya tienes.", 72, 1738);
+  }
   context.font = "600 19px Arial, sans-serif";
   context.letterSpacing = "4px";
   const footer = [
     `${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}`,
     options.includeHandle ? shareHandle(handle) : "FORME.GALLERY",
   ].join("  /  ");
-  context.fillText(footer, 72, 1793);
+  context.fillStyle = "#11110f";
+  context.fillText(footer, 72, options.includeGarmentList && lookGarments.length ? 1880 : 1793);
   context.fillStyle = "#e83b25";
-  context.fillRect(72, 1840, 128, 8);
+  context.fillRect(72, options.includeGarmentList && lookGarments.length ? 1902 : 1840, 128, 8);
 
   const result = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!result) throw new Error("No se pudo exportar la historia.");
@@ -1780,10 +1839,11 @@ function ShareTemplateDialog({ target, options, garmentById, handle, busy, onOpt
   onExport: () => void;
 }) {
   const title = target.kind === "look" ? target.look.name : target.kind === "garment" ? translateGarmentName(target.garment.name) : "Mi closet";
+  const lookGarments = target.kind === "look" ? shareLookGarments(target.look, garmentById) : [];
   return <FormeDialog labelledBy="share-template-title" className="share-template-dialog" onClose={() => { if (!busy) onClose(); }}>
       <header><div><span>COMPARTIR</span><h2 id="share-template-title">Elige cómo se verá</h2></div><button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar">×</button></header>
       <div className="share-template-layout">
-        <div className="share-template-preview" data-kind={target.kind}>
+        <div className="share-template-preview" data-kind={target.kind} data-garment-list={target.kind === "look" && options.includeGarmentList || undefined}>
           <div className="share-preview-brand">FORMÉ®</div>
           <div className="share-preview-media">
             {target.kind === "look" && <LookPreview look={target.look} garmentById={garmentById} />}
@@ -1795,14 +1855,20 @@ function ShareTemplateDialog({ target, options, garmentById, handle, busy, onOpt
             </span>)}</div>}
           </div>
           {target.kind !== "closet" && options.labelMode !== "none" && <div className="share-preview-copy"><strong>{title}</strong>{options.labelMode === "name-brand" && target.kind === "garment" && target.garment.brand && <span>{target.garment.brand}</span>}</div>}
+          {target.kind === "look" && options.includeGarmentList && <div className="share-preview-look-list" aria-label="Prendas del look">
+            <span>EN ESTE LOOK</span>
+            <ol>{lookGarments.slice(0, 8).map((garment) => <li key={garment.id}><strong>{translateGarmentName(garment.name)}</strong>{garment.brand?.trim() && <small>{garment.brand}</small>}</li>)}</ol>
+            {lookGarments.length > 8 && <small>+{lookGarments.length - 8} prendas</small>}
+          </div>}
           {options.includeHandle && <span className="share-preview-handle">{shareHandle(handle)}</span>}
         </div>
         <div className="share-template-controls">
           <fieldset><legend>Información</legend>
             <label><input type="radio" name="share-label" checked={options.labelMode === "name"} onChange={() => onOptions({ ...options, labelMode: "name" })} /><span>Solo nombre</span></label>
             {target.kind !== "look" && <label><input type="radio" name="share-label" checked={options.labelMode === "name-brand"} onChange={() => onOptions({ ...options, labelMode: "name-brand" })} /><span>Nombre + marca</span></label>}
-            <label><input type="radio" name="share-label" checked={options.labelMode === "none"} onChange={() => onOptions({ ...options, labelMode: "none" })} /><span>Sin información</span></label>
+            <label><input type="radio" name="share-label" checked={options.labelMode === "none"} onChange={() => onOptions({ ...options, labelMode: "none" })} /><span>{target.kind === "look" ? "Sin título" : "Sin información"}</span></label>
           </fieldset>
+          {target.kind === "look" && <label className="share-template-tag share-template-garments"><span><strong>Lista de prendas</strong><small>Aparece debajo del outfit, sin taparlo.</small></span><input type="checkbox" checked={options.includeGarmentList} onChange={(event) => onOptions({ ...options, includeGarmentList: event.target.checked })} /></label>}
           <label className="share-template-tag"><span><strong>Mostrar @usuario</strong><small>Desactívalo para exportar sin tag.</small></span><input type="checkbox" checked={options.includeHandle} onChange={(event) => onOptions({ ...options, includeHandle: event.target.checked })} /></label>
           <button type="button" className="primary-action" disabled={busy} onClick={onExport}>{busy ? "Preparando…" : "Compartir imagen"}</button>
         </div>
@@ -2077,7 +2143,7 @@ export function WardrobeApp({
   const [selectedLookIds, setSelectedLookIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
-  const [shareOptions, setShareOptions] = useState<ShareTemplateOptions>({ labelMode: "name-brand", includeHandle: true });
+  const [shareOptions, setShareOptions] = useState<ShareTemplateOptions>({ labelMode: "name-brand", includeHandle: true, includeGarmentList: false });
   const [shareBusy, setShareBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -3835,7 +3901,7 @@ export function WardrobeApp({
   }
 
   function openShareTemplate(target: ShareTarget) {
-    setShareOptions({ labelMode: target.kind === "look" ? "name" : "name-brand", includeHandle: true });
+    setShareOptions({ labelMode: target.kind === "look" ? "name" : "name-brand", includeHandle: true, includeGarmentList: target.kind === "look" });
     setShareTarget(target);
   }
 

@@ -305,6 +305,10 @@ test("Closet and Looks expose bulk publishing plus configurable social exports",
   assert.match(page, /Nombre \+ marca/);
   assert.match(page, /Sin información/);
   assert.match(page, /Mostrar @usuario/);
+  assert.match(page, /Lista de prendas/);
+  assert.match(page, /Aparece debajo del outfit, sin taparlo\./);
+  assert.match(page, /includeGarmentList: target\.kind === "look"/);
+  assert.match(page, /shareLookGarments/);
   assert.match(page, /createClosetStoryBlob/);
   assert.match(page, /createGarmentStoryBlob/);
 });
