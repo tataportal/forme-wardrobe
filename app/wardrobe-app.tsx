@@ -3294,9 +3294,9 @@ export function WardrobeApp({
     window.history.pushState({ formeRoute: "closet" }, "", "/closet?view=upload");
   }
 
-  function togglePanel(panel: "looks" | "layers") {
-    if (panel === "looks") { setSavedLooksOpen(open => !open); setLayersOpen(false); }
-    else { setLayersOpen(open => !open); setSavedLooksOpen(false); }
+  function selectCanvasLibrary(view: "garments" | "looks") {
+    setSavedLooksOpen(view === "looks");
+    setLayersOpen(false);
   }
 
   function changeLayer(instanceId: string, direction: "up" | "down") {
@@ -3750,7 +3750,6 @@ export function WardrobeApp({
     setActiveLookName(look.name);
     setSaved(true);
     setLockedPieceIds(new Set());
-    setSavedLooksOpen(false);
     // A saved look always belongs to the Looks archive. Even when it is opened
     // from the Canvas side panel, returning to the wardrobe should land there.
     openStudio("looks");
@@ -4624,10 +4623,6 @@ export function WardrobeApp({
           <div className="studio-layout" aria-busy={savingOutfit}>
             <header className="studio-heading">
               <div className="studio-document-name"><label className="sr-only" htmlFor="look-name">Nombre del look</label><input id="look-name" disabled={savingOutfit} value={activeLookName} maxLength={80} onFocus={() => { nameCheckpoint.current = false; }} onChange={event => { if (!nameCheckpoint.current) { checkpoint(); nameCheckpoint.current = true; } setActiveLookName(event.target.value); setSaved(false); }} /><span className="sr-only" aria-live="polite">{savingOutfit ? "Guardando…" : saved ? "Guardado en Looks" : demoMode ? "Borrador en este navegador" : "Borrador"}</span></div>
-              <nav className="canvas-panel-nav" aria-label="Paneles del canvas">
-                <button type="button" className={layersOpen ? "active" : ""} onClick={() => togglePanel("layers")} aria-expanded={layersOpen} aria-controls="canvas-layers" aria-label="Capas" title="Capas"><LookActionIcon action="layers" /><span>Capas</span></button>
-                <button type="button" className={savedLooksOpen ? "active" : ""} onClick={() => togglePanel("looks")} aria-expanded={savedLooksOpen} aria-controls="canvas-saved-looks" aria-label="Looks guardados" title="Looks guardados"><LookActionIcon action="looks" /><span>Looks</span></button>
-              </nav>
             </header>
             <div className="canvas-column">
               <div className={`look-canvas ${canvasPieces.length === 0 ? "is-empty" : "has-pieces"} library-open ${savedLooksOpen ? "saved-looks-open" : ""}`}
@@ -4788,6 +4783,7 @@ export function WardrobeApp({
                 <div className="look-document-actions">
                 <button type="button" className="canvas-core-action new-look-action" aria-label="Nuevo look" onClick={newLook} disabled={savingOutfit} title="Nuevo look"><LookActionIcon action="new" /><span className="canvas-action-label">Nuevo</span></button>
                 <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
+                <button type="button" className={`canvas-core-action layers-action ${layersOpen ? "active" : ""}`} onClick={() => setLayersOpen(open => !open)} aria-expanded={layersOpen} aria-controls="canvas-layers" aria-label="Capas" title="Capas"><LookActionIcon action="layers" /><span className="canvas-action-label">Capas</span></button>
                 <button type="button" className="history-action" aria-label="Deshacer" title="Deshacer · ⌘Z" disabled={!history.current.past.length || savingOutfit} onClick={() => travelHistory("undo")}><LookActionIcon action="undo" /></button>
                 <button type="button" className="history-action" aria-label="Rehacer" title="Rehacer · ⇧⌘Z" disabled={!history.current.future.length || savingOutfit} onClick={() => travelHistory("redo")}><LookActionIcon action="redo" /></button>
                 <div className="canvas-utility-actions" role="group" aria-label="Acciones del look">
@@ -4799,8 +4795,11 @@ export function WardrobeApp({
                 </div>
               </div>
             <div className="studio-library-column">
-            <aside className="look-controls garment-library-panel panel-open" id="canvas-garment-library" aria-label="Prendas y categorías" data-grid-size={canvasGridSize}>
-              <h2>Prendas</h2>
+            <nav className="canvas-library-tabs" role="tablist" aria-label="Biblioteca del canvas">
+              <button type="button" role="tab" id="canvas-garments-tab" aria-selected={!savedLooksOpen} aria-controls="canvas-garment-library" onClick={() => selectCanvasLibrary("garments")}>Prendas</button>
+              <button type="button" role="tab" id="canvas-looks-tab" aria-selected={savedLooksOpen} aria-controls="canvas-saved-looks" onClick={() => selectCanvasLibrary("looks")}>Looks</button>
+            </nav>
+            {!savedLooksOpen && <aside className="look-controls garment-library-panel panel-open" id="canvas-garment-library" role="tabpanel" aria-labelledby="canvas-garments-tab" data-grid-size={canvasGridSize}>
               <div className="library-tools">
               <div className="library-options">
                 {!demoMode && basicsEnabled && <label><span className="sr-only">Colección del canvas</span><select aria-label="Colección del canvas" value={librarySource} onChange={event => setLibrarySource(event.target.value as "personal" | "basics")}>
@@ -4842,10 +4841,9 @@ export function WardrobeApp({
                 </div>}
               </div>
             </aside>
+            }
 
-            {savedLooksOpen && <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} id="canvas-saved-looks" aria-label="Looks">
-              <h2>Looks guardados</h2>
-              <button type="button" className="canvas-panel-close" onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button>
+            {savedLooksOpen && <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} id="canvas-saved-looks" role="tabpanel" aria-labelledby="canvas-looks-tab">
               {savedLooks.length > 0
                 ? <div className="saved-look-panel-list">{savedLooks.map((look) => (
                   <article className={`saved-look-panel-card ${activeOutfitId === look.id ? "active" : ""}`} key={look.id} aria-label={look.name}>

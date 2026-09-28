@@ -257,8 +257,9 @@ test("recent closet order includes uploads that are still processing or need rev
   assert.match(page, /processing-badge failed">Necesita revisión/);
 });
 
-test("Canvas keeps its garment library and iteration actions visible; optional panels start closed", async () => {
+test("Canvas switches between garment and look tabs while layers stay in the bottom toolbar", async () => {
   const html = await (await render("/canvas")).text();
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
   assert.match(html, /Nombre del look/);
   assert.match(html, /id="look-name"/);
   assert.match(html, /Guardar look/);
@@ -270,6 +271,10 @@ test("Canvas keeps its garment library and iteration actions visible; optional p
   assert.doesNotMatch(html, /Ajustar look con IA/);
   assert.match(html, /aria-label="Favoritas"[^>]*aria-pressed="false"/);
   assert.match(html, /aria-label="Tamaño de miniaturas"/);
+  assert.match(html, /role="tablist"[^>]*aria-label="Biblioteca del canvas"/);
+  assert.match(html, /role="tab"[^>]*aria-selected="true"[^>]*>Prendas/);
+  assert.match(page, /role="tab" id="canvas-looks-tab" aria-selected=\{savedLooksOpen\}/);
+  assert.match(page, /className=\{`canvas-core-action layers-action/);
   assert.match(html, /aria-controls="canvas-layers"/);
   assert.match(html, /aria-controls="canvas-saved-looks"/);
   assert.doesNotMatch(html, /<aside[^>]+id="canvas-(layers|saved-looks)"/);
