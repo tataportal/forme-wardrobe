@@ -22,6 +22,8 @@ test("runs garment generation in a persistent Cloudflare Queue", async () => {
   assert.equal(config.limits, undefined, "free-plan deployment must not request a paid CPU override");
   assert.match(workerSource, /async queue\(batch: WardrobeQueueBatch/);
   assert.match(apiSource, /export async function handleGarmentQueue/);
+  assert.match(apiSource, /stage === "batch_monitor"/);
+  assert.match(apiSource, /enqueueBatchMonitor/);
   assert.match(apiSource, /IMAGE_GENERATION_TIMEOUT_MS = 3 \* 60 \* 1000/);
   assert.match(apiSource, /VISUAL_QA_TIMEOUT_MS = 45 \* 1000/);
   assert.match(apiSource, /AbortSignal\.timeout\(VISUAL_QA_TIMEOUT_MS\)/);

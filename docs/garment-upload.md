@@ -31,8 +31,10 @@ no se usa para reconocer ni para generar.
   se detiene antes de la generación. No hay aprobación humana obligatoria.
 - En batch, el reconocimiento y la ficha son inmediatos. Solo las imágenes se
   envían al proveedor batch después de reconocer; se conserva el mismo prompt.
-  La cola también despacha el batch desde el servidor: cerrar la pestaña después
-  de subir las fotos no deja las imágenes esperando a una llamada del navegador.
+  La cola despacha el batch y crea un monitor dedicado en el servidor. Ese
+  monitor consulta al proveedor, reconcilia cada resultado y encola el calado;
+  cerrar la pestaña no detiene ninguna etapa. Cada consulta pendiente crea un
+  mensaje nuevo para no consumir el límite de reintentos de una sola entrega.
 - El catálogo existente y las operaciones internas de importación explícita
   conservan su tratamiento legacy: esta migración no regenera prendas guardadas.
 

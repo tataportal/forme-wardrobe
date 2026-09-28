@@ -58,7 +58,8 @@ export type GarmentQueueMessage = {
   quality: ImageQuality;
   presentation: GarmentPresentation;
   outputVariant: GarmentOutputVariant;
-  stage?: "recognize" | "metadata" | "batch" | "generate" | "postprocess";
+  stage?: "recognize" | "metadata" | "batch" | "batch_monitor" | "generate" | "postprocess";
+  batchId?: string;
   recognitionSourceKey?: string;
   generatedKey?: string;
   maskAttempt?: number;
@@ -190,8 +191,9 @@ function isGarmentQueueMessage(value: unknown): value is GarmentQueueMessage {
     && ["low", "medium", "high"].includes(message.quality || "")
     && ["auto", "closed", "open"].includes(message.presentation || "")
     && ["closed", "open"].includes(message.outputVariant || "")
-    && (!message.stage || ["recognize", "metadata", "batch", "generate", "postprocess"].includes(message.stage))
+    && (!message.stage || ["recognize", "metadata", "batch", "batch_monitor", "generate", "postprocess"].includes(message.stage))
     && (message.stage !== "metadata" || typeof message.recognitionSourceKey === "string")
+    && (message.stage !== "batch_monitor" || typeof message.batchId === "string")
     && (message.stage !== "postprocess" || typeof message.generatedKey === "string")
     && (message.maskAttempt === undefined || (Number.isInteger(message.maskAttempt) && message.maskAttempt >= 0 && message.maskAttempt <= 2));
 }
@@ -203,6 +205,10 @@ async function enqueueGarmentJob(
 ): Promise<void> {
   if (!env.GARMENT_JOBS) throw new Error("La cola de procesamiento no está conectada.");
   await env.GARMENT_JOBS.send(message, options);
+}
+
+async function enqueueBatchMonitor(env: WardrobeEnv, message: GarmentQueueMessage): Promise<void> {
+  await enqueueGarmentJob(env, { ...message, stage: "batch_monitor" }, { delaySeconds: 60 });
 }
 
 type UserProfileRow = {
@@ -2040,6 +2046,28 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
       message.retry({ delaySeconds: 60 });
       return;
     }
+    if (payload.stage === "batch_monitor") {
+      try {
+        const deferred: Promise<unknown>[] = [];
+        const response = await reconcileGarmentBatches(
+          env,
+          { waitUntil(promise) { deferred.push(promise); } },
+          db,
+          { id: payload.ownerId, email: "", displayName: "", avatarUrl: null },
+          payload.batchId,
+        );
+        await Promise.allSettled(deferred);
+        const result = await response.json() as { batches?: Array<{ id: string; status: string }> };
+        const current = result.batches?.find(item => item.id === payload.batchId);
+        if (current && !["completed", "failed", "expired", "cancelled"].includes(current.status)) {
+          await enqueueBatchMonitor(env, payload);
+        }
+        message.ack();
+      } catch {
+        message.retry({ delaySeconds: 60 });
+      }
+      return;
+    }
     if (payload.stage === "batch") {
       try {
         const rows = await db.prepare(`SELECT g.client_id FROM intake_batch_items i
@@ -2634,12 +2662,33 @@ async function createGarmentBatch(
   if (candidates.some(item => item && item.recognition_status !== "legacy" && item.recognition_status !== "failed" && !sourceRecognition(item))) {
     return json({ recognizing: true }, 202);
   }
-  const candidateJobs = await Promise.all(candidates.filter((item): item is GarmentRow => Boolean(item) && !item?.deleted).map(item =>
-    db.prepare("SELECT id, status, batch_id FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
-      .bind(item.id, identity.id).first<{ id: string; status: string; batch_id: string | null }>()));
+  const activeCandidates = candidates.filter((item): item is GarmentRow => Boolean(item) && !item?.deleted);
+  const candidateJobs = await Promise.all(activeCandidates.map(item =>
+    db.prepare("SELECT id, status, batch_id, quality, presentation, output_variant FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+      .bind(item.id, identity.id).first<{
+        id: string;
+        status: string;
+        batch_id: string | null;
+        quality: string;
+        presentation: string;
+        output_variant: string;
+      }>()));
   if (candidateJobs.some(job => job && ["queued", "processing"].includes(job.status))) return json({ recognizing: true }, 202);
-  const submitted = candidateJobs.find(job => job?.batch_id);
-  if (submitted && candidateJobs.every(job => job?.batch_id === submitted.batch_id)) return json({ batch: { id: submitted.batch_id, status: submitted.status } }, 202);
+  const submittedIndex = candidateJobs.findIndex(job => Boolean(job?.batch_id));
+  const submitted = submittedIndex >= 0 ? candidateJobs[submittedIndex] : null;
+  if (submitted?.batch_id && candidateJobs.every(job => job?.batch_id === submitted.batch_id)) {
+    const garment = activeCandidates[submittedIndex];
+    await enqueueBatchMonitor(env, {
+      ownerId: identity.id,
+      garmentId: garment.id,
+      jobId: submitted.id,
+      quality: imageQuality(submitted.quality),
+      presentation: garmentPresentation(submitted.presentation),
+      outputVariant: submitted.output_variant === "open" ? "open" : "closed",
+      batchId: submitted.batch_id,
+    });
+    return json({ batch: { id: submitted.batch_id, status: submitted.status } }, 202);
+  }
 
   const batchItems: Array<{ garment: GarmentRow; job: { id: string; quality: ImageQuality; presentation: GarmentPresentation; outputVariant: GarmentOutputVariant }; fileId: string }> = [];
   const sourceFileIds = new Set<string>();
@@ -2711,6 +2760,22 @@ async function createGarmentBatch(
       db.prepare("UPDATE garments SET status = 'batch_processing', quality = 'low', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
         .bind(garment.id, identity.id),
     ]));
+    const monitorSeed = batchItems[0];
+    try {
+      await enqueueBatchMonitor(env, {
+        ownerId: identity.id,
+        garmentId: monitorSeed.garment.id,
+        jobId: monitorSeed.job.id,
+        quality: monitorSeed.job.quality,
+        presentation: monitorSeed.job.presentation,
+        outputVariant: monitorSeed.job.outputVariant,
+        batchId: result.id,
+      });
+    } catch {
+      // The provider batch already exists. Returning an error makes the queue
+      // retry this submission, which reuses batch_id and only repairs monitoring.
+      return apiError("El lote fue creado, pero falta activar su monitor.", 503);
+    }
     return json({ batch: { id: result.id, status: result.status || "validating", garments: garmentIds.length, requests: batchItems.length } }, 202);
   } catch (error) {
     for (const fileId of sourceFileIds) ctx.waitUntil(deleteOpenAIFile(env, fileId));
@@ -2736,25 +2801,37 @@ async function reconcileGarmentBatches(
   ctx: WardrobeExecutionContext,
   db: D1Database,
   identity: Identity,
+  onlyBatchId?: string,
 ): Promise<Response> {
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return json({ batches: [] });
-  const pending = await db.prepare(`
-    SELECT DISTINCT batch_id FROM processing_jobs
-    WHERE owner_id = ? AND batch_id IS NOT NULL AND status = 'batch_processing'
-  `).bind(identity.id).all<{ batch_id: string }>();
+  const pending = onlyBatchId
+    ? await db.prepare(`
+      SELECT DISTINCT batch_id FROM processing_jobs
+      WHERE owner_id = ? AND batch_id = ? AND status = 'batch_processing'
+    `).bind(identity.id, onlyBatchId).all<{ batch_id: string }>()
+    : await db.prepare(`
+      SELECT DISTINCT batch_id FROM processing_jobs
+      WHERE owner_id = ? AND batch_id IS NOT NULL AND status = 'batch_processing'
+    `).bind(identity.id).all<{ batch_id: string }>();
   const summaries: Array<{ id: string; status: string }> = [];
   for (const { batch_id: batchId } of pending.results) {
     const response = await fetch(`https://api.openai.com/v1/batches/${encodeURIComponent(batchId)}`, {
       headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
     });
     const batch = await response.json() as { status?: string; output_file_id?: string | null; error_file_id?: string | null; input_file_id?: string; errors?: { data?: Array<{ message?: string }> } };
-    if (!response.ok) continue;
+    if (!response.ok) {
+      if (onlyBatchId) throw new RetryableProcessingError(`No se pudo consultar el lote (${response.status}).`);
+      continue;
+    }
     summaries.push({ id: batchId, status: batch.status || "unknown" });
     if (batch.status === "completed" && batch.output_file_id) {
       const outputResponse = await fetch(`https://api.openai.com/v1/files/${encodeURIComponent(batch.output_file_id)}/content`, {
         headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
       });
-      if (!outputResponse.ok) continue;
+      if (!outputResponse.ok) {
+        if (onlyBatchId) throw new RetryableProcessingError(`No se pudo descargar el resultado del lote (${outputResponse.status}).`);
+        continue;
+      }
       const lines = (await outputResponse.text()).split(/\r?\n/).filter(Boolean);
       for (const line of lines) {
         let item: { custom_id?: string; response?: { status_code?: number; body?: { data?: Array<{ b64_json?: string }>; usage?: ImageGenerationUsage; error?: { message?: string } } }; error?: { message?: string } };

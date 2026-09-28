@@ -24,7 +24,7 @@ async function harness(t, result = recognized()) {
   const sql = new DatabaseSync(":memory:");
   t.after(() => sql.close());
   migrations.forEach(migration => sql.exec(migration));
-  let failMetadata = false, failGeneration = false;
+  let failMetadata = false, failGeneration = false, batchStatus = "validating";
   const db = {
     prepare(query) {
       const statement = sql.prepare(query); let args = [];
@@ -96,6 +96,27 @@ async function harness(t, result = recognized()) {
       calls.push("file"); return Response.json({ id: `file-${calls.length}` });
     }
     if (url.endsWith("/batches")) { calls.push("batch"); return Response.json({ id: "batch-test", status: "validating" }); }
+    if (url.endsWith("/batches/batch-test")) return Response.json({
+      id: "batch-test",
+      status: batchStatus,
+      input_file_id: "batch-input-file",
+      output_file_id: batchStatus === "completed" ? "batch-output-file" : null,
+    });
+    if (url.endsWith("/files/batch-output-file/content")) {
+      const jobs = sql.prepare("SELECT id FROM processing_jobs WHERE batch_id = 'batch-test' AND status = 'batch_processing'").all();
+      const output = jobs.map(job => JSON.stringify({
+        custom_id: job.id,
+        response: {
+          status_code: 200,
+          body: {
+            data: [{ b64_json: Buffer.from("batch-master").toString("base64") }],
+            usage: { input_tokens_details: { image_tokens: 1000, text_tokens: 200 }, output_tokens: 300 },
+          },
+        },
+      })).join("\n");
+      return new Response(output);
+    }
+    if (options?.method === "DELETE" && url.includes("/files/")) return Response.json({ deleted: true });
     throw new Error(`Unexpected provider call: ${url}`);
   });
   const api = async (path, options = {}) => {
@@ -121,7 +142,12 @@ async function harness(t, result = recognized()) {
     return { ack, retry };
   };
   const row = id => sql.prepare("SELECT * FROM garments WHERE client_id = ?").get(id);
-  return { sql, env, queued, calls, prompts, api, upload, deliver, row, failMetadata(value) { failMetadata = value; }, failGeneration(value) { failGeneration = value; } };
+  return {
+    sql, env, queued, calls, prompts, api, upload, deliver, row,
+    failMetadata(value) { failMetadata = value; },
+    failGeneration(value) { failGeneration = value; },
+    setBatchStatus(value) { batchStatus = value; },
+  };
 }
 
 test("Canvas placement uses the garment image, structured output and exact model cost", async t => {
@@ -256,6 +282,33 @@ test("batch recognition is immediate and batch generation uses the same cached p
   const count = h.calls.length;
   assert.equal((await request()).body.batch.id, "batch-test");
   assert.equal(h.calls.length, count, "replaying batch submission must not buy more images");
+});
+
+test("the batch controller reconciles provider output without an open browser", async t => {
+  const h = await harness(t), first = await h.upload("batch"), second = await h.upload("batch");
+  await h.deliver(h.queued.shift());
+  await h.deliver(h.queued.shift());
+  const response = await h.api("/api/batches", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ garmentIds: [first, second] }),
+  });
+  assert.equal(response.body.batch.id, "batch-test");
+  const monitor = h.queued.find(message => message.stage === "batch_monitor");
+  assert.equal(monitor.batchId, "batch-test");
+
+  const pending = await h.deliver(monitor);
+  assert.equal(pending.ack, true);
+  assert.equal(pending.retry, false);
+  const nextMonitor = h.queued.filter(message => message.stage === "batch_monitor").at(-1);
+  assert.notEqual(nextMonitor, monitor, "a pending provider batch schedules a fresh monitor without exhausting queue retries");
+
+  h.setBatchStatus("completed");
+  await h.deliver(nextMonitor);
+  assert.ok(h.row(first).generated_image_key);
+  assert.ok(h.row(second).generated_image_key);
+  assert.equal(h.sql.prepare("SELECT COUNT(*) AS count FROM processing_jobs WHERE batch_id = 'batch-test' AND stage = 'postprocess' AND status = 'queued'").get().count, 2);
+  assert.equal(h.queued.filter(message => message.stage === "postprocess").length, 2);
 });
 
 test("unrecognizable photos fail before spending on generation", async t => {
