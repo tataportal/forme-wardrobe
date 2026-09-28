@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formeBasics, type Garment } from "./garments";
+import { starterGarments, type Garment } from "./garments";
+import { REFERENCE_FRAME, slotPlacement } from "./garment-layout";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const garmentFor = (id: string) => starterGarments.find((item) => item.id === id) ?? starterGarments[0];
 const imageFor = (id: string) => {
-  const garment = formeBasics.find((item) => item.id === id) ?? formeBasics[0];
+  const garment = garmentFor(id);
   return garment ? `${basePath}${garment.image}` : "";
 };
 
 const steps = [
   {
     label: "Tu cuenta",
-    title: "Tu closet empieza acá.",
-    body: "Sube tus prendas. Formé las prepara para que puedas verlas, ordenarlas y combinarlas.",
+    title: "Tu ropa. Leída de nuevo.",
+    body: "Empieza con lo que ya tienes. Sube una prenda y conviértela en parte de tu closet digital.",
   },
   {
     label: "Tus fotos",
@@ -33,15 +35,38 @@ const steps = [
 ] as const;
 
 function GarmentImage({ id, className = "" }: { id: string; className?: string }) {
-  const garment = formeBasics.find((item) => item.id === id) as Garment | undefined;
+  const garment = garmentFor(id) as Garment | undefined;
   return <img className={className} src={imageFor(id)} alt={garment?.name ?? "Prenda de ejemplo"} />;
 }
 
+type TourPiece = { id: string; variant?: "closed" | "open"; z: number };
+
+function TourLook({ pieces }: { pieces: TourPiece[] }) {
+  return <div className="product-tour-stage" aria-hidden="true">
+    {pieces.map(({ id, variant = "closed", z }) => {
+      const garment = garmentFor(id);
+      if (!garment) return null;
+      const resolvedVariant = variant === "open" && garment.openImage ? "open" : "closed";
+      const placement = slotPlacement(garment, resolvedVariant, REFERENCE_FRAME);
+      const source = resolvedVariant === "open" ? garment.openImage! : garment.image;
+      return <img key={`${id}-${resolvedVariant}`} src={`${basePath}${source}`} alt="" style={{
+        left: `${placement.x}%`,
+        top: `${placement.y}%`,
+        zIndex: z,
+        transform: `translate(-50%, -50%) scale(${placement.scale})`,
+      }} />;
+    })}
+  </div>;
+}
+
 function TourVisual({ step }: { step: number }) {
-  if (step === 0) return <div className="product-tour-welcome" aria-hidden="true">
-    <GarmentImage id="demo-w-003" />
-    <GarmentImage id="top-basic-white-tee" />
-    <GarmentImage id="bottom-blue-jeans" />
+  if (step === 0) return <div className="product-tour-welcome">
+    <TourLook pieces={[
+      { id: "demo-w-023", z: 1 },
+      { id: "demo-w-012", z: 2 },
+      { id: "demo-w-034", z: 3 },
+      { id: "demo-w-043", z: 4 },
+    ]} />
   </div>;
 
   if (step === 1) return <div className="product-tour-photo" aria-hidden="true">
@@ -50,17 +75,19 @@ function TourVisual({ step }: { step: number }) {
   </div>;
 
   if (step === 2) return <div className="product-tour-canvas" aria-hidden="true">
-    <GarmentImage id="bottom-blue-jeans" className="tour-look-bottom" />
-    <GarmentImage id="top-basic-white-tee" className="tour-look-top" />
-    <GarmentImage id="demo-w-002" className="tour-look-outer" />
-    <GarmentImage id="footwear-white-sneakers" className="tour-look-shoes" />
+    <TourLook pieces={[
+      { id: "bottom-blue-jeans", z: 1 },
+      { id: "top-basic-white-tee", z: 2 },
+      { id: "archive-002", variant: "open", z: 3 },
+      { id: "footwear-white-sneakers", z: 4 },
+    ]} />
     <span className="tour-canvas-frame" />
   </div>;
 
   return <div className="product-tour-looks" aria-hidden="true">
-    <div><GarmentImage id="demo-w-001" /><GarmentImage id="bottom-black-trouser" /><GarmentImage id="footwear-black-pumps" /></div>
-    <div><GarmentImage id="demo-w-003" /><GarmentImage id="bottom-blue-jeans" /><GarmentImage id="footwear-white-sneakers" /></div>
-    <div><GarmentImage id="demo-w-004" /><GarmentImage id="bottom-stone-chino" /><GarmentImage id="accessory-black-tote" /></div>
+    <TourLook pieces={[{ id: "demo-w-023", z: 1 }, { id: "demo-w-012", z: 2 }, { id: "demo-w-034", z: 3 }]} />
+    <TourLook pieces={[{ id: "bottom-blue-jeans", z: 1 }, { id: "top-basic-white-tee", z: 2 }, { id: "archive-002", variant: "open", z: 3 }, { id: "footwear-white-sneakers", z: 4 }]} />
+    <TourLook pieces={[{ id: "demo-w-024", z: 1 }, { id: "demo-w-014", z: 2 }, { id: "demo-w-037", z: 3 }, { id: "demo-w-043", z: 4 }]} />
   </div>;
 }
 
@@ -121,7 +148,7 @@ export function ProductOnboarding({
   };
 
   const current = steps[step];
-  const currentTitle = step === 0 && authenticated && alreadyCompleted ? "Todo tu closet. Nuevas combinaciones." : current.title;
+  const currentTitle = step === 0 && authenticated && alreadyCompleted ? "Tu ropa. Nuevas posibilidades." : current.title;
   return <div className="product-tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-tour-title">
     <section className="product-tour-shell">
       <header className="product-tour-header">
@@ -147,7 +174,7 @@ export function ProductOnboarding({
           <span>{current.label}</span>
           <h1 id="product-tour-title">{currentTitle}</h1>
           <p>{current.body}</p>
-          {step === 0 && <small>{authenticated ? alreadyCompleted ? "Tu saldo está activo y puedes volver a este tutorial cuando quieras." : "Ya estás dentro. Tus 10 créditos están activos." : "Al registrarte recibes 10 créditos."}</small>}
+          {step === 0 && <small>{authenticated ? alreadyCompleted ? "Tu saldo está activo. Este recorrido siempre estará disponible desde tu cuenta." : "10 créditos incluidos · +5 al completar el recorrido." : "10 créditos al registrarte · +5 al completar el recorrido."}</small>}
           {step === 3 && !reward && <small>Completa este recorrido y recibe 5 créditos adicionales.</small>}
           {reward && <div className="product-tour-reward" role="status"><strong>+5</strong><span>{reward.rewarded ? "créditos añadidos" : "créditos ya activados"}</span><small>Saldo: {reward.credits}</small></div>}
           {error && <p className="product-tour-error" role="alert">{error}</p>}

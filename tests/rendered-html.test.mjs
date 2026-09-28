@@ -340,9 +340,10 @@ test("Profile exposes a private closet reading based on real garments and saved 
 });
 
 test("new users receive the product onboarding and its server-verified reward", async () => {
-  const [page, onboarding, worker] = await Promise.all([
+  const [page, onboarding, onboardingCss, worker] = await Promise.all([
     readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/product-onboarding.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-pilot.css", import.meta.url), "utf8"),
     readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
   ]);
   assert.match(page, /<ProductOnboarding/);
@@ -353,6 +354,9 @@ test("new users receive the product onboarding and its server-verified reward", 
   assert.match(onboarding, /Buena|Luz pareja/);
   assert.match(onboarding, /Prenda completa/);
   assert.match(onboarding, /Extendida y de frente/);
+  assert.match(onboarding, /slotPlacement\(garment, resolvedVariant, REFERENCE_FRAME\)/);
+  assert.match(onboardingCss, /\.product-tour-stage img/);
+  assert.doesNotMatch(onboardingCss, /\.product-tour-welcome img:nth-child/);
   assert.match(onboarding, /Completar y recibir 5/);
   assert.match(worker, /VALUES \(\?, \?, 'grant', 10, 'trial'/);
   assert.match(worker, /VALUES \(\?, \?, 'grant', 5, 'onboarding'/);
