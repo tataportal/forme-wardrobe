@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 type OnboardingStep = { label: string; title: string; body: string; captureLabel: string; capture: string | null };
 
@@ -72,12 +72,43 @@ export function ProductOnboarding({
   const [claiming, setClaiming] = useState(false);
   const [reward, setReward] = useState<{ rewarded: boolean; credits: number } | null>(null);
   const [error, setError] = useState("");
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const motionFrame = useRef<number | null>(null);
 
   useEffect(() => {
     const previous = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
-    return () => { document.documentElement.style.overflow = previous; };
+    return () => {
+      document.documentElement.style.overflow = previous;
+      if (motionFrame.current !== null) cancelAnimationFrame(motionFrame.current);
+    };
   }, []);
+
+  const moveTour = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch" || !layoutRef.current) return;
+    const layout = layoutRef.current;
+    const rect = layout.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const dx = (x / rect.width - 0.5) * 34;
+    const dy = (y / rect.height - 0.5) * 24;
+    if (motionFrame.current !== null) cancelAnimationFrame(motionFrame.current);
+    motionFrame.current = requestAnimationFrame(() => {
+      layout.style.setProperty("--tour-guide-x", `${x}px`);
+      layout.style.setProperty("--tour-guide-y", `${y}px`);
+      layout.style.setProperty("--tour-photo-x", `${dx}px`);
+      layout.style.setProperty("--tour-photo-y", `${dy}px`);
+    });
+  };
+
+  const resetTour = () => {
+    const layout = layoutRef.current;
+    if (!layout) return;
+    layout.style.removeProperty("--tour-guide-x");
+    layout.style.removeProperty("--tour-guide-y");
+    layout.style.removeProperty("--tour-photo-x");
+    layout.style.removeProperty("--tour-photo-y");
+  };
 
   const next = () => {
     if (step === 0 && !authenticated) {
@@ -115,7 +146,7 @@ export function ProductOnboarding({
         <button type="button" onClick={onDismiss}>Ahora no</button>
       </header>
 
-      <div className="product-tour-layout" key={step}>
+      <div ref={layoutRef} className="product-tour-layout" key={step} onPointerMove={moveTour} onPointerLeave={resetTour}>
         <aside className="product-tour-index" aria-label="Pasos del tutorial">
           {steps.map((item, index) => <button
             key={item.label}

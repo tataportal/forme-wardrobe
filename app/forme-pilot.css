@@ -608,9 +608,11 @@
 .product-tour-header sup { margin-left: 2px; color: var(--fs-signal); font-size: 7px; vertical-align: top; }
 .product-tour-header span { color: #666660; font-size: 10px; font-variant-numeric: tabular-nums; }
 .product-tour-header button { justify-self: end; min-height: 44px; padding: 0; border: 0; background: none; color: #555550; font-size: 11px; cursor: pointer; }
-.product-tour-layout { min-height: 0; position: relative; overflow: hidden; border-top: 1px dotted #aaa9a3; }
-.product-tour-layout::before { content: ""; position: absolute; z-index: 0; inset: 0; pointer-events: none; background: linear-gradient(90deg,transparent calc(74% - .5px),#aaa9a3 calc(74% - .5px),#aaa9a3 calc(74% + .5px),transparent calc(74% + .5px)),linear-gradient(180deg,transparent calc(28% - .5px),#aaa9a3 calc(28% - .5px),#aaa9a3 calc(28% + .5px),transparent calc(28% + .5px)); opacity: .72; }
-.product-tour-visual { width: clamp(270px,31vw,560px); position: absolute; z-index: 3; top: clamp(36px,6vh,78px); right: clamp(34px,7vw,140px); }
+.product-tour-layout { --tour-guide-x:74%; --tour-guide-y:28%; --tour-photo-x:0px; --tour-photo-y:0px; min-height: 0; position: relative; overflow: hidden; border-top: 1px dotted #aaa9a3; }
+.product-tour-layout::before,.product-tour-layout::after { content: ""; position: absolute; z-index: 0; pointer-events: none; background: #aaa9a3; opacity: .72; transition: left .16s cubic-bezier(.2,.7,.2,1),top .16s cubic-bezier(.2,.7,.2,1); }
+.product-tour-layout::before { width: 1px; top: 0; bottom: 0; left: var(--tour-guide-x); }
+.product-tour-layout::after { height: 1px; left: 0; right: 0; top: var(--tour-guide-y); }
+.product-tour-visual { width: clamp(270px,31vw,560px); position: absolute; z-index: 3; top: clamp(36px,6vh,78px); right: clamp(34px,7vw,140px); transform: translate3d(var(--tour-photo-x),var(--tour-photo-y),0); transition: transform .28s cubic-bezier(.2,.7,.2,1); will-change: transform; }
 .product-tour-capture { width: 100%; margin: 0; }
 .product-tour-capture-slot,.product-tour-capture img { width: 100%; aspect-ratio: 16/10; display: block; object-fit: cover; }
 .product-tour-capture-slot { position: relative; overflow: hidden; padding: 18px; border: 1px solid #b9b9b3; background: #deded8; display: grid; align-content: space-between; }
@@ -641,6 +643,9 @@
 @media (prefers-reduced-motion:no-preference) {
   .product-tour-copy h1 { animation: forme-tour-title .58s var(--fs-ease) both; }
   .product-tour-capture { animation: forme-tour-capture .52s var(--fs-ease) both; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .product-tour-layout::before,.product-tour-layout::after,.product-tour-visual { transition: none; }
 }
 @keyframes forme-tour-title { from { opacity: 0; transform: translateY(36px); } }
 @keyframes forme-tour-capture { from { opacity: 0; transform: translateY(-22px); } }
@@ -761,8 +766,7 @@
   .product-tour-shell { width: 100%; height: 100dvh; grid-template-rows: 56px minmax(0,1fr); }
   .product-tour-header { padding: 0 18px; border-bottom: 0; background: #f4f4f1; }
   .product-tour-header strong { font-size: 21px; }
-  .product-tour-layout { overflow-y: auto; border-top: 1px dotted #aaa9a3; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(240px,39dvh) auto 38px; grid-template-areas: "visual" "copy" "index"; }
-  .product-tour-layout::before { background: linear-gradient(90deg,transparent calc(72% - .5px),#aaa9a3 calc(72% - .5px),#aaa9a3 calc(72% + .5px),transparent calc(72% + .5px)),linear-gradient(180deg,transparent calc(22% - .5px),#aaa9a3 calc(22% - .5px),#aaa9a3 calc(22% + .5px),transparent calc(22% + .5px)); }
+  .product-tour-layout { --tour-guide-x:72%; --tour-guide-y:22%; overflow-y: auto; border-top: 1px dotted #aaa9a3; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(240px,39dvh) auto 38px; grid-template-areas: "visual" "copy" "index"; }
   .product-tour-visual { grid-area: visual; width: min(74vw,430px); position: relative; z-index: 3; top: auto; right: auto; align-self: center; justify-self: end; margin-right: 18px; }
   .product-tour-capture-slot { padding: 12px; }
   .product-tour-capture-slot strong { font-size: 16px; }

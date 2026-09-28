@@ -360,6 +360,10 @@ test("new users receive the product onboarding and its server-verified reward", 
   assert.match(onboarding, /captureLabel: "Looks \/ combinaciones"/);
   assert.match(onboardingCss, /\.product-tour-capture-slot/);
   assert.doesNotMatch(onboarding, /slotPlacement/);
+  assert.match(onboarding, /onPointerMove=\{moveTour\}/);
+  assert.match(onboarding, /--tour-guide-x/);
+  assert.match(onboardingCss, /left: var\(--tour-guide-x\)/);
+  assert.match(onboardingCss, /translate3d\(var\(--tour-photo-x\),var\(--tour-photo-y\),0\)/);
   assert.match(onboarding, /Completar y recibir 5/);
   assert.match(worker, /VALUES \(\?, \?, 'grant', 10, 'trial'/);
   assert.match(worker, /VALUES \(\?, \?, 'grant', 5, 'onboarding'/);
