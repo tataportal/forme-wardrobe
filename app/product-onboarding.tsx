@@ -147,7 +147,7 @@ export function ProductOnboarding({
           <span>{current.label}</span>
           <h1 id="product-tour-title">{current.title}</h1>
           <p>{current.body}</p>
-          {step === 0 && <small>{authenticated ? "Ya estás dentro. Tus 10 créditos están activos." : "Al registrarte recibes 10 créditos."}</small>}
+          {step === 0 && <small>{authenticated ? alreadyCompleted ? "Tu saldo está activo y puedes volver a este tutorial cuando quieras." : "Ya estás dentro. Tus 10 créditos están activos." : "Al registrarte recibes 10 créditos."}</small>}
           {step === 3 && !reward && <small>Completa este recorrido y recibe 5 créditos adicionales.</small>}
           {reward && <div className="product-tour-reward" role="status"><strong>+5</strong><span>{reward.rewarded ? "créditos añadidos" : "créditos ya activados"}</span><small>Saldo: {reward.credits}</small></div>}
           {error && <p className="product-tour-error" role="alert">{error}</p>}

@@ -1,4 +1,5 @@
 import { productFeatures } from "./product-features";
+import { AccountCredits } from "./account-credits";
 
 type ProductRoute = "closet" | "looks" | "asistente";
 type PrimaryDestination = "closet" | "canvas" | "looks" | "asistente";
@@ -10,6 +11,10 @@ type FormeAppHeaderProps = {
   demoMode: boolean;
   profileImage: string;
   profileImageClass: string;
+  credits?: number;
+  creditsUsed?: number;
+  onboardingCompleted?: boolean;
+  onTutorial: () => void;
   onNavigate: (route: ProductRoute | "perfil") => void;
   onOpenCanvas: () => void;
   onSignIn: () => void;
@@ -29,6 +34,10 @@ export function FormeAppHeader({
   demoMode,
   profileImage,
   profileImageClass,
+  credits,
+  creditsUsed,
+  onboardingCompleted,
+  onTutorial,
   onNavigate,
   onOpenCanvas,
   onSignIn,
@@ -70,6 +79,8 @@ export function FormeAppHeader({
             </button>
           ) : (
             <div className="topbar-account">
+              <button type="button" className="tutorial-trigger" onClick={onTutorial} aria-label="Abrir tutorial">?</button>
+              <AccountCredits credits={credits} creditsUsed={creditsUsed} onboardingCompleted={onboardingCompleted} onTutorial={onTutorial} />
               <button className="avatar" onClick={() => onNavigate("perfil")} aria-label="Abrir mi perfil">
                 <img className={profileImageClass} src={profileImage} alt="" />
               </button>

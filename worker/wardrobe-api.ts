@@ -1862,6 +1862,8 @@ async function finalizeGeneratedGarment(
   await db.prepare(`UPDATE garments SET qa_status = 'passed', qa_notes = 'Preparando calados.', updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND owner_id = ? AND (generated_image_key = ? OR generated_open_image_key = ?)`)
     .bind(garment.id, garment.owner_id, generatedKey, generatedKey).run();
+  await db.prepare(`UPDATE processing_jobs SET qa_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND owner_id = ?`).bind(jobId, garment.owner_id).run();
 
   let cutouts: StoredCutouts;
   try {
@@ -1968,7 +1970,7 @@ async function finalizeGeneratedGarment(
     garmentUpdate,
     db.prepare(`
       UPDATE processing_jobs
-      SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP,
+      SET status = 'succeeded', cutout_at = CURRENT_TIMESTAMP, finished_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP, error = NULL
       WHERE id = ? AND owner_id = ?
     `).bind(jobId, garment.owner_id),
@@ -2088,7 +2090,8 @@ async function processGarment(
       generatedUpdate,
       db.prepare(`
         UPDATE processing_jobs
-        SET status = 'queued', stage = 'postprocess', generated_key = ?, updated_at = CURRENT_TIMESTAMP, error = NULL
+        SET status = 'queued', stage = 'postprocess', generated_key = ?, generated_at = CURRENT_TIMESTAMP,
+          qa_at = NULL, cutout_at = NULL, updated_at = CURRENT_TIMESTAMP, error = NULL
         WHERE id = ? AND owner_id = ?
       `).bind(generatedKey, jobId, ownerId),
     ]);
@@ -2492,7 +2495,8 @@ async function attachCutout(
   await db.batch([
     imageUpdate,
     db.prepare(`
-      UPDATE processing_jobs SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, error = NULL
+      UPDATE processing_jobs SET status = 'succeeded', qa_at = CURRENT_TIMESTAMP, cutout_at = CURRENT_TIMESTAMP,
+        finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, error = NULL
       WHERE garment_id = ? AND owner_id = ? AND output_variant = ? AND status = 'awaiting_cutout'
     `).bind(garment.id, identity.id, outputVariant),
   ]);
@@ -3007,7 +3011,8 @@ async function reconcileGarmentBatches(
           `).bind(outputVariant, generatedKey, outputVariant, generatedKey, garment.id, identity.id),
           db.prepare(`
             UPDATE processing_jobs
-            SET status = 'queued', stage = 'postprocess', generated_key = ?, attempt = MAX(attempt, 1), updated_at = CURRENT_TIMESTAMP, error = NULL
+            SET status = 'queued', stage = 'postprocess', generated_key = ?, generated_at = CURRENT_TIMESTAMP,
+              qa_at = NULL, cutout_at = NULL, attempt = MAX(attempt, 1), updated_at = CURRENT_TIMESTAMP, error = NULL
             WHERE id = ? AND owner_id = ?
           `)
             .bind(generatedKey, job.id, identity.id),

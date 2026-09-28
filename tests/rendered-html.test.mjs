@@ -348,6 +348,8 @@ test("new users receive the product onboarding and its server-verified reward", 
   assert.match(page, /<ProductOnboarding/);
   assert.match(page, /\/api\/onboarding\/complete/);
   assert.match(page, /Cómo usar Formé/);
+  assert.match(page, /creditsUsed/);
+  assert.match(page, /onTutorial=\{openProductOnboarding\}/);
   assert.match(onboarding, /Buena|Luz pareja/);
   assert.match(onboarding, /Prenda completa/);
   assert.match(onboarding, /Extendida y de frente/);
@@ -355,6 +357,23 @@ test("new users receive the product onboarding and its server-verified reward", 
   assert.match(worker, /VALUES \(\?, \?, 'grant', 10, 'trial'/);
   assert.match(worker, /VALUES \(\?, \?, 'grant', 5, 'onboarding'/);
   assert.doesNotMatch(worker, /VALUES \(\?, \?, 'grant', 5, 'trial-topup'/);
+});
+
+test("pipeline admin uses ledger costs and real stage timestamps", async () => {
+  const [admin, worker, shell] = await Promise.all([
+    readFile(new URL("../worker/admin-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/forme-app-shell.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(admin, /FROM ai_usage_events/);
+  assert.match(admin, /usage_cost_microusd/);
+  assert.match(admin, /row\.generated_at/);
+  assert.match(admin, /row\.qa_at/);
+  assert.match(admin, /row\.cutout_at/);
+  assert.match(worker, /generated_at = CURRENT_TIMESTAMP/);
+  assert.match(worker, /qa_at = CURRENT_TIMESTAMP/);
+  assert.match(worker, /cutout_at = CURRENT_TIMESTAMP/);
+  assert.match(shell, /<AccountCredits/);
 });
 
 test("pricing sells only implemented product capabilities", async () => {

@@ -51,6 +51,19 @@
 .forme-app .zone-nav button.active::after { content: none; }
 .forme-app .topbar-actions { justify-self: end; gap: 16px; }
 .forme-app .topbar-account { display: flex; align-items: center; gap: 16px; }
+.forme-app .tutorial-trigger { width: 32px; height: 32px; padding: 0; border: 1px solid var(--fs-line); border-radius: 50%; background: transparent; color: var(--fs-ink); font: 500 13px/1 var(--fs-font); cursor: pointer; }
+.account-credits { position: relative; }
+.credits-trigger { min-height: 34px; padding: 0; border: 0; background: transparent; color: var(--fs-ink); display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 var(--fs-font); cursor: pointer; }
+.credits-trigger > span { color: var(--fs-signal); font-size: 8px; }
+.credits-trigger strong { font: inherit; }
+.credits-trigger em { font: inherit; font-style: normal; color: var(--fs-muted); }
+.credits-summary { width: 250px; position: absolute; z-index: 140; top: calc(100% + 12px); right: 0; padding: 18px; border: 1px solid var(--fs-line); background: var(--fs-paper); box-shadow: 0 18px 45px rgb(20 22 18 / .12); }
+.credits-summary header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.credits-summary header span { color: var(--fs-muted); font-size: 12px; }
+.credits-summary header strong { font: 400 34px/1 var(--fs-display); }
+.credits-summary p { margin: 12px 0 18px; color: var(--fs-muted); font-size: 12px; }
+.credits-summary button { padding: 0 0 4px; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--fs-ink); font: 500 12px/1.3 var(--fs-font); cursor: pointer; }
+.public-account-actions { justify-self: end; display: flex; align-items: center; gap: 18px; }
 .forme-app .pricing-entry, .forme-app .google-login, .forme-app .public-account-entry { min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--fs-ink); font: 500 13px/1.4 var(--fs-font); letter-spacing: 0; text-transform: none; text-decoration: none; }
 .forme-app .public-account-entry { justify-self: end; }
 .forme-app .avatar { display: grid; place-items: center; width: 44px; height: 44px; padding: 8px; border: 0; border-radius: 50%; overflow: hidden; background: transparent; }
@@ -670,6 +683,10 @@
   .forme-app .zone-nav { display: none; }
   .forme-app .wordmark { font-size: 24px; }
   .forme-app .topbar-account { gap: 14px; }
+  .forme-app .tutorial-trigger { width: 36px; height: 36px; }
+  .credits-trigger em { display: none; }
+  .credits-summary { position: fixed; top: 58px; right: 14px; width: min(250px,calc(100vw - 28px)); }
+  .public-account-actions { gap: 12px; }
   .forme-app .mobile-nav { position: fixed; inset: auto 0 0; z-index: 120; height: calc(64px + env(safe-area-inset-bottom)); min-height: calc(64px + env(safe-area-inset-bottom)); padding: 0 var(--fs-gutter) env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; border: 0; border-top: 1px solid var(--fs-line); background: rgb(243 243 239 / .96); backdrop-filter: blur(16px); }
   .forme-app .mobile-nav button { position: relative; min-height: 64px; padding: 12px 0; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--fs-muted); font: 500 13px/1 var(--fs-font); letter-spacing: 0; text-transform: none; display: grid; place-items: center; }
   .forme-app .mobile-nav button.active { color: var(--fs-ink); background: none; }

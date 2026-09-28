@@ -135,6 +135,7 @@ type WardrobeProfile = {
   joinedAt?: string;
   isTester?: boolean;
   credits?: number;
+  creditsUsed?: number;
   referralCode?: string | null;
   referralCount?: number;
   referralCredits?: number;
@@ -2563,7 +2564,7 @@ export function WardrobeApp({
   }, [profileOpen]);
 
   useEffect(() => {
-    if (!profileOpen || sessionStatus !== "authenticated") return;
+    if (sessionStatus !== "authenticated") return;
     let active = true;
     const refreshProfile = async () => {
       try {
@@ -2576,6 +2577,7 @@ export function WardrobeApp({
           joinedAt: user.joinedAt,
           isTester: user.isTester,
           credits: user.credits,
+          creditsUsed: user.creditsUsed,
           referralCode: user.referralCode,
           referralCount: user.referralCount,
           referralCredits: user.referralCredits,
@@ -2584,12 +2586,14 @@ export function WardrobeApp({
       } catch { /* Keep the last confirmed balance when offline. */ }
     };
     void refreshProfile();
+    const balanceTimer = window.setInterval(() => { if (!document.hidden) void refreshProfile(); }, 30000);
     window.addEventListener("focus", refreshProfile);
     return () => {
       active = false;
+      window.clearInterval(balanceTimer);
       window.removeEventListener("focus", refreshProfile);
     };
-  }, [profileOpen, sessionStatus]);
+  }, [sessionStatus]);
 
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
@@ -4186,6 +4190,10 @@ export function WardrobeApp({
         demoMode={demoMode}
         profileImage={profileImage}
         profileImageClass={profileImageClass}
+        credits={profile.credits}
+        creditsUsed={profile.creditsUsed}
+        onboardingCompleted={profile.onboardingCompleted}
+        onTutorial={openProductOnboarding}
         onNavigate={navigateWardrobeRoute}
         onOpenCanvas={() => openStudio(wardrobePanel)}
         onSignIn={beginGoogleSignIn}

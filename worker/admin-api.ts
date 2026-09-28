@@ -24,6 +24,9 @@ type AdminJobRow = {
   generation_cost_microusd: number | null;
   started_at: string | null;
   finished_at: string | null;
+  generated_at: string | null;
+  qa_at: string | null;
+  cutout_at: string | null;
   job_created_at: string;
   job_updated_at: string;
   garment_id: string;
@@ -41,6 +44,9 @@ type AdminJobRow = {
   owner_id: string;
   email: string;
   display_name: string;
+  usage_cost_microusd: number | null;
+  usage_generation_count: number;
+  usage_generated_at: string | null;
 };
 
 function json(value: unknown, status = 200): Response {
@@ -125,21 +131,22 @@ function serializeJob(row: AdminJobRow) {
       imageInputTokens: row.image_input_tokens,
       textInputTokens: row.text_input_tokens,
       imageOutputTokens: row.image_output_tokens,
-      usd: row.generation_cost_microusd === null ? null : row.generation_cost_microusd / 1_000_000,
+      usd: row.usage_cost_microusd === null ? null : row.usage_cost_microusd / 1_000_000,
+      generationCount: Number(row.usage_generation_count || 0),
     },
     promptHistory: [{
       prompt,
-      recordedAt: row.started_at ?? row.job_created_at,
+      recordedAt: row.usage_generated_at ?? row.generated_at ?? row.started_at ?? row.job_created_at,
       record: row.provider_request_id || `processing_jobs/${row.id}`,
       inputImage: mediaUrl(row.source_image_key),
       outputImage: mediaUrl(row.generated_image_key ?? row.generated_open_image_key),
     }],
     pipeline: [
       { key: "input", label: "Input", state: "done", timestamp: row.garment_created_at },
-      { key: "generated", label: "Generación", state: stageState(row.status, generated, failed && !generated), timestamp: generated ? (row.finished_at ?? row.job_updated_at) : row.started_at },
+      { key: "generated", label: "Generación", state: stageState(row.status, generated, failed && !generated), timestamp: row.generated_at ?? row.usage_generated_at },
       { key: "approval", label: "Aprobación", state: "skipped", timestamp: null },
-      { key: "cutout", label: "Calado", state: stageState(row.status, cutout, failed && generated && !cutout), timestamp: cutout ? row.garment_updated_at : null },
-      { key: "qa", label: "QA", state: stageState(row.status, qaDone, row.qa_status === "failed"), timestamp: qaDone ? row.garment_updated_at : null },
+      { key: "cutout", label: "Calado", state: stageState(row.status, cutout, failed && generated && !cutout), timestamp: row.cutout_at },
+      { key: "qa", label: "QA", state: stageState(row.status, qaDone, row.qa_status === "failed"), timestamp: row.qa_at },
       { key: "release", label: "Total", state: stageState(row.status, row.status === "succeeded", failed), timestamp: finished },
     ],
   };
@@ -151,15 +158,26 @@ async function generations(env: WardrobeEnv): Promise<Response> {
     SELECT
       j.id, j.status, j.error, j.attempt, j.quality, j.presentation, j.output_variant,
       j.mode, j.batch_id, j.prompt, j.provider_request_id, j.started_at, j.finished_at,
+      j.generated_at, j.qa_at, j.cutout_at,
       j.image_model, j.image_input_tokens, j.text_input_tokens, j.image_output_tokens, j.generation_cost_microusd,
       j.created_at AS job_created_at, j.updated_at AS job_updated_at,
       g.id AS garment_id, g.client_id, g.name, g.source_image_key, g.generated_image_key,
       g.generated_open_image_key, g.image_key, g.open_image_key, g.qa_status, g.qa_notes,
       g.created_at AS garment_created_at, g.updated_at AS garment_updated_at,
-      u.id AS owner_id, u.email, u.display_name
+      u.id AS owner_id, u.email, u.display_name,
+      usage.cost_microusd AS usage_cost_microusd,
+      COALESCE(usage.generation_count, 0) AS usage_generation_count,
+      usage.generated_at AS usage_generated_at
     FROM processing_jobs j
     JOIN garments g ON g.id = j.garment_id
     JOIN users u ON u.id = j.owner_id
+    LEFT JOIN (
+      SELECT job_id, SUM(cost_microusd) AS cost_microusd, COUNT(*) AS generation_count,
+        MAX(created_at) AS generated_at
+      FROM ai_usage_events
+      WHERE operation = 'garment_generation'
+      GROUP BY job_id
+    ) usage ON usage.job_id = j.id
     ORDER BY j.created_at DESC
     LIMIT 250
   `).all<AdminJobRow>();
