@@ -245,11 +245,16 @@ export async function ensureGarmentLayout(garment: Garment): Promise<void> {
 }
 
 // Preserve a user-adjusted body scale and anchor when replacing a garment.
-export function replacementPlacement(piece: CanvasItem, previous: Garment, next: Garment, variant: "closed" | "open") {
+export function replacementPlacement(piece: CanvasItem, previous: Garment, next: Garment, variant: "closed" | "open", preserveManualScale = true) {
   const frame = REFERENCE_FRAME;
   const oldDefault = slotPlacement(previous, piece.variant, frame);
   const newDefault = slotPlacement(next, variant, frame);
-  const scale = Math.max(0.08, Math.min(1.35, next.canvasScaleMultiplier ? newDefault.scale : newDefault.scale * piece.scale / oldDefault.scale));
+  // Direct gallery replacement uses the incoming garment's own size. Mixing
+  // can preserve a deliberately composed silhouette while still respecting a
+  // platform-specific preference already saved for the incoming garment.
+  const scale = Math.max(0.08, Math.min(1.35, !preserveManualScale || next.canvasScaleMultiplier
+    ? newDefault.scale
+    : newDefault.scale * piece.scale / oldDefault.scale));
   if (Math.abs(piece.rotation) > 0.01) return { x: piece.x, y: piece.y, scale };
   const oldLayout = garmentLayout(previous, piece.variant);
   const newLayout = garmentLayout(next, variant);

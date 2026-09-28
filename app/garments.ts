@@ -37,6 +37,7 @@ export const garmentTypesByCategory: Record<GarmentCategory, GarmentType[]> = {
 
 export type Garment = GarmentAttributes & {
   canvasScaleMultiplier?: number;
+  canvasScaleMultipliers?: Partial<Record<"mobile" | "desktop", number>>;
   id: string;
   name: string;
   description?: string;

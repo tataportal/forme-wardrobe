@@ -41,6 +41,7 @@ import { ProductOnboarding } from "./product-onboarding";
 import { prepareCanvasGarment, garmentLayout, layoutAnchorY, replacementPlacement, manualCanvasScaleMultiplier, slotPlacement, REFERENCE_FRAME, type LayoutFrame } from "./garment-layout";
 
 type View = "wardrobe" | "studio";
+type CanvasSizePlatform = "mobile" | "desktop";
 type WardrobePanel = "closet" | "looks" | "assistant";
 type ClosetMode = "browse" | "upload";
 type StudioLibraryFilter = "all" | "outerwear" | "tops" | "bottoms" | "footwear" | "accessories" | "one-pieces";
@@ -831,6 +832,7 @@ const layerBase = (category: Garment["category"]) => {
   return 5000;
 };
 const lowerBodyAnchor = { x: 50, y: 61.5 } as const;
+const currentCanvasSizePlatform = (): CanvasSizePlatform => typeof window !== "undefined" && window.matchMedia("(max-width: 699px)").matches ? "mobile" : "desktop";
 function currentLayoutFrame(): LayoutFrame {
   // Portrait document coordinates are independent of screen size and open panels.
   return REFERENCE_FRAME;
@@ -2116,12 +2118,17 @@ export function WardrobeApp({
     const garment = piece && garmentById.get(piece.garmentId);
     if (!piece || !garment || !Number.isFinite(scale) || scale <= 0) return;
     const multiplier = manualCanvasScaleMultiplier(garment, piece.variant, scale);
-    if (Math.abs((garment.canvasScaleMultiplier ?? 0) - multiplier) < 0.000001) return;
-    setGarments(items => items.map(item => item.id === garment.id ? { ...item, canvasScaleMultiplier: multiplier } : item));
+    const platform = currentCanvasSizePlatform();
+    if (Math.abs((garment.canvasScaleMultipliers?.[platform] ?? 0) - multiplier) < 0.000001) return;
+    setGarments(items => items.map(item => item.id === garment.id ? {
+      ...item,
+      canvasScaleMultiplier: multiplier,
+      canvasScaleMultipliers: { ...item.canvasScaleMultipliers, [platform]: multiplier },
+    } : item));
     if (demoMode) {
       try {
-        const sizes = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v1") || "{}");
-        localStorage.setItem("forme-demo-canvas-sizes-v1", JSON.stringify({ ...sizes, [garment.id]: multiplier }));
+        const stored = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v2") || "{}");
+        localStorage.setItem("forme-demo-canvas-sizes-v2", JSON.stringify({ ...stored, [platform]: { ...(stored[platform] ?? {}), [garment.id]: multiplier } }));
       } catch { /* Guest sizing remains available for this session. */ }
       return;
     }
@@ -2130,11 +2137,21 @@ export function WardrobeApp({
     canvasSizeSaves.current = canvasSizeSaves.current.then(async () => {
       const response = await fetch(`/api/garments/${encodeURIComponent(garment.id)}/canvas-size`, {
         method: "PUT", headers: { "content-type": "application/json" }, keepalive: true,
-        body: JSON.stringify({ scaleMultiplier: multiplier }),
+        body: JSON.stringify({ scaleMultiplier: multiplier, platform }),
       });
       if (!response.ok) throw new Error("No se pudo guardar el tamaño de esta prenda. Ajusta el tamaño otra vez para reintentar.");
     }).catch(() => setWardrobeError("No se pudo guardar el tamaño de esta prenda. Ajusta el tamaño otra vez para reintentar."));
   };
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 699px)");
+    const applyPlatform = () => {
+      const platform = currentCanvasSizePlatform();
+      setGarments(items => items.map(item => ({ ...item, canvasScaleMultiplier: item.canvasScaleMultipliers?.[platform] })));
+    };
+    query.addEventListener("change", applyPlatform);
+    return () => query.removeEventListener("change", applyPlatform);
+  }, []);
 
   const weekDays = useMemo(() => buildWeekDays(weekAnchor), [weekAnchor]);
   const filterOptions = useMemo<FilterOptions>(() => {
@@ -2313,8 +2330,15 @@ export function WardrobeApp({
           setAccountDataReady(true);
           setCanvasDataReady(true);
           try {
-            const sizes = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v1") || "{}");
-            setGarments(items => items.map(item => ({ ...item, canvasScaleMultiplier: typeof sizes[item.id] === "number" && sizes[item.id] > 0 && sizes[item.id] <= 20 ? sizes[item.id] : undefined })));
+            const platform = currentCanvasSizePlatform();
+            const stored = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v2") || "{}");
+            const legacy = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v1") || "{}");
+            const preferences = { mobile: stored.mobile ?? {}, desktop: { ...legacy, ...(stored.desktop ?? {}) } };
+            setGarments(items => items.map(item => ({
+              ...item,
+              canvasScaleMultiplier: preferences[platform]?.[item.id],
+              canvasScaleMultipliers: { mobile: preferences.mobile?.[item.id], desktop: preferences.desktop?.[item.id] },
+            })));
           } catch { /* No saved guest sizes. */ }
           try {
             const storedLooks = localStorage.getItem(demoLooksStorageKey);
@@ -2348,7 +2372,7 @@ export function WardrobeApp({
           fetch("/api/style-profile", { cache: "no-store" }),
         ]);
         if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu closet.");
-        const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[]; canvasSizes?: Record<string, number> };
+        const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[]; canvasSizes?: Partial<Record<CanvasSizePlatform, Record<string, number>>> };
         const outfits = outfitsResponse.ok
           ? await outfitsResponse.json() as { outfits: SavedLook[] }
           : { outfits: [] };
@@ -2362,7 +2386,11 @@ export function WardrobeApp({
         const isLocalOwnerPreview = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
         const ownerCatalogEnabled = Boolean(session.user.isOwner || isLocalOwnerPreview);
         const baseGarments = ownerCatalogEnabled ? starterGarments : formeBasics;
-        const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments).map(garment => ({ ...garment, canvasScaleMultiplier: wardrobe.canvasSizes?.[garment.id] }));
+        const platform = currentCanvasSizePlatform();
+        const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments).map(garment => {
+          const canvasScaleMultipliers = { mobile: wardrobe.canvasSizes?.mobile?.[garment.id], desktop: wardrobe.canvasSizes?.desktop?.[garment.id] };
+          return { ...garment, canvasScaleMultiplier: canvasScaleMultipliers[platform], canvasScaleMultipliers };
+        });
         const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
         const normalizedLooks = outfits.outfits.map((look) => ({
           ...look,
@@ -3213,7 +3241,7 @@ export function WardrobeApp({
       const variant = garment.openImage ? "open" as const : "closed" as const;
       const placement = autoPlacedIds.current.has(selectedPiece.instanceId)
         ? defaultPlacement(garment, variant)
-        : replacementPlacement(selectedPiece, selectedGarment, garment, variant);
+        : replacementPlacement(selectedPiece, selectedGarment, garment, variant, false);
       const next = latestCanvasPieces.current.map((item) => item.instanceId === selectedPiece.instanceId
         ? {
             ...item,

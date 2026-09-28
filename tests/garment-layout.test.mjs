@@ -357,7 +357,7 @@ test("canvas replacements wait for decoded pixels, reuse warm images and retry f
 });
 
 
-test("manual size overrides automatic scale, survives reuse, and transfers proportionally to the open cutout", () => {
+test("manual size overrides automatic scale per preference while replacement uses the incoming garment size", () => {
   const garment = { id:"coat", name:"Coat", category:"Outerwear", garmentType:"Jacket", silhouette:"Regular", image:"/wardrobe/final/0000002.png", openImage:"/wardrobe/final/0000002-c.png" };
   const closed = slotPlacement(garment, "closed"), open = slotPlacement(garment, "open");
   const factor = manualCanvasScaleMultiplier(garment, "closed", closed.scale * 1.2);
@@ -369,5 +369,6 @@ test("manual size overrides automatic scale, survives reuse, and transfers propo
   const previous = { ...garment,id:"previous" };
   const piece = {instanceId:"p",garmentId:"previous",variant:"closed",...closed,scale:closed.scale*.8,rotation:0,z:1};
   near(replacementPlacement(piece,previous,preferred,"closed").scale,closed.scale*1.2);
+  near(replacementPlacement(piece,previous,garment,"closed",false).scale,closed.scale);
   near(piece.scale,closed.scale*.8); // existing composition stays untouched
 });

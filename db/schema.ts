@@ -33,6 +33,8 @@ export const garmentCanvasPreferences = sqliteTable("garment_canvas_preferences"
   ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   garmentClientId: text("garment_client_id").notNull(),
   scaleMultiplier: real("scale_multiplier").notNull(),
+  mobileScaleMultiplier: real("mobile_scale_multiplier"),
+  desktopScaleMultiplier: real("desktop_scale_multiplier"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [primaryKey({ columns: [table.ownerId, table.garmentClientId] })]);
 

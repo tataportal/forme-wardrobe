@@ -854,10 +854,13 @@ async function getWardrobe(db: D1Database, ownerId: string): Promise<Response> {
   `).bind(ownerId).all<{ garment_id: string; tag: string }>();
   const grouped = new Map<string, string[]>();
   for (const row of tagsResult.results) grouped.set(row.garment_id, [...(grouped.get(row.garment_id) ?? []), row.tag]);
-  const preferences = await db.prepare("SELECT garment_client_id, scale_multiplier FROM garment_canvas_preferences WHERE owner_id = ?")
-    .bind(ownerId).all<{ garment_client_id: string; scale_multiplier: number }>();
+  const preferences = await db.prepare("SELECT garment_client_id, scale_multiplier, mobile_scale_multiplier, desktop_scale_multiplier FROM garment_canvas_preferences WHERE owner_id = ?")
+    .bind(ownerId).all<{ garment_client_id: string; scale_multiplier: number; mobile_scale_multiplier: number | null; desktop_scale_multiplier: number | null }>();
   return json({ garments: garmentsResult.results.map((row) => garmentJson(row, grouped.get(row.id) ?? [])),
-    canvasSizes: Object.fromEntries(preferences.results.map(row => [row.garment_client_id, row.scale_multiplier])),
+    canvasSizes: {
+      mobile: Object.fromEntries(preferences.results.filter(row => row.mobile_scale_multiplier !== null).map(row => [row.garment_client_id, row.mobile_scale_multiplier])),
+      desktop: Object.fromEntries(preferences.results.map(row => [row.garment_client_id, row.desktop_scale_multiplier ?? row.scale_multiplier])),
+    },
   });
 }
 
@@ -3887,20 +3890,22 @@ export async function handleWardrobeApi(
     const canvasSizeMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/canvas-size$/);
     if (canvasSizeMatch && request.method === "PUT") {
       const clientId = safeClientId(decodeURIComponent(canvasSizeMatch[1]));
-      const value = await request.json().catch(() => null) as { scaleMultiplier?: unknown } | null;
+      const value = await request.json().catch(() => null) as { scaleMultiplier?: unknown; platform?: unknown } | null;
       const multiplier = value?.scaleMultiplier;
-      if (!clientId || typeof multiplier !== "number" || !Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 20) {
+      const platform = value?.platform;
+      if (!clientId || typeof multiplier !== "number" || !Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 20 || (platform !== "mobile" && platform !== "desktop")) {
         return apiError("El tamaño de la prenda no es válido.", 400);
       }
       const owned = await findGarment(db, identity.id, clientId);
       const isOwner = identity.email === env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase() || localHosts.has(url.hostname);
       const catalogue = starterGarments.some(item => item.id === clientId && (isOwner || item.collection === "forme"));
       if ((!owned || owned.deleted) && !catalogue) return apiError("Prenda no encontrada.", 404);
-      await db.prepare(`INSERT INTO garment_canvas_preferences (owner_id, garment_client_id, scale_multiplier)
-        VALUES (?, ?, ?) ON CONFLICT(owner_id, garment_client_id) DO UPDATE SET
-        scale_multiplier = excluded.scale_multiplier, updated_at = CURRENT_TIMESTAMP`)
-        .bind(identity.id, clientId, multiplier).run();
-      return json({ scaleMultiplier: multiplier });
+      const platformColumn = platform === "mobile" ? "mobile_scale_multiplier" : "desktop_scale_multiplier";
+      await db.prepare(`INSERT INTO garment_canvas_preferences (owner_id, garment_client_id, scale_multiplier, ${platformColumn})
+        VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, garment_client_id) DO UPDATE SET
+        scale_multiplier = excluded.scale_multiplier, ${platformColumn} = excluded.${platformColumn}, updated_at = CURRENT_TIMESTAMP`)
+        .bind(identity.id, clientId, multiplier, multiplier).run();
+      return json({ scaleMultiplier: multiplier, platform });
     }
 
     const garmentMatch = url.pathname.match(/^\/api\/garments\/([^/]+)$/);
