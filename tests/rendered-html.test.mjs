@@ -84,7 +84,7 @@ test("keeps the main product areas on stable routes", async () => {
   ]);
   assert.match(pricingSource, /name: "Personal", monthly: 7\.99, annual: 79\.99/);
   assert.match(pricingSource, /name: "Club", monthly: 12\.99, annual: 129\.99/);
-  assert.match(pricingSource, /15 prendas de por vida y hasta 5 looks guardados/);
+  assert.match(pricingSource, /10 prendas al crear tu cuenta y 5 más al completar el tutorial/);
   assert.match(pricingSource, /\/ingresar\?return_to=%2Fcloset/);
   assert.match(pricingSource, /\/api\/sales-interest/);
   assert.doesNotMatch(pricingSource, /<label>Nombre<input/);
@@ -313,6 +313,24 @@ test("Profile exposes a private closet reading based on real garments and saved 
   assert.match(hero, /Ver perfil público/);
   assert.match(hero, /Compartir perfil/);
   assert.doesNotMatch(hero, /Ajustes|Cerrar sesión|Copiar invitación/);
+});
+
+test("new users receive the product onboarding and its server-verified reward", async () => {
+  const [page, onboarding, worker] = await Promise.all([
+    readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/product-onboarding.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../worker/wardrobe-api.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /<ProductOnboarding/);
+  assert.match(page, /\/api\/onboarding\/complete/);
+  assert.match(page, /Cómo usar Formé/);
+  assert.match(onboarding, /Buena|Luz pareja/);
+  assert.match(onboarding, /Prenda completa/);
+  assert.match(onboarding, /Extendida y de frente/);
+  assert.match(onboarding, /Completar y recibir 5/);
+  assert.match(worker, /VALUES \(\?, \?, 'grant', 10, 'trial'/);
+  assert.match(worker, /VALUES \(\?, \?, 'grant', 5, 'onboarding'/);
+  assert.doesNotMatch(worker, /VALUES \(\?, \?, 'grant', 5, 'trial-topup'/);
 });
 
 test("pricing sells only implemented product capabilities", async () => {

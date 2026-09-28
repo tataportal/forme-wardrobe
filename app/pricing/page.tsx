@@ -69,7 +69,7 @@ export default function PricingPage() {
       </div>
 
       <section className="pricing-free" aria-labelledby="free-title">
-        <div><h2 id="free-title">Empieza gratis</h2><p>15 prendas de por vida y hasta 5 looks guardados. Sin tarjeta.</p></div>
+        <div><h2 id="free-title">Empieza gratis</h2><p>10 prendas al crear tu cuenta y 5 más al completar el tutorial. Hasta 5 looks guardados. Sin tarjeta.</p></div>
         <Link href="/ingresar?return_to=%2Fcloset">Crear mi closet</Link>
       </section>
 

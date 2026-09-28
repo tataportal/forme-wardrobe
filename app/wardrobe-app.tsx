@@ -36,6 +36,7 @@ import { CanvasPieceOverlay } from "./canvas-piece-overlay";
 import { CanvasGestures, type GesturePoint } from "./canvas-gestures";
 import { fitLookPreview } from "./look-preview";
 import { LookActionIcon } from "./look-action-icon";
+import { ProductOnboarding } from "./product-onboarding";
 import { prepareCanvasGarment, garmentLayout, layoutAnchorY, replacementPlacement, manualCanvasScaleMultiplier, slotPlacement, REFERENCE_FRAME, type LayoutFrame } from "./garment-layout";
 
 type View = "wardrobe" | "studio";
@@ -124,6 +125,7 @@ type ApiGarment = Omit<GarmentDraft, "id"> & {
   qaNotes?: string;
 };
 type WardrobeProfile = {
+  id?: string;
   name: string;
   handle: string;
   bio: string;
@@ -134,6 +136,7 @@ type WardrobeProfile = {
   referralCode?: string | null;
   referralCount?: number;
   referralCredits?: number;
+  onboardingCompleted?: boolean;
   profilePublic: boolean;
   discoverable: boolean;
   showCloset: boolean;
@@ -2015,6 +2018,9 @@ export function WardrobeApp({
   const [styleOccasion, setStyleOccasion] = useState<StyleOccasion>("daily");
   const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
   const [styleOnboardingOpen, setStyleOnboardingOpen] = useState(false);
+  const [productOnboardingOpen, setProductOnboardingOpen] = useState(false);
+  const [productOnboardingStep, setProductOnboardingStep] = useState(0);
+  const productOnboardingChecked = useRef(false);
   const [savingStyleProfile, setSavingStyleProfile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(initialRoute === "perfil" || initialRoute === "ajustes");
   const [studioReturnPanel, setStudioReturnPanel] = useState<WardrobePanel>("closet");
@@ -2251,6 +2257,23 @@ export function WardrobeApp({
     document.addEventListener("visibilitychange", onVisibility);
     return () => { cancel(); window.removeEventListener("blur", cancel); document.removeEventListener("visibilitychange", onVisibility); };
   }, []);
+
+  useEffect(() => {
+    if (!accountDataReady || productOnboardingChecked.current) return;
+    productOnboardingChecked.current = true;
+    const onboardingParams = new URLSearchParams(window.location.search);
+    const forced = onboardingParams.get("onboarding") === "1";
+    const forcedStep = Number(onboardingParams.get("step"));
+    const storageKey = `forme-product-onboarding-dismissed-v1:${sessionStatus === "authenticated" ? profile.id || profile.handle : "guest"}`;
+    try {
+      if (!forced && localStorage.getItem(storageKey) === "1") return;
+      const resume = forced && Number.isInteger(forcedStep) && forcedStep >= 1 && forcedStep <= 4
+        ? forcedStep - 1
+        : Number(sessionStorage.getItem("forme-product-onboarding-resume-v1") || "0");
+      setProductOnboardingStep(Number.isFinite(resume) ? Math.max(0, Math.min(3, resume)) : 0);
+    } catch { setProductOnboardingStep(0); }
+    if (forced || sessionStatus === "guest" || profile.onboardingCompleted === false) setProductOnboardingOpen(true);
+  }, [accountDataReady, profile.handle, profile.id, profile.onboardingCompleted, sessionStatus]);
   useEffect(() => {
     if (view !== "studio" || savingOutfit) canvasGestures.current?.cancel();
   }, [view, savingOutfit]);
@@ -2447,6 +2470,7 @@ export function WardrobeApp({
           referralCode: user.referralCode,
           referralCount: user.referralCount,
           referralCredits: user.referralCredits,
+          onboardingCompleted: user.onboardingCompleted,
         }));
       } catch { /* Keep the last confirmed balance when offline. */ }
     };
@@ -2473,6 +2497,41 @@ export function WardrobeApp({
     const login = new URL("/auth/google/start", window.location.origin);
     login.searchParams.set("return_to", returnTo || "/closet");
     window.location.assign(`${login.pathname}${login.search}`);
+  }
+
+  function beginOnboardingSignIn() {
+    try { sessionStorage.setItem("forme-product-onboarding-resume-v1", "1"); } catch { /* Sign-in still works without storage. */ }
+    beginGoogleSignIn();
+  }
+
+  function dismissProductOnboarding() {
+    const storageKey = `forme-product-onboarding-dismissed-v1:${sessionStatus === "authenticated" ? profile.id || profile.handle : "guest"}`;
+    try { localStorage.setItem(storageKey, "1"); } catch { /* Dismissal only needs to last for this render. */ }
+    setProductOnboardingOpen(false);
+  }
+
+  function openProductOnboarding() {
+    setProductOnboardingStep(0);
+    setProductOnboardingOpen(true);
+  }
+
+  async function completeProductOnboarding() {
+    const response = await fetch("/api/onboarding/complete", { method: "POST" });
+    const result = await response.json().catch(() => null) as { completed?: boolean; rewarded?: boolean; credits?: number; error?: string } | null;
+    if (!response.ok || !result?.completed || typeof result.credits !== "number") throw new Error(result?.error || "No pudimos activar tus créditos. Intenta otra vez.");
+    const nextProfile = { ...profile, onboardingCompleted: true, credits: result.credits };
+    setProfile(nextProfile);
+    cacheSessionProfile(nextProfile);
+    try {
+      sessionStorage.removeItem("forme-product-onboarding-resume-v1");
+      localStorage.removeItem(`forme-product-onboarding-dismissed-v1:${profile.id || profile.handle}`);
+    } catch { /* Server completion remains authoritative. */ }
+    return { rewarded: Boolean(result.rewarded), credits: result.credits };
+  }
+
+  function finishProductOnboarding() {
+    setProductOnboardingOpen(false);
+    if (sessionStatus === "authenticated") openUpload();
   }
 
   async function saveStyleCalibration(nextProfile: StyleProfile) {
@@ -3984,6 +4043,15 @@ export function WardrobeApp({
 
   return (
     <main className={`site-shell view-${view} route-${activeRoute} forme-app`}>
+      {productOnboardingOpen && <ProductOnboarding
+        authenticated={sessionStatus === "authenticated"}
+        alreadyCompleted={Boolean(profile.onboardingCompleted)}
+        initialStep={productOnboardingStep}
+        onSignIn={beginOnboardingSignIn}
+        onComplete={completeProductOnboarding}
+        onDismiss={dismissProductOnboarding}
+        onFinish={finishProductOnboarding}
+      />}
       {productFeatures.styleTest && !demoMode && styleOnboardingOpen && <StyleOnboarding
         profile={styleProfile}
         saving={savingStyleProfile}
@@ -4042,6 +4110,11 @@ export function WardrobeApp({
               <button type="button" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/ingresar?ref=${profile.referralCode}`)}>Copiar enlace de invitación</button>
               {Boolean(profile.referralCount) && <small>{profile.referralCount} {profile.referralCount === 1 ? "persona invitada" : "personas invitadas"}. +{profile.referralCredits || 0} créditos.</small>}
             </section>}
+            <section className="settings-account-links settings-onboarding">
+              <h2>Cómo usar Formé</h2>
+              <strong>{profile.onboardingCompleted ? "Tutorial completado" : "Completa el tutorial y recibe 5 créditos"}</strong>
+              <button type="button" onClick={openProductOnboarding}>Ver tutorial</button>
+            </section>
             {productFeatures.styleTest && <>
             <section className="profile-style-summary">
               <p>Tu lectura actual</p>

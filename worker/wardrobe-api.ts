@@ -232,6 +232,7 @@ type UserProfileRow = {
   referral_code: string | null;
   referral_count: number;
   referral_credits: number;
+  onboarding_completed: number;
 };
 
 type ImageQuality = "low" | "medium";
@@ -643,12 +644,6 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
     (id, owner_id, event_type, amount, source, idempotency_key)
     VALUES (?, ?, 'grant', 10, 'trial', ?)`)
     .bind(crypto.randomUUID(), identity.id, `trial-grant:${identity.id}`).run();
-  // Launch promise: every account has 15 free digitalizations. Keeping the
-  // top-up separate makes the correction idempotent for existing accounts.
-  await db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
-    (id, owner_id, event_type, amount, source, idempotency_key)
-    VALUES (?, ?, 'grant', 5, 'trial-topup', ?)`)
-    .bind(crypto.randomUUID(), identity.id, `trial-launch-topup:${identity.id}`).run();
   let ownReferral = await db.prepare("SELECT code FROM referral_codes WHERE owner_id = ? LIMIT 1")
     .bind(identity.id).first<{ code: string }>();
   if (!ownReferral) {
@@ -712,6 +707,7 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
     referralCode: row.referral_code,
     referralCount: Number(row.referral_count || 0),
     referralCredits: Number(row.referral_credits || 0),
+    onboardingCompleted: Boolean(row.onboarding_completed),
     isOwner,
   };
 }
@@ -724,7 +720,9 @@ async function readAccountProfile(db: D1Database, ownerId: string): Promise<User
       (SELECT code FROM referral_codes WHERE owner_id = users.id) AS referral_code,
       (SELECT COUNT(*) FROM referrals WHERE referrer_owner_id = users.id) AS referral_count,
       (SELECT COALESCE(SUM(reward_amount), 0) FROM referrals WHERE referrer_owner_id = users.id) AS referral_credits,
-      (SELECT COALESCE(SUM(amount), 0) FROM digitization_credit_events WHERE owner_id = users.id) AS credits
+      (SELECT COALESCE(SUM(amount), 0) FROM digitization_credit_events WHERE owner_id = users.id) AS credits,
+      EXISTS(SELECT 1 FROM digitization_credit_events
+        WHERE owner_id = users.id AND idempotency_key IN ('onboarding-complete:' || users.id, 'trial-launch-topup:' || users.id)) AS onboarding_completed
     FROM users WHERE id = ? LIMIT 1
   `).bind(ownerId).first<UserProfileRow>();
   if (!row) throw new Error("No se pudo abrir tu perfil.");
@@ -740,6 +738,21 @@ async function getSession(request: Request, env: WardrobeEnv): Promise<Response>
   const row = await readAccountProfile(env.DB, identity.id);
   const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
   return json({ user: accountProfileJson(row, Boolean(ownerEmail && identity.email === ownerEmail)) });
+}
+
+async function completeOnboarding(db: D1Database, identity: Identity): Promise<Response> {
+  const legacyReward = await db.prepare(`SELECT 1 FROM digitization_credit_events
+    WHERE owner_id = ? AND idempotency_key = ? LIMIT 1`)
+    .bind(identity.id, `trial-launch-topup:${identity.id}`).first();
+  let rewarded = false;
+  if (!legacyReward) {
+    const result = await db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
+      (id, owner_id, event_type, amount, source, idempotency_key)
+      VALUES (?, ?, 'grant', 5, 'onboarding', ?)`)
+      .bind(crypto.randomUUID(), identity.id, `onboarding-complete:${identity.id}`).run();
+    rewarded = Number(result.meta.changes || 0) === 1;
+  }
+  return json({ completed: true, rewarded, credits: await creditBalance(db, identity.id) });
 }
 
 async function saveAccountProfile(request: Request, db: D1Database, identity: Identity, isOwner: boolean): Promise<Response> {
@@ -3788,6 +3801,7 @@ export async function handleWardrobeApi(
       const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
       return saveAccountProfile(request, db, identity, Boolean(ownerEmail && identity.email === ownerEmail));
     }
+    if (url.pathname === "/api/onboarding/complete" && request.method === "POST") return completeOnboarding(db, identity);
     if (url.pathname === "/api/billing" && request.method === "GET") {
       const account = await db.prepare(`SELECT plan_id, status, billing_cycle, current_period_start, current_period_end
         FROM billing_accounts WHERE owner_id = ? LIMIT 1`).bind(identity.id).first<{

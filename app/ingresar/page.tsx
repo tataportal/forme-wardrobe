@@ -8,7 +8,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return <main className="legal-page forme-app public-app"><FormePublicHeader />
     <section className="legal-signin" aria-labelledby="signin-title">
       <h1 id="signin-title">Tu cuenta, tus prendas.</h1>
-      <p>Guarda tu closet y tus looks. Antes de continuar, revisa cómo cuidamos tus fotos y las reglas de Formé.</p>
+      <p>Guarda tu closet y tus looks. Recibes 10 créditos al crear tu cuenta y 5 más al completar el tutorial.</p>
       {!legalReady && <p className="legal-draft">Borrador. El registro legal estará disponible al confirmar los datos del responsable.</p>}
       {params.error && <p role="alert">Revisa y acepta ambas condiciones para continuar.</p>}
       <form action="/auth/google/start" method="post">
