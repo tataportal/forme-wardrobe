@@ -12,8 +12,8 @@ const imageFor = (id: string) => {
 const steps = [
   {
     label: "Tu cuenta",
-    title: "Empieza con 10 créditos.",
-    body: "Entra a Formé y convierte tus primeras prendas en un closet digital listo para combinar.",
+    title: "Tu closet empieza acá.",
+    body: "Sube tus prendas. Formé las prepara para que puedas verlas, ordenarlas y combinarlas.",
   },
   {
     label: "Tus fotos",
@@ -121,7 +121,7 @@ export function ProductOnboarding({
   };
 
   const current = steps[step];
-  const currentTitle = step === 0 && authenticated && alreadyCompleted ? "Tu closet, en movimiento." : current.title;
+  const currentTitle = step === 0 && authenticated && alreadyCompleted ? "Todo tu closet. Nuevas combinaciones." : current.title;
   return <div className="product-tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-tour-title">
     <section className="product-tour-shell">
       <header className="product-tour-header">
