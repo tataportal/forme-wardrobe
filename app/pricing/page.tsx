@@ -17,7 +17,6 @@ const offerNames: Record<OfferId, string> = { personal: "Personal", club: "Club"
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [selected, setSelected] = useState<OfferId | null>(null);
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -42,7 +41,7 @@ export default function PricingPage() {
     const response = await fetch("/api/sales-interest", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, email, company, planId: selected, billingCycle: selectedCycle }),
+      body: JSON.stringify({ email, company, planId: selected, billingCycle: selectedCycle }),
     });
     const payload = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) {
@@ -51,7 +50,7 @@ export default function PricingPage() {
       return;
     }
     setStatus("sent");
-    setMessage(`Listo. Te escribiremos para activar ${offerNames[selected]}.`);
+    setMessage(`Listo. Te avisaremos cuando el checkout de ${offerNames[selected]} esté disponible.`);
   }
 
   return <main className="route-page pricing-page forme-app public-app">
@@ -103,13 +102,12 @@ export default function PricingPage() {
       </section>
 
       {selected && <section className="pricing-activation" aria-live="polite">
-        <div><h2>Activa {offerNames[selected]}</h2><p>Déjanos tus datos. Te enviaremos el acceso de pago y activación.</p></div>
+        <div><h2>{offerNames[selected]}</h2><p>La pasarela todavía no está activa. Déjanos tu correo y te avisaremos cuando puedas pagar.</p></div>
         {status === "sent" ? <p className="pricing-success">{message}</p> : <form onSubmit={submit}>
-          <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></label>
           <label>Correo<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
           <p className="pricing-terms">Usaremos tus datos para responder esta solicitud. Consulta la <Link href="/privacidad">Política de privacidad</Link>.</p>
           <label className="pricing-honeypot" aria-hidden="true">Empresa<input value={company} onChange={(event) => setCompany(event.target.value)} tabIndex={-1} autoComplete="off" /></label>
-          <button className="primary-action" disabled={status === "sending"}>{status === "sending" ? "Enviando..." : "Solicitar activación"}</button>
+          <button className="primary-action" disabled={status === "sending"}>{status === "sending" ? "Enviando..." : "Avisarme"}</button>
           {status === "error" && <p className="pricing-error" role="alert">{message}</p>}
         </form>}
       </section>}

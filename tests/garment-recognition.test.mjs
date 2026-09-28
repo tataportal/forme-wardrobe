@@ -172,14 +172,14 @@ test("Canvas placement uses the garment image, structured output and exact model
 test("pricing activation captures a deduplicated commercial lead without login", async t => {
   const h = await harness(t);
   const request = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-    name: "Tata", email: "TATA@example.com", planId: "personal", billingCycle: "annual", company: "",
+    email: "TATA@example.com", planId: "personal", billingCycle: "annual", company: "",
   }) };
   assert.equal((await h.api("/api/sales-interest", request)).status, 201);
   assert.equal((await h.api("/api/sales-interest", { ...request, body: JSON.stringify({
-    name: "Tata Portal", email: "tata@example.com", planId: "personal", billingCycle: "annual", company: "",
+    email: "tata@example.com", planId: "personal", billingCycle: "annual", company: "",
   }) })).status, 201);
   const lead = h.sql.prepare("SELECT email, name, plan_id, billing_cycle, status FROM sales_leads").get();
-  assert.deepEqual({ ...lead }, { email: "tata@example.com", name: "Tata Portal", plan_id: "personal", billing_cycle: "annual", status: "new" });
+  assert.deepEqual({ ...lead }, { email: "tata@example.com", name: "", plan_id: "personal", billing_cycle: "annual", status: "new" });
   assert.equal(h.sql.prepare("SELECT COUNT(*) AS count FROM sales_leads").get().count, 1);
 });
 

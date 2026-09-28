@@ -87,6 +87,8 @@ test("keeps the main product areas on stable routes", async () => {
   assert.match(pricingSource, /15 prendas de por vida y hasta 5 looks guardados/);
   assert.match(pricingSource, /\/ingresar\?return_to=%2Fcloset/);
   assert.match(pricingSource, /\/api\/sales-interest/);
+  assert.doesNotMatch(pricingSource, /<label>Nombre<input/);
+  assert.match(pricingSource, /La pasarela todavía no está activa/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /className="public-look-pieces"/);
   assert.match(publicProfileSource, /Aún no hay prendas ni looks publicados\./);
