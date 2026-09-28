@@ -287,13 +287,16 @@ test("real retry endpoint resumes approved master once and never generates again
     assert.match(body.input[0].content[0].text, /Actual silhouette candidates/);
     return Response.json({ output_text: JSON.stringify(anatomySelection()) });
   });
-  const retry = () => app.retryGarment(new Request("https://forme.test/api/garments/client/retry", { method: "POST" }),
+  const retry = () => app.retryGarment(new Request("https://forme.test/api/garments/client/retry", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quality: "medium" }),
+  }),
     state.env, {}, state.db, { id: "owner" }, "client");
   const [first, repeated] = await Promise.all([retry(), retry()]);
   assert.equal(first.status, 202); assert.equal(repeated.status, 202);
   assert.equal(state.queued.length, 1);
   assert.equal(state.queued[0].stage, "postprocess");
   assert.equal(state.queued[0].generatedKey, masterKey);
+  assert.equal(state.queued[0].quality, "low");
   assert.equal(state.sql.prepare("SELECT COUNT(*) AS count FROM processing_jobs").get().count, 1);
   state.sql.exec("UPDATE garments SET name='Nombre editado durante el calado', metadata_revision=1");
   await app.handleGarmentQueue({ messages: [{ body: state.queued.shift(), attempts: 1, ack() {}, retry() { throw new Error("Unexpected queue retry"); } }] }, state.env);

@@ -2376,18 +2376,6 @@ async function retryGarment(
   const enabled = processingEnabled(env);
   const body = await request.json().catch(() => null) as { quality?: unknown; presentation?: unknown; outputVariant?: unknown } | null;
   let quality = imageQuality(body?.quality, imageQuality(env.OPENAI_IMAGE_QUALITY));
-  const generationsToday = await dailyCount(db,
-    "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'garment_generation' AND created_at >= datetime('now', '-1 day')",
-    identity.id);
-  if (generationsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de generación. Vuelve mañana.", 429);
-  const allowance = await processingAllowanceReached(db, identity.id);
-  if (allowance.reached) return apiError("Llegaste al límite de intentos de procesamiento de tu plan.", 429);
-  if (quality === "medium") {
-    const mediumToday = await dailyCount(db,
-      "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND quality = 'medium' AND created_at >= datetime('now', '-1 day')",
-      identity.id);
-    if (mediumToday >= 3) return apiError("Ya usaste las tres mejoras de calidad de hoy.", 429);
-  }
   const requestedVariant: GarmentOutputVariant = body?.outputVariant === "open" ? "open" : "closed";
   const recognized = sourceRecognition(garment);
   const outputVariant: GarmentOutputVariant = recognized || garment.category === "Outerwear" ? "closed" : requestedVariant;
@@ -2399,7 +2387,11 @@ async function retryGarment(
       id: string; status: string; stage: string; generated_key: string | null;
       quality: string; presentation: string; output_variant: string;
     }>();
-  if (body?.quality === undefined && previous?.status === "failed") quality = imageQuality(previous.quality);
+  if (previous?.status === "failed" && previous.stage === "postprocess" && previous.output_variant === outputVariant) {
+    // A postprocess retry is not a quality upgrade: it must reuse the exact
+    // approved master even when an older client sends its current UI quality.
+    quality = imageQuality(previous.quality);
+  } else if (body?.quality === undefined && previous?.status === "failed") quality = imageQuality(previous.quality);
   // A repeated click must not enqueue a second paid image. The existing job's
   // stage guard and claim are also used for postprocess-only resumption.
   if (previous && ["queued", "processing", "batch_staged", "batch_submitting", "batch_processing", "retrying"].includes(previous.status)) {
@@ -2407,7 +2399,7 @@ async function retryGarment(
   }
   const expectedMaster = outputVariant === "open" ? garment.generated_open_image_key : garment.generated_image_key;
   if (previous?.stage === "postprocess" && previous.status === "failed" && previous.generated_key
-    && previous.quality === quality && previous.output_variant === outputVariant) {
+    && previous.output_variant === outputVariant) {
     // Fail closed if a checkpoint is missing or belongs to a replaced master.
     // Recovery must never silently turn a cutout retry into new generation.
     if (previous.generated_key !== expectedMaster || !env.WARDROBE_MEDIA || !await env.WARDROBE_MEDIA.get(expectedMaster!)) {
@@ -2428,6 +2420,18 @@ async function retryGarment(
       });
     }
     return json({ job: { id: previous.id, status: "queued" }, resumed: "postprocess" }, 202);
+  }
+  const generationsToday = await dailyCount(db,
+    "SELECT COUNT(*) AS count FROM ai_usage_events WHERE owner_id = ? AND operation = 'garment_generation' AND created_at >= datetime('now', '-1 day')",
+    identity.id);
+  if (generationsToday >= MAX_DAILY_UPLOADS) return apiError("Llegaste al límite diario de generación. Vuelve mañana.", 429);
+  const allowance = await processingAllowanceReached(db, identity.id);
+  if (allowance.reached) return apiError("Llegaste al límite de intentos de procesamiento de tu plan.", 429);
+  if (quality === "medium") {
+    const mediumToday = await dailyCount(db,
+      "SELECT COUNT(*) AS count FROM processing_jobs WHERE owner_id = ? AND quality = 'medium' AND created_at >= datetime('now', '-1 day')",
+      identity.id);
+    if (mediumToday >= 3) return apiError("Ya usaste las tres mejoras de calidad de hoy.", 429);
   }
   const job = await createProcessingJob(db, identity.id, garment.id, enabled, quality, presentation, outputVariant);
   await syncIntakeItem(db, garment.id, enabled ? "processing" : "uploaded");
