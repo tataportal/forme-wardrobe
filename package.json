@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
-    "deploy": "vinext deploy",
+    "deploy": "node scripts/check-legal-publication.mjs && vinext deploy",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "garments:prepare": "node scripts/garment-fast-batch.mjs prepare",
     "garments:release": "node scripts/garment-fast-batch.mjs release",
@@ -25,30 +25,33 @@
   "dependencies": {
     "@jsquash/png": "^3.1.1",
     "drizzle-orm": "0.45.2",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@gltf-transform/core": "^4.4.2",
-    "@gltf-transform/functions": "^4.4.2",
+    "@cloudflare/vite-plugin": "^1.61.0",
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
+    "@vitejs/plugin-rsc": "^0.5.35",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.3.6",
     "meshoptimizer": "^1.2.0",
-    "react-server-dom-webpack": "19.2.6",
+    "react-server-dom-webpack": "^19.3.0",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vite": "^8.3.1",
+    "wrangler": "^4.142.0"
+  },
+  "overrides": {
+    "image-size": "2.0.4"
   },
   "type": "module"
 }

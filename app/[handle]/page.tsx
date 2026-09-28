@@ -78,7 +78,7 @@ export default function PublicProfilePage() {
   const invalidHandle = !rawHandle.startsWith("@") || !handle;
   const [data, setData] = useState<PublicProfilePayload | null>(null);
   const [error, setError] = useState("");
-  const [shareNotice, setShareNotice] = useState("");
+  const [shareError, setShareError] = useState("");
   const [loading, setLoading] = useState(true);
   const initials = useMemo(() => data?.profile.name.split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toLocaleUpperCase() || "F", [data]);
 
@@ -98,12 +98,13 @@ export default function PublicProfilePage() {
 
   async function shareProfile() {
     if (!data) return;
+    setShareError("");
     const payload = { title: `${data.profile.name} en Formé`, text: `Mira el closet de ${data.profile.name}`, url: window.location.href };
     try {
       if (navigator.share) await navigator.share(payload);
-      else { await navigator.clipboard.writeText(window.location.href); setShareNotice("Enlace copiado"); }
+      else await navigator.clipboard.writeText(window.location.href);
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) setShareNotice("No se pudo compartir. Puedes copiar el enlace de esta página.");
+      if (!(error instanceof DOMException && error.name === "AbortError")) setShareError("No se pudo compartir. Puedes copiar el enlace de esta página.");
     }
   }
 
@@ -119,7 +120,7 @@ export default function PublicProfilePage() {
   return <main className="public-profile-page forme-app public-app">
     <FormePublicHeader />
     <div className="public-profile-frame">
-      {shareNotice && <p role="status">{shareNotice}</p>}
+      {shareError && <p role="alert">{shareError}</p>}
       <section className="public-profile-hero">
         <div className="public-profile-avatar">{data.profile.avatarUrl ? <img src={data.profile.avatarUrl} alt={`Foto de ${data.profile.name}`} /> : <span>{initials}</span>}</div>
         <div className="public-profile-copy">

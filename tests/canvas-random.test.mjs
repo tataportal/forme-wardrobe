@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 
 const bundle = await build({ entryPoints: [fileURLToPath(new URL("../app/canvas-random.ts", import.meta.url))], bundle: true, write: false, platform: "node", format: "esm", logLevel: "silent" });
-const { randomGarmentReplacements, randomLookGarments } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+const { randomGarmentReplacements, randomLookGarments, applyGarmentReplacements } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 const garment = (id, category = "Tops", garmentType = "T-shirt", status = "ready") => ({ id, category, garmentType, status, name: id, silhouette: "Regular", image: `/test/${id}.png` });
 const garments = [garment("top-a"), garment("top-b"), garment("top-c"), garment("pants-a", "Bottoms", "Trousers"), garment("pants-b", "Bottoms", "Trousers"),
   garment("bag-a", "Accessories", "Bag"), garment("bag-b", "Accessories", "Bag"), garment("glasses", "Accessories", "Glasses")];
@@ -88,4 +88,29 @@ test("disabled basics cannot enter a mix, but existing basics can be replaced wi
   const existing = [{ instanceId: "top", garmentId: "basic" }];
   assert.equal(randomGarmentReplacements([personal, basic], existing, new Set(), () => 0, false).get("top").id, "personal");
   assert.equal(existing[0].garmentId, "basic", "the saved composition remains untouched");
+});
+
+
+test("mixing keeps locked geometry and manual scale while using measured sizes for new garments", () => {
+  const top = garment("top-a");
+  const nextTop = garment("top-b");
+  const pants = garment("pants-a", "Bottoms", "Trousers");
+  const shape = { bounds: [.1,.05,.8,.9], shoulderY: .1, hemY: .7, bodyHeight: .6, neckRise: .05, sleeveBottoms: [.8,.8], slots: 3, region: "upper" };
+  top.anatomy = { version: 1, closed: shape };
+  // Same garment length with half as much transparent image-space occupancy.
+  nextTop.anatomy = { version: 1, closed: { ...shape, bounds: [.3,.275,.4,.45], shoulderY:.3, hemY:.6, bodyHeight:.3 } };
+  const base = { x:43, y:32, scale:.4, rotation:0, z:2001, variant:"closed" };
+  const current = [{ ...base, instanceId:"top", garmentId:top.id }, { ...base, instanceId:"pants", garmentId:pants.id, rotation:17, scale:.72, z:1001 }];
+  const original = structuredClone(current);
+  const byId = new Map([top,nextTop,pants].map(g => [g.id,g]));
+  const replacements = new Map([["top",nextTop],["pants",nextTop]]);
+  const result = applyGarmentReplacements(current, replacements, byId, new Set(["pants"]), new Set());
+  assert.strictEqual(result[1], current[1], "a locked item retains every coordinate, scale, rotation and layer");
+  assert.ok(Math.abs(result[0].scale - .8) < 1e-10, "padding cannot shrink the visible garment; preserve the user's body scale");
+  assert.equal(result[0].x, current[0].x);
+  assert.ok(Math.abs(result[0].y-current[0].y)<1e-10, "aligned shoulder anchors must not jump");
+  assert.equal(result[0].z, current[0].z);
+  assert.deepEqual(current, original, "mixing does not rewrite its input or saved looks");
+  const automatic = applyGarmentReplacements(current, replacements, byId, new Set(["pants"]), new Set(["top"]));
+  assert.notEqual(automatic[0].scale, result[0].scale, "new automatic pieces use their own measured default, not the previous manual scale");
 });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalLinks } from "./legal-page";
 import { FormePublicHeader } from "./forme-public-header";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -36,6 +37,7 @@ export function FormeLanding() {
           />
         </div>
       </section>
+      <footer className="landing-legal"><LegalLinks /></footer>
     </main>
   );
 }

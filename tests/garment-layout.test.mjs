@@ -9,7 +9,7 @@ const root = new URL("../", import.meta.url);
 const catalog = JSON.parse(await readFile(new URL("app/garment-layout-data.json", root), "utf8"));
 const bundled = await build({ entryPoints: [fileURLToPath(new URL("app/garment-layout.ts", root))], bundle: true, write: false, platform: "node", format: "esm", logLevel: "silent" });
 const js = bundled.outputFiles[0].text;
-const { measureGarmentAlpha, classifyGarmentLayout, matchOpenLayout, slotPlacement, layoutAnchorY, canvasSlotSpan, canvasBodyGrid, SLOT_GRID } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+const { measureGarmentAlpha, classifyGarmentLayout, matchOpenLayout, slotPlacement, layoutAnchorY, canvasSlotSpan, canvasBodyGrid, SLOT_GRID, prepareCanvasGarment, manualCanvasScaleMultiplier, replacementPlacement } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 0.00001, `${actual} != ${expected}`);
 
 test("every catalog image has current, finite alpha and slot measurements", async () => {
@@ -308,7 +308,7 @@ test("opening a saved look does not silently rescale or reposition its pieces", 
   const normalization = page.slice(page.indexOf("function normalizedCanvasPiece("), page.indexOf("function initialSlotPiece("));
   assert.match(normalization, /return piece;/);
   assert.doesNotMatch(normalization, /scale:|y:|x:/);
-  assert.match(page, /function replacementPlacement/);
+  assert.match(page, /replacementPlacement/);
   assert.match(page, /change: \(instanceId, geometry\) => \{\s*autoPlacedIds\.current\.delete\(instanceId\)/);
 });
 
@@ -325,4 +325,49 @@ test("typed accessories keep their placement when renamed; one-pieces use a full
     const geometry = measureGarmentAlpha(new Uint8Array(100 * 125 * 4).fill(255), 100, 125);
     assert.equal(classifyGarmentLayout(item, geometry).region, "full");
   }
+});
+
+
+test("canvas replacements wait for decoded pixels, reuse warm images and retry failed images", async () => {
+  const savedImage = globalThis.Image, savedDocument = globalThis.document;
+  let release, calls = 0, fail = false;
+  globalThis.document = {};
+  globalThis.Image = class {
+    decode() { calls++; return fail ? Promise.reject(new Error("offline")) : new Promise(resolve => { release = resolve; }); }
+  };
+  const anatomy = { version:1, closed:{}, open:{} };
+  try {
+    let complete = false;
+    const item = { image:"decoded-closed", openImage:"decoded-open", anatomy };
+    const first = prepareCanvasGarment(item).then(() => { complete = true; });
+    await Promise.resolve();
+    assert.equal(complete, false, "must not swap geometry before the new image is ready");
+    const second = prepareCanvasGarment(item);
+    assert.equal(calls, 1, "concurrent requests share one image decode");
+    release(); await Promise.all([first, second]);
+    await prepareCanvasGarment(item);
+    assert.equal(calls, 1, "mixing a previously prepared image is immediate");
+    fail = true;
+    const retry = { ...item, openImage:"retry-open" };
+    await assert.rejects(prepareCanvasGarment(retry), /offline/);
+    fail = false;
+    const recovered = prepareCanvasGarment(retry); release(); await recovered;
+    assert.equal(calls, 3, "a failed decode does not poison the next mix");
+  } finally { globalThis.Image = savedImage; globalThis.document = savedDocument; }
+});
+
+
+test("manual size overrides automatic scale, survives reuse, and transfers proportionally to the open cutout", () => {
+  const garment = { id:"coat", name:"Coat", category:"Outerwear", garmentType:"Jacket", silhouette:"Regular", image:"/wardrobe/final/0000002.png", openImage:"/wardrobe/final/0000002-c.png" };
+  const closed = slotPlacement(garment, "closed"), open = slotPlacement(garment, "open");
+  const factor = manualCanvasScaleMultiplier(garment, "closed", closed.scale * 1.2);
+  near(factor,1.2);
+  const preferred = { ...garment, canvasScaleMultiplier:factor };
+  near(slotPlacement(preferred,"closed").scale,closed.scale*1.2);
+  near(slotPlacement(preferred,"open").scale,open.scale*1.2);
+  near(manualCanvasScaleMultiplier(preferred,"closed",closed.scale*1.2),1.2); // no compounding
+  const previous = { ...garment,id:"previous" };
+  const piece = {instanceId:"p",garmentId:"previous",variant:"closed",...closed,scale:closed.scale*.8,rotation:0,z:1};
+  near(replacementPlacement(piece,previous,preferred,"closed").scale,closed.scale*1.2);
+  near(piece.scale,closed.scale*.8); // existing composition stays untouched
 });

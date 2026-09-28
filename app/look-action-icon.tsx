@@ -8,6 +8,8 @@ const paths = {
   share: "M12 15V3m-4 4 4-4 4 4M5 12v8h14v-8",
   clear: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
   save: "M5 3h12l4 4v14H3V3Zm2 0v6h10V3M7 21v-8h10v8",
+  layers: "m12 3 8 4-8 4-8-4 8-4Zm8 9-8 4-8-4m16 5-8 4-8-4",
+  looks: "M5 4h14v16H5zM9 4v16m6-16v16",
 } as const;
 
 export function LookActionIcon({ action }: { action: keyof typeof paths }) {

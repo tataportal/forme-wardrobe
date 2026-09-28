@@ -14,10 +14,12 @@ export function useGarmentGridSize(area: "closet" | "canvas") {
   const [size, setSize] = useState<GridSize>("medium");
   const key = `forme-${area}-grid-size-v1`;
   useEffect(() => {
+    let frame = 0;
     try {
       const stored = localStorage.getItem(key);
-      if (sizes.some(option => option.value === stored)) setSize(stored as GridSize);
+      if (sizes.some(option => option.value === stored)) frame = requestAnimationFrame(() => setSize(stored as GridSize));
     } catch { /* Grid controls also work without browser storage. */ }
+    return () => cancelAnimationFrame(frame);
   }, [key]);
   const updateSize = (next: GridSize) => {
     setSize(next);

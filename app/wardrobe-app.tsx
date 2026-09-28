@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   Fragment,
   CSSProperties,
@@ -29,12 +31,12 @@ import { GarmentViewControls, useGarmentGridSize } from "./garment-view-controls
 import { FormeDialog } from "./forme-dialog";
 import { CanvasHistory, snapshotLook, sameDocument, readCanvasDraft, type CanvasDocument } from "./canvas-document";
 import { moveCanvasLayer } from "./canvas-layers";
-import { availableMixGarments, randomGarmentReplacements, randomLookGarments } from "./canvas-random";
+import { applyGarmentReplacements, availableMixGarments, randomGarmentReplacements, randomLookGarments } from "./canvas-random";
 import { CanvasPieceOverlay } from "./canvas-piece-overlay";
 import { CanvasGestures, type GesturePoint } from "./canvas-gestures";
 import { fitLookPreview } from "./look-preview";
 import { LookActionIcon } from "./look-action-icon";
-import { ensureGarmentLayout, garmentLayout, layoutAnchorY, slotPlacement, REFERENCE_FRAME, type LayoutFrame } from "./garment-layout";
+import { prepareCanvasGarment, garmentLayout, layoutAnchorY, replacementPlacement, manualCanvasScaleMultiplier, slotPlacement, REFERENCE_FRAME, type LayoutFrame } from "./garment-layout";
 
 type View = "wardrobe" | "studio";
 type WardrobePanel = "closet" | "looks" | "assistant";
@@ -60,6 +62,7 @@ type TransformHandleSession = {
   startDistance: number;
   startAngle: number;
   startScale: number;
+  lastScale?: number;
   startRotation: number;
   startX: number;
   startY: number;
@@ -102,6 +105,8 @@ type GarmentDraft = Pick<Garment, "id" | "name" | "category" | "garmentType" | "
 
 type ApiGarment = Omit<GarmentDraft, "id"> & {
   id: string;
+  createdAt?: string;
+  updatedAt?: string;
   anatomy?: Garment["anatomy"];
   recognitionStatus?: Garment["recognitionStatus"];
   metadataStatus?: Garment["metadataStatus"];
@@ -123,6 +128,12 @@ type WardrobeProfile = {
   handle: string;
   bio: string;
   avatarUrl?: string | null;
+  joinedAt?: string;
+  isTester?: boolean;
+  credits?: number;
+  referralCode?: string | null;
+  referralCount?: number;
+  referralCredits?: number;
   profilePublic: boolean;
   discoverable: boolean;
   showCloset: boolean;
@@ -823,24 +834,6 @@ function currentLayoutFrame(): LayoutFrame {
 
 const defaultPlacement = (garment: Garment, variant: "closed" | "open" = garment.openImage ? "open" : "closed", frame = currentLayoutFrame()) => slotPlacement(garment, variant, frame);
 
-function replacementPlacement(piece: CanvasPiece, previous: Garment, next: Garment, variant: "closed" | "open") {
-  const frame = currentLayoutFrame();
-  const oldDefault = defaultPlacement(previous, piece.variant, frame);
-  const newDefault = defaultPlacement(next, variant, frame);
-  const scale = clamp(newDefault.scale * piece.scale / oldDefault.scale, 0.08, 1.35);
-  if (Math.abs(piece.rotation) > 0.01) return { x: piece.x, y: piece.y, scale };
-  const oldLayout = garmentLayout(previous, piece.variant);
-  const newLayout = garmentLayout(next, variant);
-  const [oldLeft, , oldWidth] = oldLayout.bounds;
-  const [newLeft, , newWidth] = newLayout.bounds;
-  const oldTop = layoutAnchorY(oldLayout);
-  const newTop = layoutAnchorY(newLayout);
-  return {
-    x: piece.x + ((oldLeft + oldWidth / 2 - 0.5) * piece.scale - (newLeft + newWidth / 2 - 0.5) * scale) * frame.baseWidth / frame.width * 100,
-    y: piece.y + ((oldTop - 0.5) * piece.scale - (newTop - 0.5) * scale) * frame.baseWidth * 1.25 / frame.height * 100,
-    scale,
-  };
-}
 
 function recommendationOuterPlacement(garment: Garment) {
   return defaultPlacement(garment);
@@ -1811,9 +1804,12 @@ function ShareTemplateDialog({ target, options, garmentById, handle, busy, onOpt
   </FormeDialog>;
 }
 
-function ClosetActionIcon({ filter = false }: { filter?: boolean }) {
+function ClosetActionIcon({ action = "add" }: { action?: "add" | "filter" | "select" | "share" }) {
   return <svg className="closet-action-icon" viewBox="0 0 24 24" aria-hidden="true">
-    {filter ? <><path d="M4 7h4m4 0h8M4 17h8m4 0h4" /><circle cx="10" cy="7" r="2" /><circle cx="14" cy="17" r="2" /></> : <path d="M12 5v14M5 12h14" />}
+    {action === "filter" && <><path d="M4 7h4m4 0h8M4 17h8m4 0h4" /><circle cx="10" cy="7" r="2" /><circle cx="14" cy="17" r="2" /></>}
+    {action === "select" && <><rect x="4" y="4" width="16" height="16" rx="1" /><path d="m8 12 3 3 5-6" /></>}
+    {action === "share" && <><path d="M12 15V3m-4 4 4-4 4 4" /><path d="M5 12v8h14v-8" /></>}
+    {action === "add" && <path d="M12 5v14M5 12h14" />}
   </svg>;
 }
 
@@ -2029,9 +2025,7 @@ export function WardrobeApp({
   const [recommendationHistory, setRecommendationHistory] = useState<string[]>([]);
   const [lockedPieceIds, setLockedPieceIds] = useState<Set<string>>(new Set());
   const [randomizing, setRandomizing] = useState(false);
-  const [arrangingCanvas, setArrangingCanvas] = useState(false);
   const randomizingRef = useRef(false);
-  const arrangementRequest = useRef(0);
   const latestCanvasPieces = useRef(canvasPieces);
   latestCanvasPieces.current = canvasPieces;
   const [selectedId, setSelectedId] = useState("");
@@ -2046,7 +2040,7 @@ export function WardrobeApp({
   const [pendingDelete, setPendingDelete] = useState<{ kind: "look" | "garment"; id: string; name: string } | null>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogSource, setCatalogSource] = useState<"personal" | "basics">("personal");
-  const [catalogSort, setCatalogSort] = useState("recent");
+  const [catalogSort, setCatalogSort] = useState<"recent" | "type" | "name">("recent");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [libraryFavoritesOnly, setLibraryFavoritesOnly] = useState(false);
   const [closetGridSize, setClosetGridSize] = useGarmentGridSize("closet");
@@ -2076,11 +2070,12 @@ export function WardrobeApp({
   const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
   const [shareOptions, setShareOptions] = useState<ShareTemplateOptions>({ labelMode: "name-brand", includeHandle: true });
   const [shareBusy, setShareBusy] = useState(false);
-  const [shareNotice, setShareNotice] = useState("");
-  const [profileShareNotice, setProfileShareNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const autoPlacedIds = useRef(new Set(initialDemoCanvas.map(piece => piece.instanceId)));
+  const rememberCanvasSize = useRef<(instanceId: string, scale: number) => void>(() => {});
+  const canvasSizeSaves = useRef<Promise<void>>(Promise.resolve());
+  const keyboardSizes = useRef(new Map<string, number>());
   const canvasGestures = useRef<CanvasGestures | null>(null);
   if (!canvasGestures.current) canvasGestures.current = new CanvasGestures({
     select: instanceId => { setSelectedId(instanceId); setSelectedGroupIds([]); setMarqueeRect(null); },
@@ -2092,6 +2087,7 @@ export function WardrobeApp({
     },
     replace: beginReplacingPiece,
     lock: toggleRandomLock,
+    resize: (instanceId, scale) => rememberCanvasSize.current(instanceId, scale),
   });
   const transformHandleSession = useRef<TransformHandleSession | null>(null);
   const marqueeSession = useRef<MarqueeSession | null>(null);
@@ -2108,6 +2104,31 @@ export function WardrobeApp({
   const [weekAnchor] = useState(() => new Date());
 
   const garmentById = useMemo(() => new Map(garments.map((item) => [item.id, item])), [garments]);
+  rememberCanvasSize.current = (instanceId, scale) => {
+    const piece = latestCanvasPieces.current.find(item => item.instanceId === instanceId);
+    const garment = piece && garmentById.get(piece.garmentId);
+    if (!piece || !garment || !Number.isFinite(scale) || scale <= 0) return;
+    const multiplier = manualCanvasScaleMultiplier(garment, piece.variant, scale);
+    if (Math.abs((garment.canvasScaleMultiplier ?? 0) - multiplier) < 0.000001) return;
+    setGarments(items => items.map(item => item.id === garment.id ? { ...item, canvasScaleMultiplier: multiplier } : item));
+    if (demoMode) {
+      try {
+        const sizes = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v1") || "{}");
+        localStorage.setItem("forme-demo-canvas-sizes-v1", JSON.stringify({ ...sizes, [garment.id]: multiplier }));
+      } catch { /* Guest sizing remains available for this session. */ }
+      return;
+    }
+    // Save once per completed gesture, in order, so a slower earlier response
+    // can never overwrite the user's most recent adjustment.
+    canvasSizeSaves.current = canvasSizeSaves.current.then(async () => {
+      const response = await fetch(`/api/garments/${encodeURIComponent(garment.id)}/canvas-size`, {
+        method: "PUT", headers: { "content-type": "application/json" }, keepalive: true,
+        body: JSON.stringify({ scaleMultiplier: multiplier }),
+      });
+      if (!response.ok) throw new Error("No se pudo guardar el tamaño de esta prenda. Ajusta el tamaño otra vez para reintentar.");
+    }).catch(() => setWardrobeError("No se pudo guardar el tamaño de esta prenda. Ajusta el tamaño otra vez para reintentar."));
+  };
+
   const weekDays = useMemo(() => buildWeekDays(weekAnchor), [weekAnchor]);
   const filterOptions = useMemo<FilterOptions>(() => {
     const unique = (key: FilterKey) => Array.from(new Set(garments.map((item) => item[key]))).sort();
@@ -2142,8 +2163,18 @@ export function WardrobeApp({
   const closetReading = buildClosetReading(personalGarments, savedLooks);
   const basicsEnabled = demoMode || profile.includeFormeBasics === true;
   const sharedBasics = basicsEnabled ? garments.filter((item) => item.collection === "forme") : [];
+  const garmentCategoryOrder: Garment["category"][] = ["Outerwear", "Tailoring", "Tops", "One-pieces", "Bottoms", "Footwear", "Accessories"];
   const filterCatalog = (items: Garment[]) => items.filter(item => matchFilters(item, archiveFilters) && matchesSearch(item, catalogQuery) && (!favoritesOnly || item.favorite))
-    .sort((a, b) => catalogSort === "name" ? translateGarmentName(a.name).localeCompare(translateGarmentName(b.name), "es") : 0);
+    .sort((a, b) => {
+      if (catalogSort === "name") return translateGarmentName(a.name).localeCompare(translateGarmentName(b.name), "es");
+      if (catalogSort === "type") {
+        const categoryDifference = garmentCategoryOrder.indexOf(a.category) - garmentCategoryOrder.indexOf(b.category);
+        return categoryDifference || translateValue(a.garmentType).localeCompare(translateValue(b.garmentType), "es") || translateGarmentName(a.name).localeCompare(translateGarmentName(b.name), "es");
+      }
+      const aTime = Date.parse(a.createdAt ?? "");
+      const bTime = Date.parse(b.createdAt ?? "");
+      return Number.isFinite(aTime) && Number.isFinite(bTime) ? bTime - aTime : 0;
+    });
   const visiblePersonalGarments = filterCatalog(personalGarments);
   const visibleFormeBasics = filterCatalog(sharedBasics);
   const showingBasics = demoMode || (basicsEnabled && catalogSource === "basics");
@@ -2190,6 +2221,9 @@ export function WardrobeApp({
   const detectedLengthLabel = editorLengths.find(([key]) => key === detectedLength)?.[1];
   const profileImage = profile.avatarUrl || asset("/profile/tata.png");
   const profileImageClass = `profile-photo${profile.avatarUrl ? "" : " local-profile"}`;
+  const profileJoinedDate = profile.joinedAt ? new Intl.DateTimeFormat("es-PE", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "America/Lima",
+  }).format(new Date(profile.joinedAt)) : null;
   const profileTopStyles = styleProfile?.completed
     ? styleFamilyMeta
       .map((family) => ({ ...family, rating: styleProfile.ratings.find((rating) => rating.family === family.id) }))
@@ -2238,6 +2272,13 @@ export function WardrobeApp({
           if (profileOpen) setProfileDraft(profileDraftFrom(cachedProfile));
         }
         const sessionResponse = await fetch("/api/session", { cache: "no-store" });
+        if (sessionResponse.status === 428) {
+          if (!active) return;
+          clearCachedSessionProfile();
+          const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          window.location.replace(`/ingresar?return_to=${encodeURIComponent(returnTo)}`);
+          return;
+        }
         if (sessionResponse.status === 401 || sessionResponse.status === 403) {
           if (!active) return;
           clearCachedSessionProfile();
@@ -2246,6 +2287,10 @@ export function WardrobeApp({
           setSessionStatus("guest");
           setAccountDataReady(true);
           setCanvasDataReady(true);
+          try {
+            const sizes = JSON.parse(localStorage.getItem("forme-demo-canvas-sizes-v1") || "{}");
+            setGarments(items => items.map(item => ({ ...item, canvasScaleMultiplier: typeof sizes[item.id] === "number" && sizes[item.id] > 0 && sizes[item.id] <= 20 ? sizes[item.id] : undefined })));
+          } catch { /* No saved guest sizes. */ }
           try {
             const storedLooks = localStorage.getItem(demoLooksStorageKey);
             setSavedLooks(storedLooks ? JSON.parse(storedLooks) as SavedLook[] : []);
@@ -2278,7 +2323,7 @@ export function WardrobeApp({
           fetch("/api/style-profile", { cache: "no-store" }),
         ]);
         if (!wardrobeResponse.ok) throw new Error((await wardrobeResponse.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo abrir tu closet.");
-        const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[] };
+        const wardrobe = await wardrobeResponse.json() as { garments: ApiGarment[]; canvasSizes?: Record<string, number> };
         const outfits = outfitsResponse.ok
           ? await outfitsResponse.json() as { outfits: SavedLook[] }
           : { outfits: [] };
@@ -2292,7 +2337,7 @@ export function WardrobeApp({
         const isLocalOwnerPreview = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
         const ownerCatalogEnabled = Boolean(session.user.isOwner || isLocalOwnerPreview);
         const baseGarments = ownerCatalogEnabled ? starterGarments : formeBasics;
-        const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments);
+        const loadedGarments = mergeApiGarments(baseGarments, wardrobe.garments).map(garment => ({ ...garment, canvasScaleMultiplier: wardrobe.canvasSizes?.[garment.id] }));
         const loadedGarmentById = new Map(loadedGarments.map((item) => [item.id, item]));
         const normalizedLooks = outfits.outfits.map((look) => ({
           ...look,
@@ -2385,6 +2430,34 @@ export function WardrobeApp({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileOpen]);
 
+  useEffect(() => {
+    if (!profileOpen || sessionStatus !== "authenticated") return;
+    let active = true;
+    const refreshProfile = async () => {
+      try {
+        const response = await fetch("/api/session", { cache: "no-store" });
+        if (!response.ok) return;
+        const { user } = await response.json() as { user: WardrobeProfile };
+        if (!active) return;
+        setProfile((current) => ({
+          ...current,
+          joinedAt: user.joinedAt,
+          isTester: user.isTester,
+          credits: user.credits,
+          referralCode: user.referralCode,
+          referralCount: user.referralCount,
+          referralCredits: user.referralCredits,
+        }));
+      } catch { /* Keep the last confirmed balance when offline. */ }
+    };
+    void refreshProfile();
+    window.addEventListener("focus", refreshProfile);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshProfile);
+    };
+  }, [profileOpen, sessionStatus]);
+
   function updateArchiveFilter(key: FilterKey, next: string) {
     setArchiveFilters((current) => ({ ...current, [key]: next, ...(key === "colorFamily" ? { tone: "All" } : {}) }));
   }
@@ -2431,7 +2504,6 @@ export function WardrobeApp({
   }
 
   function updateProfileDraft<Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) {
-    setProfileShareNotice("");
     setProfileDraft((current) => current ? { ...current, [key]: value } : current);
     setProfileSaved(false);
     setProfileSaveError("");
@@ -2496,7 +2568,6 @@ export function WardrobeApp({
         await navigator.share({ title: `${profile.name} en Formé`, text: `Mira mi closet en Formé`, url });
       } else {
         await navigator.clipboard.writeText(url);
-        setProfileShareNotice("Enlace copiado");
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
@@ -2514,7 +2585,6 @@ export function WardrobeApp({
         body: JSON.stringify({ name: look.name, items: look.items, isPublic: nextPublic }),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo cambiar la visibilidad del look.");
-      setShareNotice(!nextPublic ? "Look oculto del perfil" : profile.profilePublic && profile.showLooks ? "Look visible en tu perfil" : "Look elegido. Activa su visibilidad en Perfil para publicarlo.");
     } catch (error) {
       setSavedLooks((looks) => looks.map((item) => item.id === look.id ? look : item));
       setWardrobeError(error instanceof Error ? error.message : "No se pudo cambiar la visibilidad del look.");
@@ -3042,7 +3112,7 @@ export function WardrobeApp({
     if (savingOutfit) return;
     checkpoint();
     restoreDocument({ items: [], id: null, name: "Nuevo look" });
-    setClearedLook(null); setShareNotice("");
+    setClearedLook(null);
     openStudio("looks");
   }
 
@@ -3068,7 +3138,7 @@ export function WardrobeApp({
     if (!garment || savingOutfit) return;
     const replacementId = replacingId;
     const generationAtStart = documentGeneration.current;
-    try { await ensureGarmentLayout(garment); }
+    try { await prepareCanvasGarment(garment); }
     catch { setWardrobeError("No se pudo medir esta prenda. Vuelve a intentarlo."); return; }
     if (documentGeneration.current !== generationAtStart) return;
     checkpoint();
@@ -3096,7 +3166,6 @@ export function WardrobeApp({
       setSelectedId(selectedPiece.instanceId);
       setSelectedGroupIds([]);
       setSaved(false);
-      void arrangeCanvasAutomatically(next, generationAtStart);
       return;
     }
 
@@ -3121,7 +3190,6 @@ export function WardrobeApp({
     setSelectedId(instanceId);
     setSelectedGroupIds([]);
     setSaved(false);
-    void arrangeCanvasAutomatically(next, generationAtStart);
   }
 
   async function addAndOpenStudio(garmentId: string) {
@@ -3261,6 +3329,7 @@ export function WardrobeApp({
     if (session.mode === "scale") {
       const distance = Math.hypot(event.clientX - session.centerX, event.clientY - session.centerY);
       const scale = clamp(session.startScale * (distance / session.startDistance), 0.08, 1.35);
+      session.lastScale = scale;
       setCanvasPieces((items) => items.map((item) => item.instanceId === session.instanceId ? { ...item, scale } : item));
     } else {
       const angle = Math.atan2(event.clientY - session.centerY, event.clientX - session.centerX);
@@ -3273,7 +3342,12 @@ export function WardrobeApp({
   function stopTransformHandle(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-    if (transformHandleSession.current?.pointerId === event.pointerId) transformHandleSession.current = null;
+    const session = transformHandleSession.current;
+    if (session?.pointerId !== event.pointerId) return;
+    transformHandleSession.current = null;
+    if (event.type !== "pointercancel" && session.mode === "scale" && session.lastScale !== undefined && Math.abs(session.lastScale - session.startScale) > 0.00001) {
+      rememberCanvasSize.current(session.instanceId, session.lastScale);
+    }
   }
 
   function adjustPieceWithKeyboard(instanceId: string, field: "rotation" | "scale", delta: number) {
@@ -3282,6 +3356,7 @@ export function WardrobeApp({
     const value = field === "rotation" ? normalizeDegrees(piece.rotation + delta) : clamp(piece.scale + delta, .08, 1.35);
     if (piece[field] === value) return;
     checkpoint(); autoPlacedIds.current.delete(instanceId);
+    if (field === "scale") keyboardSizes.current.set(instanceId, value);
     setCanvasPieces(items => items.map(item => item.instanceId === instanceId ? { ...item, [field]: value } : item));
     setSaved(false);
   }
@@ -3398,54 +3473,8 @@ export function WardrobeApp({
     });
   }
 
-  async function arrangeCanvasAutomatically(snapshot: CanvasPiece[], generationAtStart: number) {
-    if (demoMode || !snapshot.length || snapshot.length > 8) return;
-    const requestId = arrangementRequest.current + 1;
-    arrangementRequest.current = requestId;
-    setArrangingCanvas(true);
-    setWardrobeError("");
-    setShareNotice("");
-    try {
-      const response = await fetch("/api/canvas-placement", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items: snapshot.map((piece) => {
-          const garment = garmentById.get(piece.garmentId);
-          return {
-            instanceId: piece.instanceId,
-            garmentId: piece.garmentId,
-            variant: piece.variant,
-            name: garment?.name || "Prenda",
-            category: garment?.category || "Other",
-            garmentType: garment?.garmentType || "Garment",
-          };
-        }) }),
-      });
-      const result = await response.json().catch(() => null) as { placements?: Array<Pick<CanvasPiece, "instanceId" | "x" | "y" | "scale" | "z"> & { confidence: number }>; costUsd?: number | null; error?: string } | null;
-      if (!response.ok || !result?.placements) throw new Error(result?.error || "No se pudo ajustar el look.");
-      if (arrangementRequest.current !== requestId || latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
-      const placementById = new Map(result.placements.map((placement) => [placement.instanceId, placement]));
-      if (placementById.size !== snapshot.length) throw new Error("El asistente no pudo ubicar todas las prendas.");
-      const next = snapshot.map((piece) => {
-        const placement = placementById.get(piece.instanceId);
-        return placement ? { ...piece, x: placement.x, y: placement.y, scale: placement.scale, rotation: 0, z: placement.z } : piece;
-      });
-      autoPlacedIds.current = new Set(next.map(piece => piece.instanceId));
-      latestCanvasPieces.current = next;
-      setCanvasPieces(next);
-      setSaved(false);
-      setShareNotice(result.costUsd == null ? "Look ajustado con IA" : `Look ajustado con IA. Costo US$${result.costUsd.toFixed(5)}`);
-    } catch (error) {
-      if (arrangementRequest.current === requestId && latestCanvasPieces.current === snapshot && documentGeneration.current === generationAtStart) {
-        setWardrobeError(error instanceof Error ? error.message : "No se pudo ajustar el look.");
-      }
-    } finally {
-      if (arrangementRequest.current === requestId) setArrangingCanvas(false);
-    }
-  }
-
   async function randomizeCurrentLook() {
-    if (randomizingRef.current || savingOutfit || arrangingCanvas) return;
+    if (randomizingRef.current || savingOutfit) return;
     randomizingRef.current = true;
     setRandomizing(true);
     const snapshot = canvasPieces;
@@ -3457,7 +3486,7 @@ export function WardrobeApp({
           setWardrobeError("Añade prendas a tu closet para empezar a mezclar.");
           return;
         }
-        await Promise.all(chosen.map(ensureGarmentLayout));
+        await Promise.all(chosen.map(prepareCanvasGarment));
         if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
         const next = chosen.map(garment => {
           const variant = garment.openImage ? "open" as const : "closed" as const;
@@ -3471,7 +3500,6 @@ export function WardrobeApp({
         setClearedLook(null);
         setSaved(false);
         setWardrobeError("");
-        await arrangeCanvasAutomatically(next, generationAtStart);
         return;
       }
       const replacements = randomGarmentReplacements(garments, snapshot, lockedPieceIds, Math.random, basicsEnabled);
@@ -3479,25 +3507,16 @@ export function WardrobeApp({
         setWardrobeError("No hay otras prendas para mezclar. Prueba a liberar alguna de las que mantuviste.");
         return;
       }
-      await Promise.all([...replacements.values()].map(ensureGarmentLayout));
+      await Promise.all([...replacements.values()].map(prepareCanvasGarment));
       // A drag, deletion or a newly opened look during measurement wins over
       // this pending randomization; never overwrite the user's newer changes.
       if (latestCanvasPieces.current !== snapshot || documentGeneration.current !== generationAtStart) return;
-      const next = snapshot.map(piece => {
-        const garment = replacements.get(piece.instanceId);
-        if (!garment || lockedPieceIds.has(piece.instanceId)) return piece;
-        const previous = garmentById.get(piece.garmentId);
-        const variant = garment.openImage ? "open" as const : "closed" as const;
-        const placement = previous && !autoPlacedIds.current.has(piece.instanceId)
-          ? replacementPlacement(piece, previous, garment, variant) : defaultPlacement(garment, variant);
-        return { ...piece, garmentId: garment.id, variant, ...placement };
-      });
+      const next = applyGarmentReplacements(snapshot, replacements, garmentById, lockedPieceIds, autoPlacedIds.current);
       checkpoint();
       latestCanvasPieces.current = next;
       setCanvasPieces(next);
       setSaved(false);
       setWardrobeError("");
-      await arrangeCanvasAutomatically(next, generationAtStart);
     } catch {
       setWardrobeError("No se pudo preparar una de las prendas para mezclar.");
     } finally {
@@ -3641,8 +3660,6 @@ export function WardrobeApp({
       return;
     }
     const occasions: WeeklyOccasion[] = ["work", "work", "daily", "work", "dinner", "weekend", "weekend"];
-    const currentWeekKeys = new Set(weekDays.map((day) => day.key));
-    const hasPlannedWeek = weeklyPlan.some((entry) => currentWeekKeys.has(entry.date));
     const currentFirstLookId = weeklyPlan.find((entry) => entry.date === weekDays[0]?.key)?.outfitId;
     const currentFirstLookIndex = currentFirstLookId ? plannableLooks.findIndex((look) => look.id === currentFirstLookId) : -1;
     const rotationOffset = currentFirstLookIndex >= 0 ? (currentFirstLookIndex + 1) % plannableLooks.length : 0;
@@ -3669,7 +3686,6 @@ export function WardrobeApp({
         persistDemoWeek(next);
         return next;
       });
-      setShareNotice(hasPlannedWeek ? "Semana replanteada." : "Tu semana quedó lista.");
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo completar la semana.");
     } finally {
@@ -3726,7 +3742,6 @@ export function WardrobeApp({
   async function exportShareTemplate() {
     if (!shareTarget || shareBusy) return;
     setShareBusy(true);
-    setShareNotice("");
     setWardrobeError("");
     try {
       const blob = shareTarget.kind === "look"
@@ -3745,7 +3760,6 @@ export function WardrobeApp({
             title: `${baseName} - Formé`,
             text: shareOptions.includeHandle ? `${shareHandle(profile.handle)} en Formé` : "Creado en Formé",
           });
-          setShareNotice("Imagen compartida");
           setShareTarget(null);
           return;
         } catch (error) {
@@ -3758,7 +3772,6 @@ export function WardrobeApp({
       link.download = file.name;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-      setShareNotice("Imagen descargada");
       setShareTarget(null);
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo compartir la imagen.");
@@ -3799,7 +3812,6 @@ export function WardrobeApp({
         return result.garment;
       }));
       setGarments((items) => mergeApiGarments(items, results));
-      setShareNotice(isPublic ? `${selected.length} prendas elegidas para tu perfil` : `${selected.length} prendas quedaron privadas`);
       setSelectedGarmentIds(new Set()); setClosetSelecting(false);
     } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron actualizar las prendas."); }
     finally { setBulkBusy(false); }
@@ -3818,7 +3830,6 @@ export function WardrobeApp({
       setGarments((items) => items.filter((item) => !ids.has(item.id)));
       setCanvasPieces((items) => items.filter((piece) => !ids.has(piece.garmentId)));
       setSelectedGarmentIds(new Set()); setClosetSelecting(false);
-      setShareNotice(`${selected.length} prendas eliminadas`);
     } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron eliminar las prendas."); }
     finally { setBulkBusy(false); }
   }
@@ -3833,7 +3844,6 @@ export function WardrobeApp({
         if (!response.ok) throw new Error((await response.json().catch(() => null) as { error?: string } | null)?.error || "No se pudo actualizar un look.");
       }));
       setSavedLooks((looks) => looks.map((look) => selectedLookIds.has(look.id) ? { ...look, isPublic } : look));
-      setShareNotice(isPublic ? `${selected.length} looks elegidos para tu perfil` : `${selected.length} looks quedaron privados`);
       setSelectedLookIds(new Set()); setLookSelecting(false);
     } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron actualizar los looks."); }
     finally { setBulkBusy(false); }
@@ -3852,7 +3862,6 @@ export function WardrobeApp({
       setSavedLooks((looks) => looks.filter((look) => !ids.has(look.id)));
       setWeeklyPlan((entries) => entries.filter((entry) => !ids.has(entry.outfitId)));
       setSelectedLookIds(new Set()); setLookSelecting(false);
-      setShareNotice(`${selected.length} looks eliminados`);
     } catch (error) { setWardrobeError(error instanceof Error ? error.message : "No se pudieron eliminar los looks."); }
     finally { setBulkBusy(false); }
   }
@@ -3896,7 +3905,6 @@ export function WardrobeApp({
         if (currentDocument.current.name === documentAtSave.name) setActiveLookName(lookName);
         setSaved(sameDocument(documentAtSave, currentDocument.current));
       }
-      if (demoMode) setShareNotice("Look guardado en este navegador");
     } catch (error) {
       setWardrobeError(error instanceof Error ? error.message : "No se pudo guardar el look.");
     } finally {
@@ -4027,7 +4035,7 @@ export function WardrobeApp({
               <div><h2>{profile.name}</h2><small>{profile.handle}</small><button type="button" className="account-sign-out" onClick={signOut}>Cerrar sesión</button></div>
             </section>
 
-            <section className="settings-account-links"><h2>Cuenta</h2><a href="/perfil">Perfil y privacidad</a><a href="/pricing">Información de la beta</a><a href="/about">Manifiesto</a></section>
+            <section className="settings-account-links"><h2>Cuenta</h2><Link href="/perfil">Perfil y privacidad</Link><Link href="/pricing">Información de la beta</Link><Link href="/about">Manifiesto</Link><Link href="/terminos">Términos de uso</Link><Link href="/privacidad">Privacidad y fotos</Link></section>
             {productFeatures.styleTest && <>
             <section className="profile-style-summary">
               <p>Tu lectura actual</p>
@@ -4080,13 +4088,20 @@ export function WardrobeApp({
           <div className="profile-page-intro">
             <span>{profileDraft.handle || "@tuusuario"}</span>
             <h1>{profileDraft.name || "Tu nombre"}</h1>
+            <div className="profile-account-details">
+              {profile.isTester && <span className="profile-tester-badge">Tester</span>}
+              {typeof profile.credits === "number" && <span>{profile.credits} {profile.credits === 1 ? "crédito" : "créditos"}</span>}
+            </div>
+            {profileJoinedDate && <p className="profile-joined-date">Se unió el <time dateTime={profile.joinedAt}>{profileJoinedDate}</time></p>}
             {profileDraft.bio.trim() ? <p>{profileDraft.bio}</p> : null}
             <nav className="profile-page-links" aria-label="Acciones del perfil">
               {profile.profilePublic && <button type="button" onClick={() => window.open(`/${profile.handle}`, "_blank", "noopener,noreferrer")}>Ver perfil público</button>}
               {profile.profilePublic && <button type="button" onClick={() => void sharePublicProfile()}>Compartir</button>}
               <button type="button" onClick={() => navigateWardrobeRoute("ajustes")}>Ajustes</button>
+              {profile.referralCode && <button type="button" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}/ingresar?ref=${profile.referralCode}`)}>Copiar invitación · +5 créditos</button>}
               <button type="button" onClick={signOut}>Cerrar sesión</button>
             </nav>
+            {Boolean(profile.referralCount) && <p className="profile-referral-summary">{profile.referralCount} {profile.referralCount === 1 ? "persona invitada" : "personas invitadas"} · +{profile.referralCredits || 0} créditos</p>}
           </div>
           <dl className="profile-page-stats">
             <div><dt>Prendas</dt><dd>{personalGarments.length}</dd></div>
@@ -4095,7 +4110,6 @@ export function WardrobeApp({
           </dl>
         </header>
 
-        {profileShareNotice && <p className="profile-share-notice" role="status">{profileShareNotice}</p>}
         <section className="closet-reading" aria-labelledby="closet-reading-title">
           <header className="closet-reading-heading">
             <h2 id="closet-reading-title">Análisis del closet</h2>
@@ -4150,7 +4164,7 @@ export function WardrobeApp({
             <div className="profile-preferences">
             <div className="profile-page-visibility">
               <h3>Privacidad</h3>
-              <label><span><strong>Perfil público</strong><small>Cualquier persona con el enlace podrá verlo.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => { setProfileSaved(false); setProfileShareNotice(""); setProfileSaveError(""); setProfileDraft((current) => current ? {
+              <label><span><strong>Perfil público</strong><small>Cualquier persona con el enlace podrá verlo.</small></span><input type="checkbox" checked={profileDraft.profilePublic} onChange={(event) => { setProfileSaved(false); setProfileSaveError(""); setProfileDraft((current) => current ? {
                 ...current,
                 profilePublic: event.target.checked,
                 ...(!event.target.checked ? { discoverable: false, showCloset: false, showLooks: false } : {}),
@@ -4211,9 +4225,9 @@ export function WardrobeApp({
                 <label className="catalog-search"><span className="sr-only">Buscar prendas</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" value={catalogQuery} onChange={event => setCatalogQuery(event.target.value)} placeholder="Buscar" /></label>
                 <div className="catalog-tools">
                   <GarmentViewControls size={closetGridSize} onSizeChange={setClosetGridSize} favorites={favoritesOnly} onFavoritesChange={setFavoritesOnly} />
-                  <button type="button" className={`catalog-filter${archiveFilterCount || catalogSort !== "recent" ? " active" : ""}`} onClick={() => setFiltersOpen(true)} aria-label={`Filtrar y ordenar prendas${archiveFilterCount ? `, ${archiveFilterCount} filtros activos` : ""}`}><ClosetActionIcon filter /><span>Filtros{archiveFilterCount ? ` · ${archiveFilterCount}` : ""}</span></button>
-                  {!showingBasics && catalogItems.length > 0 && <button type="button" className={closetSelecting ? "active" : ""} onClick={() => { setClosetSelecting((value) => !value); setSelectedGarmentIds(new Set()); }}>{closetSelecting ? "Cancelar" : "Seleccionar"}</button>}
-                  {!showingBasics && personalGarments.length > 0 && <button type="button" onClick={() => openShareTemplate({ kind: "closet", garments: personalGarments })}>Compartir closet</button>}
+                  <button type="button" className={`catalog-filter${archiveFilterCount || catalogSort !== "recent" ? " active" : ""}`} onClick={() => setFiltersOpen(true)} aria-label={`Filtrar y ordenar prendas${archiveFilterCount ? `, ${archiveFilterCount} filtros activos` : ""}`} title="Filtrar y ordenar"><ClosetActionIcon action="filter" /><span>Filtros{archiveFilterCount ? ` · ${archiveFilterCount}` : ""}</span></button>
+                  {!showingBasics && catalogItems.length > 0 && <button type="button" className={`catalog-secondary-action${closetSelecting ? " active" : ""}`} aria-label={closetSelecting ? "Cancelar selección" : "Seleccionar prendas"} title={closetSelecting ? "Cancelar selección" : "Seleccionar prendas"} onClick={() => { setClosetSelecting((value) => !value); setSelectedGarmentIds(new Set()); }}><ClosetActionIcon action="select" /><span className="catalog-action-label">{closetSelecting ? "Cancelar" : "Seleccionar"}</span></button>}
+                  {!showingBasics && personalGarments.length > 0 && <button type="button" className="catalog-secondary-action" aria-label="Compartir closet" title="Compartir closet" onClick={() => openShareTemplate({ kind: "closet", garments: personalGarments })}><ClosetActionIcon action="share" /><span className="catalog-action-label">Compartir closet</span></button>}
                 </div>
                 {(demoMode || showingBasics || personalGarments.length > 0) && <button className="closet-add" type="button" onClick={demoMode ? beginGoogleSignIn : openUpload} aria-label={demoMode ? "Crear mi closet" : "Añadir prendas"}><ClosetActionIcon /><span>{demoMode ? "Crear mi closet" : <>Añadir<span className="closet-add-context"> prendas</span></>}</span></button>}
               </div>
@@ -4226,7 +4240,7 @@ export function WardrobeApp({
               </div>}
               {filtersOpen && <FormeDialog labelledBy="filter-title" className="filter-dialog" onClose={() => setFiltersOpen(false)}>
                 <header className="dialog-heading"><h2 id="filter-title">Filtros y orden</h2><button type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">×</button></header>
-                <label className="catalog-sort"><span>Ordenar por</span><select aria-label="Ordenar prendas" value={catalogSort} onChange={event => setCatalogSort(event.target.value)}><option value="recent">Más recientes</option><option value="name">Nombre A–Z</option></select></label>
+                <label className="catalog-sort"><span>Ordenar por</span><select aria-label="Ordenar prendas" value={catalogSort} onChange={event => setCatalogSort(event.target.value as "recent" | "type" | "name")}><option value="recent">Más recientes</option><option value="type">Tipo de prenda</option><option value="name">Nombre A–Z</option></select></label>
                 <AttributeFilters value={archiveFilters} options={filterOptions} onChange={updateArchiveFilter} onReset={() => setArchiveFilters(emptyFilters)} />
                 <button className="primary-action" onClick={() => setFiltersOpen(false)}>Ver {catalogItems.length} prendas</button>
               </FormeDialog>}
@@ -4255,7 +4269,6 @@ export function WardrobeApp({
                 <button type="button" disabled={!selectedLookIds.size || bulkBusy} onClick={() => void bulkSetLookVisibility(false)}>Hacer privados</button>
                 <button type="button" className="danger-action" disabled={!selectedLookIds.size || bulkBusy} onClick={() => void bulkDeleteLooks()}>Eliminar</button>
               </div>}
-              {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
               <div className="saved-looks-grid">
                 {savedLooks.map((look) => (
                   <article className="saved-look-card" data-selected={selectedLookIds.has(look.id) || undefined} key={look.id}>
@@ -4407,12 +4420,12 @@ export function WardrobeApp({
 
       {view === "studio" && (
         <section className="content studio-view" data-pending={!accountDataReady || undefined} inert={!accountDataReady}>
-          <div className="studio-layout" aria-busy={savingOutfit || arrangingCanvas}>
+          <div className="studio-layout" aria-busy={savingOutfit}>
             <header className="studio-heading">
               <div className="studio-document-name"><label className="sr-only" htmlFor="look-name">Nombre del look</label><input id="look-name" disabled={savingOutfit} value={activeLookName} maxLength={80} onFocus={() => { nameCheckpoint.current = false; }} onChange={event => { if (!nameCheckpoint.current) { checkpoint(); nameCheckpoint.current = true; } setActiveLookName(event.target.value); setSaved(false); }} /><span className="sr-only" aria-live="polite">{savingOutfit ? "Guardando…" : saved ? "Guardado en Looks" : demoMode ? "Borrador en este navegador" : "Borrador"}</span></div>
               <nav className="canvas-panel-nav" aria-label="Paneles del canvas">
-                <button type="button" className={layersOpen ? "active" : ""} onClick={() => togglePanel("layers")} aria-expanded={layersOpen} aria-controls="canvas-layers">Capas</button>
-                <button type="button" className={savedLooksOpen ? "active" : ""} onClick={() => togglePanel("looks")} aria-expanded={savedLooksOpen} aria-controls="canvas-saved-looks">Looks</button>
+                <button type="button" className={layersOpen ? "active" : ""} onClick={() => togglePanel("layers")} aria-expanded={layersOpen} aria-controls="canvas-layers" aria-label="Capas" title="Capas"><LookActionIcon action="layers" /><span>Capas</span></button>
+                <button type="button" className={savedLooksOpen ? "active" : ""} onClick={() => togglePanel("looks")} aria-expanded={savedLooksOpen} aria-controls="canvas-saved-looks" aria-label="Looks guardados" title="Looks guardados"><LookActionIcon action="looks" /><span>Looks</span></button>
               </nav>
             </header>
             <div className="canvas-column">
@@ -4531,6 +4544,13 @@ export function WardrobeApp({
                             onPointerMove={moveTransformHandle} onPointerUp={stopTransformHandle} onPointerCancel={stopTransformHandle}
                           ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V3M5 3h5M5.5 3.5A9 9 0 1 1 3 13" /></svg></button>
                           <button type="button" className="transform-handle scale-handle" disabled={savingOutfit}
+                            onKeyUp={event => {
+                              if (["ArrowUp", "ArrowDown"].includes(event.key)) {
+                                const scale = keyboardSizes.current.get(piece.instanceId);
+                                keyboardSizes.current.delete(piece.instanceId);
+                                if (scale !== undefined) rememberCanvasSize.current(piece.instanceId, scale);
+                              }
+                            }}
                             aria-label={`Cambiar tamaño de ${translateGarmentName(garment.name)}`} title="Arrastra para cambiar tamaño · ↑ ↓ con teclado"
                             onKeyDown={event => { if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); adjustPieceWithKeyboard(piece.instanceId, "scale", event.key === "ArrowDown" ? -.03 : .03); } }}
                             onPointerDown={event => startTransformHandle(event, piece.instanceId, "scale")}
@@ -4566,7 +4586,7 @@ export function WardrobeApp({
                 </div>}
                 <div className="look-document-actions">
                 <button type="button" className="canvas-core-action new-look-action" aria-label="Nuevo look" onClick={newLook} disabled={savingOutfit} title="Nuevo look"><LookActionIcon action="new" /><span className="canvas-action-label">Nuevo</span></button>
-                <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing || arrangingCanvas} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || arrangingCanvas || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
+                <button type="button" className="canvas-core-action mix-look-action" aria-label={randomizing ? "Mezclando…" : "Mezclar"} title="Mezclar" aria-busy={randomizing} onClick={() => void randomizeCurrentLook()} disabled={!canRandomize || randomizing || savingOutfit || !canvasDataReady}><LookActionIcon action="mix" /><span className="canvas-action-label">Mezclar</span></button>
                 <button type="button" className="history-action" aria-label="Deshacer" title="Deshacer · ⌘Z" disabled={!history.current.past.length || savingOutfit} onClick={() => travelHistory("undo")}><LookActionIcon action="undo" /></button>
                 <button type="button" className="history-action" aria-label="Rehacer" title="Rehacer · ⇧⌘Z" disabled={!history.current.future.length || savingOutfit} onClick={() => travelHistory("redo")}><LookActionIcon action="redo" /></button>
                 <div className="canvas-utility-actions" role="group" aria-label="Acciones del look">
@@ -4649,7 +4669,6 @@ export function WardrobeApp({
 
             </div>
 
-            {shareNotice && <div className="share-status-message" role="status">{shareNotice}<button type="button" onClick={() => setShareNotice("")} aria-label="Cerrar mensaje">×</button></div>}
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
           </div>
         </section>

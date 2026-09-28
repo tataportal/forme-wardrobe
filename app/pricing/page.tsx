@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
 import { FormePublicHeader } from "../forme-public-header";
 
 type BillingCycle = "monthly" | "annual";
@@ -59,7 +60,7 @@ export default function PricingPage() {
       <header className="pricing-intro">
         <h1>Tu closet,<br />listo para usar.</h1>
         <span>Sube una foto. Formé la convierte en una prenda limpia, la ordena y te ayuda a armar el look.</span>
-        <a className="primary-action pricing-start" href="/closet">Probar gratis</a>
+        <Link className="primary-action pricing-start" href="/closet">Probar gratis</Link>
       </header>
 
       <div className="pricing-garment-rail" aria-label="Prendas digitalizadas con Formé">
@@ -69,8 +70,8 @@ export default function PricingPage() {
       </div>
 
       <section className="pricing-free" aria-labelledby="free-title">
-        <div><h2 id="free-title">Empieza gratis</h2><p>10 prendas de por vida y hasta 5 looks guardados. Sin tarjeta.</p></div>
-        <a href="/auth/google/start?return_to=%2Fcloset">Crear mi closet</a>
+        <div><h2 id="free-title">Empieza gratis</h2><p>15 prendas de por vida y hasta 5 looks guardados. Sin tarjeta.</p></div>
+        <Link href="/ingresar?return_to=%2Fcloset">Crear mi closet</Link>
       </section>
 
       <section className="pricing-paid" aria-labelledby="plans-title">
@@ -106,12 +107,14 @@ export default function PricingPage() {
         {status === "sent" ? <p className="pricing-success">{message}</p> : <form onSubmit={submit}>
           <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></label>
           <label>Correo<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
+          <p className="pricing-terms">Usaremos tus datos para responder esta solicitud. Consulta la <Link href="/privacidad">Política de privacidad</Link>.</p>
           <label className="pricing-honeypot" aria-hidden="true">Empresa<input value={company} onChange={(event) => setCompany(event.target.value)} tabIndex={-1} autoComplete="off" /></label>
           <button className="primary-action" disabled={status === "sending"}>{status === "sending" ? "Enviando..." : "Solicitar activación"}</button>
           {status === "error" && <p className="pricing-error" role="alert">{message}</p>}
         </form>}
       </section>}
 
+      <p className="pricing-terms"><Link href="/terminos">Términos de uso</Link> · <Link href="/privacidad">Privacidad y fotos</Link></p>
       <p className="pricing-terms">Un crédito se descuenta solo cuando la prenda queda lista. Los reintentos del sistema no consumen créditos. Puedes cancelar el plan cuando quieras.</p>
     </section>
   </main>;

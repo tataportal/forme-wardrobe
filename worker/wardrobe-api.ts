@@ -1,3 +1,4 @@
+import { currentLegalAcceptance, LEGAL_VERSION, type LegalAcceptance } from "../shared/legal";
 import layoutCatalog from "../app/garment-layout-data.json";
 import { garmentWebp } from "./garment-webp";
 import { uploadFileError } from "../app/garment-upload";
@@ -58,7 +59,8 @@ export type GarmentQueueMessage = {
   quality: ImageQuality;
   presentation: GarmentPresentation;
   outputVariant: GarmentOutputVariant;
-  stage?: "recognize" | "metadata" | "batch" | "generate" | "postprocess";
+  stage?: "recognize" | "metadata" | "batch" | "batch_monitor" | "generate" | "postprocess";
+  batchId?: string;
   recognitionSourceKey?: string;
   generatedKey?: string;
   maskAttempt?: number;
@@ -74,6 +76,8 @@ export interface WardrobeQueueBatch {
 }
 
 type Identity = {
+  legalAcceptance?: LegalAcceptance;
+  referralCode?: string;
   id: string;
   email: string;
   displayName: string;
@@ -190,8 +194,9 @@ function isGarmentQueueMessage(value: unknown): value is GarmentQueueMessage {
     && ["low", "medium", "high"].includes(message.quality || "")
     && ["auto", "closed", "open"].includes(message.presentation || "")
     && ["closed", "open"].includes(message.outputVariant || "")
-    && (!message.stage || ["recognize", "metadata", "batch", "generate", "postprocess"].includes(message.stage))
+    && (!message.stage || ["recognize", "metadata", "batch", "batch_monitor", "generate", "postprocess"].includes(message.stage))
     && (message.stage !== "metadata" || typeof message.recognitionSourceKey === "string")
+    && (message.stage !== "batch_monitor" || typeof message.batchId === "string")
     && (message.stage !== "postprocess" || typeof message.generatedKey === "string")
     && (message.maskAttempt === undefined || (Number.isInteger(message.maskAttempt) && message.maskAttempt >= 0 && message.maskAttempt <= 2));
 }
@@ -205,6 +210,10 @@ async function enqueueGarmentJob(
   await env.GARMENT_JOBS.send(message, options);
 }
 
+async function enqueueBatchMonitor(env: WardrobeEnv, message: GarmentQueueMessage): Promise<void> {
+  await enqueueGarmentJob(env, { ...message, stage: "batch_monitor" }, { delaySeconds: 60 });
+}
+
 type UserProfileRow = {
   id: string;
   email: string;
@@ -212,11 +221,17 @@ type UserProfileRow = {
   handle: string | null;
   bio: string;
   avatar_url: string | null;
+  created_at: string;
+  is_tester: number;
+  credits: number;
   profile_public: number;
   discoverable: number;
   show_closet: number;
   show_looks: number;
   include_forme_basics: number;
+  referral_code: string | null;
+  referral_count: number;
+  referral_credits: number;
 };
 
 type ImageQuality = "low" | "medium";
@@ -245,6 +260,8 @@ const MAX_DAILY_UPLOADS = 20;
 const MAX_DAILY_CANVAS_RUNS = 100;
 const MONTHLY_CANVAS_RUNS: Record<string, number> = { trial: 100, personal: 300, club: 1000 };
 const PROCESSING_JOB_ALLOWANCE: Record<string, number> = { trial: 15, personal: 25, club: 60 };
+const GARMENT_STORAGE_LIMIT: Record<string, number> = { trial: 15, personal: 75, club: 250 };
+const OUTFIT_STORAGE_LIMIT: Record<string, number> = { trial: 5, personal: Number.POSITIVE_INFINITY, club: Number.POSITIVE_INFINITY };
 const BATCH_EXPIRY_SECONDS = 3 * 24 * 60 * 60;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const categories = new Set(Object.keys(garmentTypesByCategory));
@@ -548,13 +565,19 @@ async function hash(value: string): Promise<string> {
 
 async function identify(request: Request, env: WardrobeEnv): Promise<Identity | null> {
   const headers = request.headers;
-  let email = headers.get("oai-authenticated-user-email")?.trim().toLocaleLowerCase() ?? "";
-  let displayName = decodeHeader(
+  let legalAcceptance: LegalAcceptance | undefined;
+  let identityReferralCode: string | undefined;
+  const hostname = new URL(request.url).hostname;
+  const localRequest = localHosts.has(hostname);
+  // These headers are supplied by the local Codex preview. On the public
+  // Worker they are attacker-controlled, so production only trusts the signed
+  // Forme session cookie below.
+  let email = localRequest ? headers.get("oai-authenticated-user-email")?.trim().toLocaleLowerCase() ?? "" : "";
+  let displayName = localRequest ? decodeHeader(
     headers.get("oai-authenticated-user-full-name"),
     headers.get("oai-authenticated-user-full-name-encoding"),
-  ).trim();
-  let avatarUrl = headers.get("oai-authenticated-user-picture")?.trim() || null;
-  const hostname = new URL(request.url).hostname;
+  ).trim() : "";
+  let avatarUrl = localRequest ? headers.get("oai-authenticated-user-picture")?.trim() || null : null;
 
   if (!email) {
     const nativeIdentity = await readNativeSession(request, env.SESSION_SECRET);
@@ -562,20 +585,37 @@ async function identify(request: Request, env: WardrobeEnv): Promise<Identity | 
       email = nativeIdentity.email;
       displayName = nativeIdentity.displayName;
       avatarUrl = nativeIdentity.avatarUrl;
+      legalAcceptance = nativeIdentity.legalAcceptance;
+      identityReferralCode = nativeIdentity.referralCode;
     }
   }
 
-  if (!email && localHosts.has(hostname)) {
+  if (!email && localRequest) {
     email = "local@forme.test";
     displayName = displayName || "Tata";
   }
   if (!email) return null;
   return {
+    legalAcceptance,
+    referralCode: identityReferralCode,
     id: `usr_${(await hash(email)).slice(0, 28)}`,
     email,
     displayName: displayName || email.split("@")[0] || "Mi perfil",
     avatarUrl,
   };
+}
+
+async function recordLegalAcceptance(db: D1Database, identity: Identity): Promise<void> {
+  if (!currentLegalAcceptance(identity.legalAcceptance)) return;
+  await db.prepare("INSERT OR IGNORE INTO user_legal_acceptances (owner_id, version, accepted_at) VALUES (?, ?, ?)")
+    .bind(identity.id, identity.legalAcceptance.version, identity.legalAcceptance.acceptedAt).run();
+}
+
+async function hasLegalAcceptance(request: Request, db: D1Database, identity: Identity): Promise<boolean> {
+  // Local development never creates evidence of acceptance for a real user.
+  if (localHosts.has(new URL(request.url).hostname) || currentLegalAcceptance(identity.legalAcceptance)) return true;
+  return Boolean(await db.prepare("SELECT 1 FROM user_legal_acceptances WHERE owner_id = ? AND version = ? LIMIT 1")
+    .bind(identity.id, LEGAL_VERSION).first());
 }
 
 async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
@@ -603,6 +643,39 @@ async function ensureUser(db: D1Database, identity: Identity): Promise<void> {
     (id, owner_id, event_type, amount, source, idempotency_key)
     VALUES (?, ?, 'grant', 10, 'trial', ?)`)
     .bind(crypto.randomUUID(), identity.id, `trial-grant:${identity.id}`).run();
+  // Launch promise: every account has 15 free digitalizations. Keeping the
+  // top-up separate makes the correction idempotent for existing accounts.
+  await db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
+    (id, owner_id, event_type, amount, source, idempotency_key)
+    VALUES (?, ?, 'grant', 5, 'trial-topup', ?)`)
+    .bind(crypto.randomUUID(), identity.id, `trial-launch-topup:${identity.id}`).run();
+  let ownReferral = await db.prepare("SELECT code FROM referral_codes WHERE owner_id = ? LIMIT 1")
+    .bind(identity.id).first<{ code: string }>();
+  if (!ownReferral) {
+    for (let attempt = 0; attempt < 3 && !ownReferral; attempt += 1) {
+      const code = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+      await db.prepare("INSERT OR IGNORE INTO referral_codes (owner_id, code) VALUES (?, ?)").bind(identity.id, code).run();
+      ownReferral = await db.prepare("SELECT code FROM referral_codes WHERE owner_id = ? LIMIT 1")
+        .bind(identity.id).first<{ code: string }>();
+    }
+  }
+  if (!existing && identity.referralCode) {
+    const referrer = await db.prepare("SELECT owner_id FROM referral_codes WHERE code = ? LIMIT 1")
+      .bind(identity.referralCode).first<{ owner_id: string }>();
+    if (referrer && referrer.owner_id !== identity.id) {
+      const referralId = crypto.randomUUID();
+      const created = await db.prepare(`INSERT OR IGNORE INTO referrals
+        (id, referrer_owner_id, referred_owner_id, code, reward_amount) VALUES (?, ?, ?, ?, 5)`)
+        .bind(referralId, referrer.owner_id, identity.id, identity.referralCode).run();
+      if (Number(created.meta.changes || 0) === 1) {
+        await db.prepare(`INSERT OR IGNORE INTO digitization_credit_events
+          (id, owner_id, event_type, amount, source, idempotency_key)
+          VALUES (?, ?, 'grant', 5, 'referral', ?)`)
+          .bind(crypto.randomUUID(), referrer.owner_id, `referral:${identity.id}`).run();
+      }
+    }
+  }
+  await recordLegalAcceptance(db, identity);
 }
 
 async function creditBalance(db: D1Database, ownerId: string): Promise<number> {
@@ -615,6 +688,7 @@ async function authenticated(request: Request, env: WardrobeEnv): Promise<{ db: 
   if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
   const identity = await identify(request, env);
   if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
+  if (!await hasLegalAcceptance(request, env.DB, identity)) return apiError("Revisa y acepta las condiciones de Formé para continuar.", 428);
   await ensureUser(env.DB, identity);
   return { db: env.DB, identity };
 }
@@ -627,11 +701,17 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
     handle: `@${handle}`,
     bio: row.bio || "",
     avatarUrl: row.avatar_url,
+    joinedAt: `${row.created_at.replace(" ", "T")}Z`,
+    isTester: Boolean(row.is_tester),
+    credits: Number(row.credits || 0),
     profilePublic: Boolean(row.profile_public),
     discoverable: Boolean(row.discoverable),
     showCloset: Boolean(row.show_closet),
     showLooks: Boolean(row.show_looks),
     includeFormeBasics: Boolean(row.include_forme_basics),
+    referralCode: row.referral_code,
+    referralCount: Number(row.referral_count || 0),
+    referralCredits: Number(row.referral_credits || 0),
     isOwner,
   };
 }
@@ -639,7 +719,12 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
 async function readAccountProfile(db: D1Database, ownerId: string): Promise<UserProfileRow> {
   const row = await db.prepare(`
     SELECT id, email, display_name, handle, bio, avatar_url,
-      profile_public, discoverable, show_closet, show_looks, include_forme_basics
+      profile_public, discoverable, show_closet, show_looks, include_forme_basics,
+      created_at, is_tester,
+      (SELECT code FROM referral_codes WHERE owner_id = users.id) AS referral_code,
+      (SELECT COUNT(*) FROM referrals WHERE referrer_owner_id = users.id) AS referral_count,
+      (SELECT COALESCE(SUM(reward_amount), 0) FROM referrals WHERE referrer_owner_id = users.id) AS referral_credits,
+      (SELECT COALESCE(SUM(amount), 0) FROM digitization_credit_events WHERE owner_id = users.id) AS credits
     FROM users WHERE id = ? LIMIT 1
   `).bind(ownerId).first<UserProfileRow>();
   if (!row) throw new Error("No se pudo abrir tu perfil.");
@@ -650,15 +735,9 @@ async function getSession(request: Request, env: WardrobeEnv): Promise<Response>
   if (!env.DB) return apiError("Formé no está disponible en este momento. Vuelve a intentarlo más tarde.", 503);
   const identity = await identify(request, env);
   if (!identity) return apiError("Inicia sesión para abrir tu closet.", 401);
-  let row = await env.DB.prepare(`
-    SELECT id, email, display_name, handle, bio, avatar_url,
-      profile_public, discoverable, show_closet, show_looks, include_forme_basics
-    FROM users WHERE id = ? LIMIT 1
-  `).bind(identity.id).first<UserProfileRow>();
-  if (!row) {
-    await ensureUser(env.DB, identity);
-    row = await readAccountProfile(env.DB, identity.id);
-  }
+  if (!await hasLegalAcceptance(request, env.DB, identity)) return apiError("Revisa y acepta las condiciones de Formé para continuar.", 428);
+  await ensureUser(env.DB, identity);
+  const row = await readAccountProfile(env.DB, identity.id);
   const ownerEmail = env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase();
   return json({ user: accountProfileJson(row, Boolean(ownerEmail && identity.email === ownerEmail)) });
 }
@@ -762,7 +841,11 @@ async function getWardrobe(db: D1Database, ownerId: string): Promise<Response> {
   `).bind(ownerId).all<{ garment_id: string; tag: string }>();
   const grouped = new Map<string, string[]>();
   for (const row of tagsResult.results) grouped.set(row.garment_id, [...(grouped.get(row.garment_id) ?? []), row.tag]);
-  return json({ garments: garmentsResult.results.map((row) => garmentJson(row, grouped.get(row.id) ?? [])) });
+  const preferences = await db.prepare("SELECT garment_client_id, scale_multiplier FROM garment_canvas_preferences WHERE owner_id = ?")
+    .bind(ownerId).all<{ garment_client_id: string; scale_multiplier: number }>();
+  return json({ garments: garmentsResult.results.map((row) => garmentJson(row, grouped.get(row.id) ?? [])),
+    canvasSizes: Object.fromEntries(preferences.results.map(row => [row.garment_client_id, row.scale_multiplier])),
+  });
 }
 
 async function saveGarment(db: D1Database, ownerId: string, clientId: string, payload: GarmentPayload): Promise<GarmentRow> {
@@ -880,6 +963,12 @@ async function uploadGarment(
   }
   if (env.FORME_BILLING_ENFORCED === "true" && await creditBalance(db, identity.id) <= 0) {
     return apiError("Ya usaste tus digitalizaciones. Elige un plan o agrega créditos para continuar.", 402);
+  }
+  const planId = allowance.planId;
+  const storageLimit = GARMENT_STORAGE_LIMIT[planId] ?? GARMENT_STORAGE_LIMIT.trial;
+  const storedGarments = await dailyCount(db, "SELECT COUNT(*) AS count FROM garments WHERE owner_id = ? AND deleted = 0", identity.id);
+  if (storedGarments >= storageLimit) {
+    return apiError(`Tu plan permite guardar hasta ${storageLimit} prendas. Elimina una o cambia de plan para continuar.`, 409);
   }
   const form = await request.formData();
   const file = form.get("file");
@@ -2040,6 +2129,28 @@ export async function handleGarmentQueue(batch: WardrobeQueueBatch, env: Wardrob
       message.retry({ delaySeconds: 60 });
       return;
     }
+    if (payload.stage === "batch_monitor") {
+      try {
+        const deferred: Promise<unknown>[] = [];
+        const response = await reconcileGarmentBatches(
+          env,
+          { waitUntil(promise) { deferred.push(promise); } },
+          db,
+          { id: payload.ownerId, email: "", displayName: "", avatarUrl: null },
+          payload.batchId,
+        );
+        await Promise.allSettled(deferred);
+        const result = await response.json() as { batches?: Array<{ id: string; status: string }> };
+        const current = result.batches?.find(item => item.id === payload.batchId);
+        if (current && !["completed", "failed", "expired", "cancelled"].includes(current.status)) {
+          await enqueueBatchMonitor(env, payload);
+        }
+        message.ack();
+      } catch {
+        message.retry({ delaySeconds: 60 });
+      }
+      return;
+    }
     if (payload.stage === "batch") {
       try {
         const rows = await db.prepare(`SELECT g.client_id FROM intake_batch_items i
@@ -2455,7 +2566,7 @@ async function publicMediaResponse(env: WardrobeEnv, db: D1Database, handle: str
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
-  headers.set("cache-control", "public, max-age=86400, stale-while-revalidate=604800");
+  headers.set("cache-control", "private, no-store");
   headers.set("x-content-type-options", "nosniff");
   return new Response(object.body, { headers });
 }
@@ -2634,12 +2745,33 @@ async function createGarmentBatch(
   if (candidates.some(item => item && item.recognition_status !== "legacy" && item.recognition_status !== "failed" && !sourceRecognition(item))) {
     return json({ recognizing: true }, 202);
   }
-  const candidateJobs = await Promise.all(candidates.filter((item): item is GarmentRow => Boolean(item) && !item?.deleted).map(item =>
-    db.prepare("SELECT id, status, batch_id FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
-      .bind(item.id, identity.id).first<{ id: string; status: string; batch_id: string | null }>()));
+  const activeCandidates = candidates.filter((item): item is GarmentRow => Boolean(item) && !item?.deleted);
+  const candidateJobs = await Promise.all(activeCandidates.map(item =>
+    db.prepare("SELECT id, status, batch_id, quality, presentation, output_variant FROM processing_jobs WHERE garment_id = ? AND owner_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+      .bind(item.id, identity.id).first<{
+        id: string;
+        status: string;
+        batch_id: string | null;
+        quality: string;
+        presentation: string;
+        output_variant: string;
+      }>()));
   if (candidateJobs.some(job => job && ["queued", "processing"].includes(job.status))) return json({ recognizing: true }, 202);
-  const submitted = candidateJobs.find(job => job?.batch_id);
-  if (submitted && candidateJobs.every(job => job?.batch_id === submitted.batch_id)) return json({ batch: { id: submitted.batch_id, status: submitted.status } }, 202);
+  const submittedIndex = candidateJobs.findIndex(job => Boolean(job?.batch_id));
+  const submitted = submittedIndex >= 0 ? candidateJobs[submittedIndex] : null;
+  if (submitted?.batch_id && candidateJobs.every(job => job?.batch_id === submitted.batch_id)) {
+    const garment = activeCandidates[submittedIndex];
+    await enqueueBatchMonitor(env, {
+      ownerId: identity.id,
+      garmentId: garment.id,
+      jobId: submitted.id,
+      quality: imageQuality(submitted.quality),
+      presentation: garmentPresentation(submitted.presentation),
+      outputVariant: submitted.output_variant === "open" ? "open" : "closed",
+      batchId: submitted.batch_id,
+    });
+    return json({ batch: { id: submitted.batch_id, status: submitted.status } }, 202);
+  }
 
   const batchItems: Array<{ garment: GarmentRow; job: { id: string; quality: ImageQuality; presentation: GarmentPresentation; outputVariant: GarmentOutputVariant }; fileId: string }> = [];
   const sourceFileIds = new Set<string>();
@@ -2711,6 +2843,22 @@ async function createGarmentBatch(
       db.prepare("UPDATE garments SET status = 'batch_processing', quality = 'low', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?")
         .bind(garment.id, identity.id),
     ]));
+    const monitorSeed = batchItems[0];
+    try {
+      await enqueueBatchMonitor(env, {
+        ownerId: identity.id,
+        garmentId: monitorSeed.garment.id,
+        jobId: monitorSeed.job.id,
+        quality: monitorSeed.job.quality,
+        presentation: monitorSeed.job.presentation,
+        outputVariant: monitorSeed.job.outputVariant,
+        batchId: result.id,
+      });
+    } catch {
+      // The provider batch already exists. Returning an error makes the queue
+      // retry this submission, which reuses batch_id and only repairs monitoring.
+      return apiError("El lote fue creado, pero falta activar su monitor.", 503);
+    }
     return json({ batch: { id: result.id, status: result.status || "validating", garments: garmentIds.length, requests: batchItems.length } }, 202);
   } catch (error) {
     for (const fileId of sourceFileIds) ctx.waitUntil(deleteOpenAIFile(env, fileId));
@@ -2736,25 +2884,37 @@ async function reconcileGarmentBatches(
   ctx: WardrobeExecutionContext,
   db: D1Database,
   identity: Identity,
+  onlyBatchId?: string,
 ): Promise<Response> {
   if (!env.OPENAI_API_KEY || !env.WARDROBE_MEDIA) return json({ batches: [] });
-  const pending = await db.prepare(`
-    SELECT DISTINCT batch_id FROM processing_jobs
-    WHERE owner_id = ? AND batch_id IS NOT NULL AND status = 'batch_processing'
-  `).bind(identity.id).all<{ batch_id: string }>();
+  const pending = onlyBatchId
+    ? await db.prepare(`
+      SELECT DISTINCT batch_id FROM processing_jobs
+      WHERE owner_id = ? AND batch_id = ? AND status = 'batch_processing'
+    `).bind(identity.id, onlyBatchId).all<{ batch_id: string }>()
+    : await db.prepare(`
+      SELECT DISTINCT batch_id FROM processing_jobs
+      WHERE owner_id = ? AND batch_id IS NOT NULL AND status = 'batch_processing'
+    `).bind(identity.id).all<{ batch_id: string }>();
   const summaries: Array<{ id: string; status: string }> = [];
   for (const { batch_id: batchId } of pending.results) {
     const response = await fetch(`https://api.openai.com/v1/batches/${encodeURIComponent(batchId)}`, {
       headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
     });
     const batch = await response.json() as { status?: string; output_file_id?: string | null; error_file_id?: string | null; input_file_id?: string; errors?: { data?: Array<{ message?: string }> } };
-    if (!response.ok) continue;
+    if (!response.ok) {
+      if (onlyBatchId) throw new RetryableProcessingError(`No se pudo consultar el lote (${response.status}).`);
+      continue;
+    }
     summaries.push({ id: batchId, status: batch.status || "unknown" });
     if (batch.status === "completed" && batch.output_file_id) {
       const outputResponse = await fetch(`https://api.openai.com/v1/files/${encodeURIComponent(batch.output_file_id)}/content`, {
         headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` },
       });
-      if (!outputResponse.ok) continue;
+      if (!outputResponse.ok) {
+        if (onlyBatchId) throw new RetryableProcessingError(`No se pudo descargar el resultado del lote (${outputResponse.status}).`);
+        continue;
+      }
       const lines = (await outputResponse.text()).split(/\r?\n/).filter(Boolean);
       for (const line of lines) {
         let item: { custom_id?: string; response?: { status_code?: number; body?: { data?: Array<{ b64_json?: string }>; usage?: ImageGenerationUsage; error?: { message?: string } } }; error?: { message?: string } };
@@ -3121,6 +3281,14 @@ async function saveOutfit(request: Request, db: D1Database, ownerId: string, out
   const existing = await db.prepare("SELECT id, is_public FROM outfits WHERE owner_id = ? AND client_id = ? LIMIT 1")
     .bind(ownerId, outfitId)
     .first<{ id: string; is_public: number }>();
+  if (!existing) {
+    const planId = await accountPlanId(db, ownerId);
+    const limit = OUTFIT_STORAGE_LIMIT[planId] ?? OUTFIT_STORAGE_LIMIT.trial;
+    if (Number.isFinite(limit)) {
+      const storedOutfits = await dailyCount(db, "SELECT COUNT(*) AS count FROM outfits WHERE owner_id = ?", ownerId);
+      if (storedOutfits >= limit) return apiError(`Tu plan permite guardar hasta ${limit} looks.`, 409);
+    }
+  }
   const serverId = existing?.id ?? crypto.randomUUID();
   const isPublic = value.isPublic === undefined ? Boolean(existing?.is_public) : booleanValue(value.isPublic);
   await db.batch([
@@ -3700,6 +3868,25 @@ export async function handleWardrobeApi(
     if (cutoutMatch && request.method === "POST") {
       const clientId = safeClientId(decodeURIComponent(cutoutMatch[1]));
       return clientId ? attachCutout(request, env, ctx, db, identity, clientId) : apiError("Ruta inválida.", 400);
+    }
+
+    const canvasSizeMatch = url.pathname.match(/^\/api\/garments\/([^/]+)\/canvas-size$/);
+    if (canvasSizeMatch && request.method === "PUT") {
+      const clientId = safeClientId(decodeURIComponent(canvasSizeMatch[1]));
+      const value = await request.json().catch(() => null) as { scaleMultiplier?: unknown } | null;
+      const multiplier = value?.scaleMultiplier;
+      if (!clientId || typeof multiplier !== "number" || !Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 20) {
+        return apiError("El tamaño de la prenda no es válido.", 400);
+      }
+      const owned = await findGarment(db, identity.id, clientId);
+      const isOwner = identity.email === env.FORME_OWNER_EMAIL?.trim().toLocaleLowerCase() || localHosts.has(url.hostname);
+      const catalogue = starterGarments.some(item => item.id === clientId && (isOwner || item.collection === "forme"));
+      if ((!owned || owned.deleted) && !catalogue) return apiError("Prenda no encontrada.", 404);
+      await db.prepare(`INSERT INTO garment_canvas_preferences (owner_id, garment_client_id, scale_multiplier)
+        VALUES (?, ?, ?) ON CONFLICT(owner_id, garment_client_id) DO UPDATE SET
+        scale_multiplier = excluded.scale_multiplier, updated_at = CURRENT_TIMESTAMP`)
+        .bind(identity.id, clientId, multiplier).run();
+      return json({ scaleMultiplier: multiplier });
     }
 
     const garmentMatch = url.pathname.match(/^\/api\/garments\/([^/]+)$/);

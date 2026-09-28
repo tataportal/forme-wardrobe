@@ -891,7 +891,7 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .share-template-dialog > header h2 { margin:5px 0 0; font:400 clamp(28px,5vw,42px)/.95 Georgia,serif; letter-spacing:-.045em; }
 .share-template-dialog > header button { width:44px; height:44px; border:0; background:transparent; color:var(--ink); font-size:28px; cursor:pointer; }
 .share-template-layout { display:grid; grid-template-columns:minmax(280px,1.1fr) minmax(260px,.9fr); }
-.share-template-preview { min-height:640px; padding:32px; position:relative; overflow:hidden; display:flex; flex-direction:column; background-color:var(--canvas-greige); background-image:radial-gradient(rgba(17,17,15,.12) .7px,transparent .7px); background-size:16px 16px; }
+.share-template-preview { min-height:640px; padding:32px; position:relative; overflow:hidden; display:flex; flex-direction:column; background:var(--fs-canvas); }
 .share-preview-brand { font:600 13px/1 Arial,sans-serif; letter-spacing:.2em; }
 .share-preview-media { min-height:0; height:420px; flex:0 1 420px; display:grid; place-items:center; }
 .share-preview-media > img { width:82%; height:82%; object-fit:contain; filter:var(--garment-sticker-filter); }
@@ -1449,8 +1449,6 @@ select option { background:var(--panel); color:var(--ink); font:14px/1.35 Arial,
 .canvas-action-bar .share-look-action { color:var(--ink); }
 .canvas-status-message { position:fixed; z-index:87; left:50%; bottom:142px; width:min(460px,calc(100vw - 20px)); padding:10px 12px; border:1px solid rgba(232,59,37,.5); background:rgba(248,247,242,.97); color:var(--signal); display:flex; align-items:center; justify-content:space-between; gap:12px; transform:translateX(-50%); box-shadow:0 8px 28px rgba(17,17,15,.08); font-size:var(--type-kicker); line-height:1.35; }
 .canvas-status-message button { flex:0 0 auto; border:0; background:transparent; color:inherit; font:17px/1 Georgia,serif; cursor:pointer; }
-.share-status-message { position:fixed; z-index:88; left:50%; bottom:142px; width:min(480px,calc(100vw - 20px)); padding:11px 13px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); display:flex; align-items:center; justify-content:space-between; gap:12px; transform:translateX(-50%); box-shadow:0 8px 28px rgba(17,17,15,.18); font-size:var(--type-kicker); line-height:1.35; }
-.share-status-message button { flex:0 0 auto; border:0; background:transparent; color:inherit; font:17px/1 Georgia,serif; cursor:pointer; }
 
 .mobile-nav { position:fixed; z-index:90; left:0; right:0; bottom:0; height:72px; padding-bottom:env(safe-area-inset-bottom); border-top:1px solid var(--ink); background:rgba(242,240,233,.97); display:grid; grid-template-columns:repeat(2,1fr); }
 .mobile-nav button { border:0; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:var(--type-kicker); text-transform:uppercase; cursor:pointer; }

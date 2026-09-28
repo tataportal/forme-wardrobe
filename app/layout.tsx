@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./forme-system.css";
 import "./forme-pilot.css";
+import "./legal.css";
 
 const title = "FORMÉ | Tu ropa, leída de nuevo";
 const description = "Tu closet digital. Añade tus prendas, combínalas y guarda tus looks.";

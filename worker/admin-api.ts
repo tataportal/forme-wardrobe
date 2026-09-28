@@ -51,9 +51,14 @@ function json(value: unknown, status = 200): Response {
 }
 
 function requestIdentity(request: Request, sessionSecret?: string): Promise<AdminIdentity | null> {
-  const accessEmail = request.headers.get("cf-access-authenticated-user-email")
-    ?? request.headers.get("oai-authenticated-user-email");
-  if (accessEmail?.trim()) return Promise.resolve({ email: accessEmail.trim().toLocaleLowerCase() });
+  const hostname = new URL(request.url).hostname;
+  // The OAI identity headers are convenient in the local preview, but they are
+  // ordinary client-controlled HTTP headers on the public Worker. Production
+  // admin access must be backed by Forme's signed session cookie.
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    const localEmail = request.headers.get("oai-authenticated-user-email");
+    if (localEmail?.trim()) return Promise.resolve({ email: localEmail.trim().toLocaleLowerCase() });
+  }
   return readNativeSession(request, sessionSecret).then((identity) => identity
     ? { email: identity.email.trim().toLocaleLowerCase() }
     : null);
@@ -80,7 +85,7 @@ export async function guardAdminPage(request: Request, env: WardrobeEnv): Promis
       headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
     });
   }
-  const login = new URL("/auth/google", url.origin);
+  const login = new URL("/ingresar", url.origin);
   login.searchParams.set("return_to", "/admin");
   return Response.redirect(login, 302);
 }

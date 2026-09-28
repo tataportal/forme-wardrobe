@@ -1,6 +1,7 @@
 import type { Garment } from "./garments";
 import { accessoryKind } from "../shared/garment-proportions";
-import { garmentLayout } from "./garment-layout";
+import type { CanvasItem } from "./canvas-document";
+import { garmentLayout, slotPlacement, replacementPlacement } from "./garment-layout";
 
 type Piece = { instanceId: string; garmentId: string };
 
@@ -54,4 +55,21 @@ export function randomGarmentReplacements(
     replacements.set(piece.instanceId, choice);
   }
   return replacements;
+}
+
+// Measurements are computed once per garment. Mixing only substitutes pieces;
+// it never asks a remote model to reinterpret the entire document.
+export function applyGarmentReplacements(
+  current: CanvasItem[], replacements: ReadonlyMap<string, Garment>, byId: ReadonlyMap<string, Garment>,
+  locked: ReadonlySet<string>, automatic: ReadonlySet<string>,
+): CanvasItem[] {
+  return current.map(piece => {
+    const garment = replacements.get(piece.instanceId);
+    if (!garment || locked.has(piece.instanceId)) return piece;
+    const previous = byId.get(piece.garmentId);
+    const variant = garment.openImage ? "open" as const : "closed" as const;
+    const placement = previous && !automatic.has(piece.instanceId)
+      ? replacementPlacement(piece, previous, garment, variant) : slotPlacement(garment, variant);
+    return { ...piece, garmentId: garment.id, variant, ...placement };
+  });
 }

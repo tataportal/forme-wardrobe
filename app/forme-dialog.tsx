@@ -11,7 +11,7 @@ export function FormeDialog({ children, labelledBy, onClose, className = "" }: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
-  close.current = onClose;
+  useEffect(() => { close.current = onClose; }, [onClose]);
   useEffect(() => {
     const element = dialog.current;
     const previous = document.activeElement;

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -8,6 +8,7 @@ export const users = sqliteTable("users", {
   handle: text("handle"),
   bio: text("bio").notNull().default(""),
   avatarUrl: text("avatar_url"),
+  isTester: integer("is_tester", { mode: "boolean" }).notNull().default(false),
   profilePublic: integer("profile_public", { mode: "boolean" }).notNull().default(false),
   discoverable: integer("discoverable", { mode: "boolean" }).notNull().default(false),
   showCloset: integer("show_closet", { mode: "boolean" }).notNull().default(false),
@@ -19,6 +20,21 @@ export const users = sqliteTable("users", {
   uniqueIndex("users_email_unique").on(table.email),
   uniqueIndex("users_handle_unique").on(table.handle),
 ]);
+
+export const userLegalAcceptances = sqliteTable("user_legal_acceptances", {
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  version: text("version").notNull(),
+  acceptedAt: text("accepted_at").notNull(),
+  recordedAt: text("recorded_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.version] })]);
+
+// Preferences also apply to shared catalogue garments, which have no per-user garment row.
+export const garmentCanvasPreferences = sqliteTable("garment_canvas_preferences", {
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  garmentClientId: text("garment_client_id").notNull(),
+  scaleMultiplier: real("scale_multiplier").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.garmentClientId] })]);
 
 export const garments = sqliteTable("garments", {
   id: text("id").primaryKey(),
@@ -233,6 +249,24 @@ export const digitizationCreditEvents = sqliteTable("digitization_credit_events"
 }, (table) => [
   uniqueIndex("digitization_credit_idempotency_unique").on(table.idempotencyKey),
   index("digitization_credit_owner_idx").on(table.ownerId, table.createdAt),
+]);
+
+export const referralCodes = sqliteTable("referral_codes", {
+  ownerId: text("owner_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex("referral_codes_code_unique").on(table.code)]);
+
+export const referrals = sqliteTable("referrals", {
+  id: text("id").primaryKey(),
+  referrerOwnerId: text("referrer_owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referredOwnerId: text("referred_owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  rewardAmount: integer("reward_amount").notNull().default(5),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("referrals_referred_unique").on(table.referredOwnerId),
+  index("referrals_referrer_idx").on(table.referrerOwnerId, table.createdAt),
 ]);
 
 export const aiUsageEvents = sqliteTable("ai_usage_events", {

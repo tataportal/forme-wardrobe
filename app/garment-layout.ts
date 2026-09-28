@@ -1,3 +1,4 @@
+import type { CanvasItem } from "./canvas-document";
 import catalog from "./garment-layout-data.json";
 import { accessoryKind, garmentRegion, validLengthOverride } from "../shared/garment-proportions";
 import { slotsByRegion } from "../shared/garment-anatomy";
@@ -162,6 +163,7 @@ export function slotPlacement(garment: Garment, variant: "closed" | "open" = "cl
   const profile = garmentLayout(garment, variant);
   const grid = canvasBodyGrid(frame);
   const unit = frame.height * grid.height;
+  const multiplier = garment.canvasScaleMultiplier && garment.canvasScaleMultiplier > 0 ? garment.canvasScaleMultiplier : 1;
   if (profile.region === "accessory") {
     const kind = accessoryKind(garment);
     const glasses = kind === "Glasses", bag = kind === "Bag", hat = kind === "Hat";
@@ -171,7 +173,8 @@ export function slotPlacement(garment: Garment, variant: "closed" | "open" = "cl
     // objects must not decide whether a hat is tiny or runs outside the frame.
     const targetWidth = unit * (glasses ? 1.2 : hat ? 1.4 : bag ? 1.6 : belt ? 2.1 : 1.35);
     const maxHeight = unit * (glasses ? 0.65 : hat ? 1.2 : bag ? 2.5 : belt ? 0.65 : 1.6);
-    const scale = Math.min(targetWidth / (frame.baseWidth * width), maxHeight / (frame.baseWidth * 1.25 * height));
+    const automaticScale = Math.min(targetWidth / (frame.baseWidth * width), maxHeight / (frame.baseWidth * 1.25 * height));
+    const scale = garment.canvasScaleMultiplier ? Math.max(0.08, Math.min(1.35, multiplier * automaticScale)) : automaticScale;
     const imageWidth = frame.baseWidth * scale;
     const imageHeight = imageWidth * 1.25;
     const atSide = bag || (!glasses && !hat && !belt && !scarf);
@@ -201,6 +204,7 @@ export function slotPlacement(garment: Garment, variant: "closed" | "open" = "cl
       : profile.slots <= 3.5 ? 3.8 : profile.slots <= 4 ? 4.2 : 4.6;
     scale = Math.min(scale, unit * (widthSpan + (broad ? 0.25 : 0)) / (frame.baseWidth * width));
   }
+  if (garment.canvasScaleMultiplier) scale = Math.max(0.08, Math.min(1.35, scale * multiplier));
   const imageWidth = frame.baseWidth * scale;
   const imageHeight = imageWidth * 1.25;
   const anchor = profile.region === "lower" ? grid.lower
@@ -238,4 +242,49 @@ export async function ensureGarmentLayout(garment: Garment): Promise<void> {
   if (closed && open && garment.openImage) {
     measured.set(garment.openImage, matchOpenLayout(closed, open));
   }
+}
+
+// Preserve a user-adjusted body scale and anchor when replacing a garment.
+export function replacementPlacement(piece: CanvasItem, previous: Garment, next: Garment, variant: "closed" | "open") {
+  const frame = REFERENCE_FRAME;
+  const oldDefault = slotPlacement(previous, piece.variant, frame);
+  const newDefault = slotPlacement(next, variant, frame);
+  const scale = Math.max(0.08, Math.min(1.35, next.canvasScaleMultiplier ? newDefault.scale : newDefault.scale * piece.scale / oldDefault.scale));
+  if (Math.abs(piece.rotation) > 0.01) return { x: piece.x, y: piece.y, scale };
+  const oldLayout = garmentLayout(previous, piece.variant);
+  const newLayout = garmentLayout(next, variant);
+  const [oldLeft, , oldWidth] = oldLayout.bounds;
+  const [newLeft, , newWidth] = newLayout.bounds;
+  const oldTop = layoutAnchorY(oldLayout);
+  const newTop = layoutAnchorY(newLayout);
+  return {
+    x: piece.x + ((oldLeft + oldWidth / 2 - 0.5) * piece.scale - (newLeft + newWidth / 2 - 0.5) * scale) * frame.baseWidth / frame.width * 100,
+    y: piece.y + ((oldTop - 0.5) * piece.scale - (newTop - 0.5) * scale) * frame.baseWidth * 1.25 / frame.height * 100,
+    scale,
+  };
+}
+
+const canvasImages = new Map<string, Promise<void>>();
+
+// Commit a replacement only once its actual pixels are decoded. Otherwise the
+// browser briefly stretches the old garment to the next garment's geometry.
+export async function prepareCanvasGarment(garment: Garment): Promise<void> {
+  if (typeof document === "undefined") return;
+  const source = garment.openImage || garment.image;
+  let ready = canvasImages.get(source);
+  if (!ready) {
+    ready = (async () => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.src = source;
+      await image.decode();
+    })().catch(error => { canvasImages.delete(source); throw error; });
+    canvasImages.set(source, ready);
+  }
+  await Promise.all([ensureGarmentLayout(garment), ready]);
+}
+
+export function manualCanvasScaleMultiplier(garment: Garment, variant: "closed" | "open", scale: number): number {
+  const automatic = slotPlacement({ ...garment, canvasScaleMultiplier: undefined }, variant);
+  return scale / automatic.scale;
 }

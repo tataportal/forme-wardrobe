@@ -36,6 +36,7 @@ export const garmentTypesByCategory: Record<GarmentCategory, GarmentType[]> = {
 };
 
 export type Garment = GarmentAttributes & {
+  canvasScaleMultiplier?: number;
   id: string;
   name: string;
   description?: string;
@@ -61,6 +62,8 @@ export type Garment = GarmentAttributes & {
   status: "ghosted" | "original" | "uploaded" | "queued" | "processing" | "batch_staged" | "batch_processing" | "cutout_pending" | "ready" | "review" | "failed";
   favorite?: boolean;
   isPublic?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export function garmentPhotoFor(garment: Pick<Garment, "image" | "openImage">, requestedRole: GarmentPhotoRole): GarmentPhoto {

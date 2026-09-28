@@ -1,3 +1,5 @@
+import { currentLegalAcceptance, LEGAL_VERSION, legalReady, type LegalAcceptance } from "../shared/legal";
+
 export interface GoogleAuthEnv {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -8,6 +10,8 @@ export type NativeIdentity = {
   email: string;
   displayName: string;
   avatarUrl: string | null;
+  legalAcceptance?: LegalAcceptance;
+  referralCode?: string;
 };
 
 type SessionPayload = NativeIdentity & {
@@ -18,6 +22,9 @@ type SessionPayload = NativeIdentity & {
 type OAuthState = {
   state: string;
   returnTo: string;
+  legalAcceptance: LegalAcceptance;
+  referralCode?: string;
+  expiresAt: number;
 };
 
 const SESSION_COOKIE = "__Host-forme_session";
@@ -40,6 +47,12 @@ function safeReturnTo(value: string | null): string {
   } catch {
     return "/closet";
   }
+}
+
+function safeReferralCode(value: FormDataEntryValue | string | null): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const code = value.trim().toLocaleLowerCase();
+  return /^[a-z0-9_-]{4,24}$/.test(code) ? code : undefined;
 }
 
 function cookieValue(request: Request, name: string): string | null {
@@ -149,9 +162,30 @@ export function enforceProductionHttps(request: Request): Response | null {
 }
 
 async function startGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<Response> {
-  if (!authConfigured(env)) return authUnavailable();
   const url = new URL(request.url);
-  const state: OAuthState = { state: randomToken(), returnTo: safeReturnTo(url.searchParams.get("return_to")) };
+  if (request.method === "GET") {
+    const referralCode = safeReferralCode(url.searchParams.get("ref"));
+    const referral = referralCode ? `&ref=${encodeURIComponent(referralCode)}` : "";
+    return redirect(`/ingresar?return_to=${encodeURIComponent(safeReturnTo(url.searchParams.get("return_to")))}${referral}`);
+  }
+  if (!authConfigured(env)) return authUnavailable();
+  if (!legalReady) return new Response("El registro está pendiente de completar la información legal.", { status: 503 });
+  if (request.headers.get("origin") !== url.origin) return new Response("Origen no permitido.", { status: 403 });
+  if (!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) return new Response("Solicitud inválida.", { status: 400 });
+  const form = await request.formData().catch(() => null);
+  const returnTo = safeReturnTo(typeof form?.get("return_to") === "string" ? String(form.get("return_to")) : null);
+  const referralCode = safeReferralCode(form?.get("ref") ?? null);
+  if (form?.get("version") !== LEGAL_VERSION || form.get("terms") !== "yes" || form.get("privacy") !== "yes") {
+    return redirect(`/ingresar?error=consent&return_to=${encodeURIComponent(returnTo)}`);
+  }
+  const legalAcceptance = { version: LEGAL_VERSION, acceptedAt: new Date().toISOString() };
+  const current = cookieValue(request, SESSION_COOKIE);
+  const existing = current ? await verifySession(current, env.SESSION_SECRET) : null;
+  if (existing) {
+    const session = await createSession({ ...existing, legalAcceptance, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS }, env.SESSION_SECRET);
+    return redirect(returnTo, [secureCookie(SESSION_COOKIE, session, SESSION_TTL_SECONDS)]);
+  }
+  const state: OAuthState = { state: randomToken(), returnTo, legalAcceptance, referralCode, expiresAt: Date.now() + 10 * 60_000 };
   const authorization = new URL(AUTHORIZATION_ENDPOINT);
   authorization.searchParams.set("client_id", env.GOOGLE_CLIENT_ID);
   authorization.searchParams.set("redirect_uri", redirectUri(request));
@@ -159,13 +193,24 @@ async function startGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<Re
   authorization.searchParams.set("scope", "openid profile email");
   authorization.searchParams.set("state", state.state);
   authorization.searchParams.set("prompt", "select_account");
-  return redirect(authorization.toString(), [secureCookie(STATE_COOKIE, encodeJson(state), 10 * 60)]);
+  const encoded = encodeJson(state);
+  return redirect(authorization.toString(), [secureCookie(STATE_COOKIE, `${encoded}.${await signPayload(encoded, env.SESSION_SECRET)}`, 10 * 60)]);
+}
+
+async function readOAuthState(value: string, secret: string): Promise<OAuthState | null> {
+  const [encoded, signature, extra] = value.split(".");
+  if (!encoded || !signature || extra) return null;
+  try {
+    const valid = await crypto.subtle.verify("HMAC", await hmacKey(secret), base64UrlToBytes(signature), new TextEncoder().encode(encoded));
+    const state = valid ? decodeJson<OAuthState>(encoded) : null;
+    return state && state.expiresAt > Date.now() && currentLegalAcceptance(state.legalAcceptance) ? state : null;
+  } catch { return null; }
 }
 
 async function finishGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<Response> {
   if (!authConfigured(env)) return authUnavailable();
   const url = new URL(request.url);
-  const storedState = decodeJson<OAuthState>(cookieValue(request, STATE_COOKIE) ?? "");
+  const storedState = await readOAuthState(cookieValue(request, STATE_COOKIE) ?? "", env.SESSION_SECRET);
   const state = url.searchParams.get("state");
   const code = url.searchParams.get("code");
   if (!storedState || !state || state !== storedState.state || !code) {
@@ -204,10 +249,12 @@ async function finishGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<R
 
   const now = Math.floor(Date.now() / 1000);
   const session = await createSession({
+    legalAcceptance: storedState.legalAcceptance,
     sub: user.sub,
     email: user.email.trim().toLocaleLowerCase(),
     displayName: user.name?.trim() || user.email.split("@")[0] || "Mi perfil",
     avatarUrl: user.picture?.trim() || null,
+    referralCode: storedState.referralCode,
     exp: now + SESSION_TTL_SECONDS,
   }, env.SESSION_SECRET);
   return redirect(storedState.returnTo, [
@@ -222,13 +269,13 @@ export async function readNativeSession(request: Request, sessionSecret?: string
   if (!value) return null;
   const payload = await verifySession(value, sessionSecret);
   if (!payload) return null;
-  return { email: payload.email, displayName: payload.displayName, avatarUrl: payload.avatarUrl };
+  return { email: payload.email, displayName: payload.displayName, avatarUrl: payload.avatarUrl, legalAcceptance: payload.legalAcceptance, referralCode: payload.referralCode };
 }
 
 export async function handleGoogleAuth(request: Request, env: GoogleAuthEnv): Promise<Response | null> {
   const url = new URL(request.url);
+  if (url.pathname === "/auth/google/start" && ["GET", "POST"].includes(request.method)) return startGoogleAuth(request, env);
   if (request.method !== "GET") return null;
-  if (url.pathname === "/auth/google/start") return startGoogleAuth(request, env);
   if (url.pathname === "/auth/google/callback") return finishGoogleAuth(request, env);
   if (url.pathname === "/auth/logout") {
     return redirect(safeReturnTo(url.searchParams.get("return_to")), [

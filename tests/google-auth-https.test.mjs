@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { build } from "esbuild";
-import { fileURLToPath } from "node:url";
-
-const bundle = await build({ entryPoints: [fileURLToPath(new URL("../worker/google-auth.ts", import.meta.url))], bundle: true, write: false, platform: "node", format: "esm" });
-const { enforceProductionHttps, handleGoogleAuth } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+import { bundleModule, consentRequest, env } from "./helpers/legal-fixture.mjs";
+const { enforceProductionHttps, handleGoogleAuth } = await bundleModule("../../worker/google-auth.ts");
 
 test("HTTP production login redirects before issuing secure OAuth cookies", () => {
   const result = enforceProductionHttps(new Request("http://forme.gallery/auth/google/start?return_to=%2Fcloset"));
@@ -22,7 +19,7 @@ test("HTTPS and local development requests are not redirected", () => {
 test("Google always receives the HTTPS production callback", async () => {
   const env = { GOOGLE_CLIENT_ID: "test-client", GOOGLE_CLIENT_SECRET: "test-secret", SESSION_SECRET: "test-session" };
   for (const protocol of ["http", "https"]) {
-    const response = await handleGoogleAuth(new Request(`${protocol}://forme.gallery/auth/google/start`), env);
+    const response = await handleGoogleAuth(consentRequest({}, { origin: `${protocol}://forme.gallery` }), env);
     const location = new URL(response.headers.get("location"));
     assert.equal(location.searchParams.get("redirect_uri"), "https://forme.gallery/auth/google/callback");
   }
@@ -30,11 +27,22 @@ test("Google always receives the HTTPS production callback", async () => {
 
 test("login defaults to the real closet instead of the red brand page", async () => {
   const env = { GOOGLE_CLIENT_ID: "test-client", GOOGLE_CLIENT_SECRET: "test-secret", SESSION_SECRET: "test-session" };
-  const response = await handleGoogleAuth(new Request("https://forme.gallery/auth/google/start"), env);
+  const response = await handleGoogleAuth(consentRequest(), env);
   const stateCookie = response.headers.get("set-cookie") ?? "";
   const encodedState = stateCookie.match(/__Host-forme_oauth_state=([^;]+)/)?.[1];
   assert.ok(encodedState);
-  const padded = encodedState.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(encodedState.length / 4) * 4, "=");
+  const padded = encodedState.split(".")[0].replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(encodedState.split(".")[0].length / 4) * 4, "=");
   const state = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
   assert.equal(state.returnTo, "/closet");
+});
+
+test("referral code survives the consent step inside signed OAuth state", async () => {
+  const response = await handleGoogleAuth(consentRequest({ ref: "Pepito_50" }), env);
+  const stateCookie = response.headers.get("set-cookie") ?? "";
+  const encodedState = stateCookie.match(/__Host-forme_oauth_state=([^;]+)/)?.[1];
+  assert.ok(encodedState);
+  const payload = encodedState.split(".")[0];
+  const padded = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+  const state = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  assert.equal(state.referralCode, "pepito_50");
 });

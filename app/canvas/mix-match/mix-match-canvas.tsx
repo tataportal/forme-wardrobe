@@ -241,7 +241,6 @@ export function MixMatchCanvas({
   const [showOuterwear, setShowOuterwear] = useState(true);
   const [saved, setSaved] = useState(false);
   const [finished, setFinished] = useState(false);
-  const [message, setMessage] = useState("Desliza cada fila para cambiar la prenda.");
   const railRefs = useRef<Partial<Record<RailKey, HTMLDivElement | null>>>({});
   const scrollTimers = useRef<Partial<Record<RailKey, ReturnType<typeof setTimeout>>>>({});
   const scrollFrames = useRef<Partial<Record<RailKey, number>>>({});
@@ -477,7 +476,6 @@ export function MixMatchCanvas({
     );
     setSaved(true);
     setFinished(false);
-    setMessage("Look guardado. Ahora puedes añadir un accesorio.");
   }
 
   function finishLook() {
@@ -500,20 +498,17 @@ export function MixMatchCanvas({
       }),
     );
     setFinished(true);
-    setMessage("Look guardado.");
   }
 
   function editCoreLook() {
     setSaved(false);
     setFinished(false);
-    setMessage("Desliza cada fila para cambiar la prenda.");
   }
 
   function toggleOuterwear() {
     setShowOuterwear((current) => !current);
     setSaved(false);
     setFinished(false);
-    setMessage(showOuterwear ? "Look sin abrigo." : "Abrigo añadido.");
   }
 
   function mixCurrentLook() {
@@ -545,7 +540,6 @@ export function MixMatchCanvas({
       });
     });
 
-    setMessage("Look combinado por color, textura y silueta.");
   }
 
   return (
@@ -625,7 +619,6 @@ export function MixMatchCanvas({
       </section>
 
       <footer className={styles.footer}>
-        <p aria-live="polite">{message}</p>
         <div className={styles.footerActions}>
           {saved && !finished ? (
             <button className={styles.secondaryAction} type="button" onClick={editCoreLook}>

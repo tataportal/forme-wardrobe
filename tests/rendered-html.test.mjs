@@ -84,8 +84,8 @@ test("keeps the main product areas on stable routes", async () => {
   ]);
   assert.match(pricingSource, /name: "Personal", monthly: 7\.99, annual: 79\.99/);
   assert.match(pricingSource, /name: "Club", monthly: 12\.99, annual: 129\.99/);
-  assert.match(pricingSource, /10 prendas de por vida y hasta 5 looks guardados/);
-  assert.match(pricingSource, /\/auth\/google\/start\?return_to=%2Fcloset/);
+  assert.match(pricingSource, /15 prendas de por vida y hasta 5 looks guardados/);
+  assert.match(pricingSource, /\/ingresar\?return_to=%2Fcloset/);
   assert.match(pricingSource, /\/api\/sales-interest/);
   assert.match(publicProfileSource, /className="public-profile-frame"/);
   assert.match(publicProfileSource, /className="public-look-pieces"/);
@@ -261,11 +261,11 @@ test("Canvas keeps its garment library and iteration actions visible; optional p
   assert.doesNotMatch(html, /<aside[^>]+id="canvas-(layers|saved-looks)"/);
 });
 
-test("Canvas automatically refines new and mixed garments without an adjustment control", async () => {
+test("Canvas reuses garment measurements without blocking add or mix on a remote arrangement", async () => {
   const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
-  assert.match(page, /fetch\("\/api\/canvas-placement"/);
-  assert.match(page, /void arrangeCanvasAutomatically\(next, generationAtStart\)/);
-  assert.match(page, /await arrangeCanvasAutomatically\(next, generationAtStart\)/);
+  assert.doesNotMatch(page, /fetch\("\/api\/canvas-placement"/);
+  assert.doesNotMatch(page, /arrangeCanvasAutomatically|arrangingCanvas/);
+  assert.match(page, /await Promise\.all\(chosen\.map\(prepareCanvasGarment\)\)/);
   assert.doesNotMatch(page, /className="canvas-core-action arrange-look-action"/);
 });
 
@@ -315,4 +315,21 @@ test("pricing sells only implemented product capabilities", async () => {
   assert.match(html, /Cuando tu closet crece/);
   assert.match(html, /Un crédito se descuenta solo cuando la prenda queda lista/);
   assert.doesNotMatch(html, /planificación semanal|Asistente según|insights avanzados/);
+});
+
+test("legal documents and registration render publicly with accessible consent controls", async () => {
+  const terms = await (await render("/terminos")).text();
+  const privacy = await (await render("/privacidad")).text();
+  const login = await (await render("/ingresar?return_to=%2Fcanvas")).text();
+  assert.match(terms, /a su exclusivo criterio/);
+  assert.match(terms, /id="usernames"/);
+  assert.match(privacy, /fotos originales/i);
+  assert.match(privacy, /OpenAI/);
+  assert.match(login, /action="\/auth\/google\/start"/);
+  assert.match(login, /method="post"/);
+  assert.match(login, /name="terms"/);
+  assert.match(login, /name="privacy"/);
+  assert.equal((login.match(/type="checkbox"[^>]*required/g)||[]).length,2);
+  assert.doesNotMatch(login, /type="checkbox"[^>]*checked/);
+  assert.match(login, /name="return_to" value="\/canvas"/);
 });

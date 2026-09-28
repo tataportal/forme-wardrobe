@@ -6,7 +6,7 @@ type Pair = { x: number; y: number; distance: number; angle: number };
 type Session = {
   id: string; frame: Frame; geometry: GestureGeometry; origin: GestureGeometry;
   contacts: Map<number, Contact>; pair: Pair | null;
-  changed: boolean; moved: boolean; held: boolean; multiple: boolean;
+  initialScale: number; changed: boolean; moved: boolean; held: boolean; multiple: boolean;
 };
 type Callbacks = {
   select(id: string): void;
@@ -14,6 +14,7 @@ type Callbacks = {
   change(id: string, geometry: GestureGeometry): void;
   replace(id: string): void;
   lock(id: string): void;
+  resize?(id: string, scale: number): void;
 };
 type Timer = { start(fn: () => void, delay: number): unknown; clear(id: unknown): void };
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -61,7 +62,7 @@ export class CanvasGestures {
     const geometry = { x: target.geometry.x, y: target.geometry.y, scale: target.geometry.scale, rotation: target.geometry.rotation };
     const session: Session = { id: target.id, frame: target.frame, geometry,
       origin: { ...geometry }, contacts: new Map([[point.id, contact]]), pair: null,
-      changed: false, moved: false, held: false, multiple: false };
+      initialScale: geometry.scale, changed: false, moved: false, held: false, multiple: false };
     this.session = session;
     this.callbacks.select(target.id);
     if (point.touch) this.holdTimer = this.timer.start(() => {
@@ -125,6 +126,7 @@ export class CanvasGestures {
       return;
     }
     this.session = null;
+    if (Math.abs(session.geometry.scale - session.initialScale) > .00001) this.callbacks.resize?.(session.id, session.geometry.scale);
     if (tap) {
       const previous = this.lastTap;
       if (previous?.id === session.id && point.time - previous.time < 320

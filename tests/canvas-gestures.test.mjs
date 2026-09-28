@@ -9,7 +9,7 @@ const point = (id, x, y, time = 0, touch = true) => ({ id, x, y, time, touch });
 const target = { id: "coat", geometry: { x: 50, y: 50, scale: .5, rotation: 0 }, frame: { left: 0, top: 0, width: 400, height: 600 } };
 function setup() {
   const events = [], pending = new Map(); let clock = 0, timerId = 0;
-  const gestures = new CanvasGestures(Object.fromEntries(["select", "checkpoint", "change", "replace", "lock"].map(action => [action, (...args) => events.push({ action, args })])), {
+  const gestures = new CanvasGestures(Object.fromEntries(["select", "checkpoint", "change", "replace", "lock", "resize"].map(action => [action, (...args) => events.push({ action, args })])), {
     start(fn, delay) { pending.set(++timerId, { fn, at: clock + delay }); return timerId; },
     clear(id) { pending.delete(id); },
   });
@@ -111,4 +111,19 @@ test("almost coincident fingers and cancelled captures produce finite geometry a
   g.up(point(2, 220, 330, 50), true); advance(1000);
   assert.equal(g.active, false);
   assert.equal(actions("lock").length + actions("replace").length, 0);
+});
+
+
+test("only a completed resize teaches the garment size, once per gesture", () => {
+  const { gestures:g, actions } = setup();
+  g.down(point(1,150,300),target);g.move(point(1,160,310,50));g.up(point(1,160,310,100));
+  assert.equal(actions("resize").length,0,"moving alone must not save a size");
+  g.down(point(1,150,300,200),target);g.down(point(2,250,300,210));
+  g.move(point(2,290,300,230));g.move(point(2,310,300,240));
+  assert.equal(actions("resize").length,0,"no writes while fingers are moving");
+  g.up(point(2,310,300,250));g.up(point(1,150,300,260));
+  assert.equal(actions("resize").length,1);
+  near(actions("resize")[0].args[1],.8);
+  g.down(point(1,150,300,300),target);g.down(point(2,250,300,310));g.move(point(2,290,300,330));g.up(point(2,290,300,350),true);
+  assert.equal(actions("resize").length,1,"cancelled gestures must not teach a size");
 });
