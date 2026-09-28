@@ -33,6 +33,7 @@ import { CanvasHistory, snapshotLook, sameDocument, readCanvasDraft, type Canvas
 import { moveCanvasLayer } from "./canvas-layers";
 import { applyGarmentReplacements, availableMixGarments, randomGarmentReplacements, randomLookGarments } from "./canvas-random";
 import { CanvasPieceOverlay } from "./canvas-piece-overlay";
+import { topCanvasPieceAtPoint, visibleGarmentBounds } from "./canvas-overlay-bounds";
 import { CanvasGestures, type GesturePoint } from "./canvas-gestures";
 import { fitLookPreview } from "./look-preview";
 import { LookActionIcon } from "./look-action-icon";
@@ -3271,7 +3272,17 @@ export function WardrobeApp({
   function startCanvasGesture(event: ReactPointerEvent<HTMLDivElement>) {
     const gestures = canvasGestures.current!;
     if (savingOutfit || event.button !== 0) return;
-    const element = event.target instanceof Element ? event.target.closest<HTMLElement>(".canvas-piece") : null;
+    const directElement = event.target instanceof Element ? event.target.closest<HTMLElement>(".canvas-piece") : null;
+    const pieceElements = Array.from(canvasRef.current?.querySelectorAll<HTMLElement>(".canvas-piece") ?? []);
+    const candidates = pieceElements.map((element, order) => {
+      const rect = element.getBoundingClientRect();
+      const alpha = (element.dataset.alphaBounds ?? "").split(",").map(Number);
+      const visible = visibleGarmentBounds(rect, { width: element.offsetWidth, height: element.offsetHeight }, alpha,
+        new DOMMatrixReadOnly(getComputedStyle(element).transform));
+      return { id: element.dataset.instanceId ?? "", z: Number(element.style.zIndex) || 0, order, rect: visible };
+    }).filter(candidate => candidate.id);
+    const hitId = topCanvasPieceAtPoint(candidates, event.clientX, event.clientY, event.pointerType === "touch" ? 10 : 2);
+    const element = pieceElements.find(candidate => candidate.dataset.instanceId === hitId) ?? directElement;
     const piece = currentDocument.current.items.find(item => item.instanceId === element?.dataset.instanceId);
     const frame = canvasRef.current?.getBoundingClientRect();
     if (!gestures.active && (!piece || !frame)) return;

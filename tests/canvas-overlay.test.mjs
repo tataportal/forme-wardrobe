@@ -4,7 +4,17 @@ import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 
 const bundle = await build({ entryPoints: [fileURLToPath(new URL("../app/canvas-overlay-bounds.ts", import.meta.url))], bundle: true, write: false, platform: "node", format: "esm", logLevel: "silent" });
-const { fitCanvasOverlay, visibleGarmentBounds } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+const { fitCanvasOverlay, visibleGarmentBounds, topCanvasPieceAtPoint } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+
+test("a tap selects the top visible garment instead of a transparent image box", () => {
+  const candidates = [
+    { id: "pants", z: 1000, order: 0, rect: { left: 100, top: 220, width: 120, height: 260 } },
+    { id: "jacket", z: 3000, order: 1, rect: { left: 80, top: 80, width: 180, height: 170 } },
+  ];
+  assert.equal(topCanvasPieceAtPoint(candidates, 160, 300, 10), "pants");
+  assert.equal(topCanvasPieceAtPoint(candidates, 160, 230, 10), "jacket");
+  assert.equal(topCanvasPieceAtPoint(candidates, 20, 20, 10), null);
+});
 
 test("all selection controls fit at every edge, including oversized and tiny pieces", () => {
   for (const width of [305, 425, 640]) for (const height of [180, 400, 740]) {

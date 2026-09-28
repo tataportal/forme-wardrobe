@@ -1,4 +1,12 @@
 export type OverlayRect = { left: number; top: number; width: number; height: number };
+export type CanvasHitCandidate = { id: string; z: number; order: number; rect: OverlayRect };
+
+export function topCanvasPieceAtPoint(candidates: CanvasHitCandidate[], x: number, y: number, hitSlop = 0): string | null {
+  return candidates
+    .filter(({ rect }) => x >= rect.left - hitSlop && x <= rect.left + rect.width + hitSlop
+      && y >= rect.top - hitSlop && y <= rect.top + rect.height + hitSlop)
+    .sort((a, b) => b.z - a.z || b.order - a.order)[0]?.id ?? null;
+}
 
 // Follow the visible cutout, including rotation, instead of its transparent padding.
 export function visibleGarmentBounds(rect: OverlayRect, size: { width: number; height: number },

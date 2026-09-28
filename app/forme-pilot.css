@@ -791,20 +791,21 @@
   .product-tour-looks { padding: 18px; }
 }
 @media (max-width: 699px) {
-  .forme-app.view-studio .studio-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: 40px minmax(0,1fr) 40px 132px; gap: 6px; }
+  .forme-app.view-studio .studio-view { inset: 64px 0 calc(56px + env(safe-area-inset-bottom)); padding: 8px 14px; }
+  .forme-app.view-studio .studio-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: 34px minmax(0,1fr) 36px 92px; gap: 4px; }
   .forme-app.view-studio .studio-heading { grid-column: 1; grid-row: 1; gap: 4px; }
   .forme-app.view-studio .canvas-column { grid-column: 1; grid-row: 2; }
   .forme-app.view-studio .studio-document-actions { grid-column: 1; grid-row: 3; padding-top: 0; gap: 4px; }
-  .forme-app.view-studio .studio-document-actions button, .forme-app.view-studio .studio-document-actions .forme-menu > summary { min-height: 40px; height: 40px; }
-  .forme-app.view-studio .studio-library-column { grid-column: 1; grid-row: 4; padding: 6px 0 0; border: 0; border-top: 1px solid var(--fs-line); }
-  .forme-app.view-studio .garment-library-panel { --library-thumbnail: 72px; grid-template-columns: minmax(0,1fr); grid-template-rows: 32px minmax(0,1fr); gap: 2px; }
-  .forme-app.view-studio .garment-library-panel[data-grid-size="small"] { --library-thumbnail: 58px; }
-  .forme-app.view-studio .garment-library-panel[data-grid-size="large"] { --library-thumbnail: 88px; }
+  .forme-app.view-studio .studio-document-actions button, .forme-app.view-studio .studio-document-actions .forme-menu > summary { min-height: 36px; height: 36px; }
+  .forme-app.view-studio .studio-library-column { grid-column: 1; grid-row: 4; padding: 4px 0 0; border: 0; border-top: 1px solid var(--fs-line); }
+  .forme-app.view-studio .garment-library-panel { --library-thumbnail: 58px; grid-template-columns: minmax(0,1fr); grid-template-rows: 26px minmax(0,1fr); gap: 2px; }
+  .forme-app.view-studio .garment-library-panel[data-grid-size="small"] { --library-thumbnail: 48px; }
+  .forme-app.view-studio .garment-library-panel[data-grid-size="large"] { --library-thumbnail: 72px; }
   .forme-app.view-studio .library-tools .forme-menu-content { top: auto; bottom: calc(100% + 4px); }
   .forme-app.view-studio .garment-library-panel > h2, .forme-app.view-studio .library-search { display: none; }
   .forme-app.view-studio .library-tools { grid-column: 1; grid-row: 1; gap: 8px; }
   .forme-app.view-studio .library-options { gap: 8px; }
-  .forme-app.view-studio .library-options select { min-height: 32px; font-size: 14px; }
+  .forme-app.view-studio .library-options select { min-height: 26px; font-size: 13px; }
   .forme-app.view-studio .sticker-tray-groups { grid-column: 1; grid-row: 2; padding: 0; overflow-x: auto; overflow-y: hidden; }
   .forme-app.view-studio .sticker-tray-section { height: 100%; }
   .forme-app.view-studio .sticker-tray { display: flex; width: max-content; height: 100%; gap: 12px; }
@@ -815,17 +816,19 @@
   .forme-app.view-studio .garment-library-panel:has(.replacement-notice) .replacement-notice { grid-row: 2; }
   .forme-app.view-studio .garment-library-panel:has(.replacement-notice) .sticker-tray-groups { grid-row: 3; }
   .forme-app.view-studio .canvas-panel-nav { gap: 2px; }
-  .forme-app.view-studio .canvas-panel-nav button { width: 40px; height: 40px; min-height: 40px; }
+  .forme-app.view-studio .canvas-panel-nav button { width: 34px; height: 34px; min-height: 34px; }
   .forme-app.view-studio .canvas-panel-nav button span { display: none; }
   .forme-app.view-studio .canvas-panel-nav svg { display: block; }
   .forme-app.view-studio .canvas-panel-nav button.active { text-decoration: none; color: var(--fs-ink); }
   .forme-app.view-studio .studio-document-actions .canvas-action-label { display: none; }
   .forme-app.view-studio .studio-document-actions :is(.mix-look-action,.save-look-action) > svg { display: block; }
-  .forme-app.view-studio .studio-document-actions :is(button,.primary-action) { width: 40px; min-height: 40px; height: 40px; padding: 0; }
+  .forme-app.view-studio .studio-document-actions :is(button,.primary-action) { width: 36px; min-height: 36px; height: 36px; padding: 0; }
   .forme-app.view-studio .studio-document-actions .save-look-action { margin-left: 0; }
   .forme-app.view-studio .canvas-utility-actions { gap: 0; }
-  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { position: absolute; inset: 46px 0 184px; max-height: none; margin: 0; padding: 8px 16px; border: 1px solid var(--fs-line); border-radius: 4px; background: var(--fs-surface); z-index: 97; }
+  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { position: absolute; inset: 38px 0 132px; max-height: none; margin: 0; padding: 8px 16px; border: 1px solid var(--fs-line); border-radius: 4px; background: var(--fs-surface); z-index: 97; }
   .forme-app.view-studio .canvas-panel-close { top: 8px; right: 8px; }
+  .forme-app.view-studio .mobile-nav { height: calc(56px + env(safe-area-inset-bottom)); min-height: calc(56px + env(safe-area-inset-bottom)); }
+  .forme-app.view-studio .mobile-nav button { min-height: 56px; padding: 8px 0; font-size: 12px; }
 }
 @media (max-width: 370px) {
   .forme-app .closet-add-context { display: none; }
@@ -836,11 +839,11 @@
   .forme-app.view-studio .new-look-action { padding-left: 0; }
 }
 @media (max-width: 699px) and (max-height: 740px) {
-  .forme-app.view-studio .studio-layout { grid-template-rows: 36px minmax(0,1fr) 40px 112px; gap: 4px; }
-  .forme-app.view-studio .garment-library-panel { --library-thumbnail: 64px; grid-template-rows: 30px minmax(0,1fr); }
-  .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 30px auto minmax(0,1fr); }
-  .forme-app.view-studio .library-options select { min-height: 28px; }
-  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { inset: 40px 0 160px; }
+  .forme-app.view-studio .studio-layout { grid-template-rows: 32px minmax(0,1fr) 34px 78px; gap: 3px; }
+  .forme-app.view-studio .garment-library-panel { --library-thumbnail: 50px; grid-template-rows: 24px minmax(0,1fr); }
+  .forme-app.view-studio .garment-library-panel:has(.replacement-notice) { grid-template-rows: 24px auto minmax(0,1fr); }
+  .forme-app.view-studio .library-options select { min-height: 24px; }
+  .forme-app.view-studio :is(.saved-looks-panel,.canvas-layers-panel) { inset: 36px 0 116px; }
 }
 @media (max-height: 600px) and (orientation: landscape) {
   .forme-app.view-studio .studio-view { padding-block: 4px; }
