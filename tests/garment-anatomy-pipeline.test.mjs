@@ -12,6 +12,7 @@ const bundle = await build({
   stdin: { contents: `
     export * from "./worker/wardrobe-api";
     export * from "./shared/garment-anatomy";
+    export * from "./worker/contour-cutout";
     export * from "./worker/interior-edge-trace";
     export { slotPlacement, garmentLayout, ensureGarmentLayout } from "./app/garment-layout";
     export { default as encodePng, init as initPng } from "@jsquash/png/encode";
@@ -210,6 +211,19 @@ test("landmarks not on real alpha boundaries trigger measurement-only repair", a
   const state = await runPipeline(t, { wrongLandmark: true });
   assert.equal(state.row().status, "ready");
   assert.deepEqual(state.requests, ["generate", "garment_quality_gate", "garment_anatomy"]);
+});
+
+test("a white garment on real transparency is not erased as studio background", async () => {
+  const input = fixture();
+  for (let offset = 0; offset < input.data.length; offset += 4) {
+    const garment = input.data[offset] !== 255;
+    input.data.set(garment ? [250, 250, 248, 255] : [0, 0, 0, 0], offset);
+  }
+  const png = await app.encodePng(input);
+  const result = await app.contourCutoutPng(new Uint8Array(png), [], anatomy());
+  assert.equal(result.passed, true, result.notes);
+  assert.ok(result.coverage > 0.1);
+  assert.ok(result.layout);
 });
 
 test("two failed measurements stop automatically and retain the approved master", async t => {

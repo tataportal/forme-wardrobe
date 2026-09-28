@@ -88,13 +88,22 @@ export async function contourCutoutPng(
   let head = 0;
   let tail = 0;
 
+  let transparentPixels = 0;
+  for (let index = 0; index < total; index += 1) {
+    if (data[index * 4 + 3] < 24) transparentPixels += 1;
+  }
+  // Image generation already returns a real alpha channel. When that alpha is
+  // present, RGB white belongs to white garments and must never be flood-filled
+  // as a fallback studio background.
+  const hasTransparentBackground = transparentPixels / total >= 0.005;
+
   const isStudioWhite = (index: number) => {
     const offset = index * 4;
     const red = data[offset];
     const green = data[offset + 1];
     const blue = data[offset + 2];
     return data[offset + 3] < 24
-      || (Math.min(red, green, blue) >= 244 && Math.max(red, green, blue) - Math.min(red, green, blue) <= 18);
+      || (!hasTransparentBackground && Math.min(red, green, blue) >= 244 && Math.max(red, green, blue) - Math.min(red, green, blue) <= 18);
   };
   const seed = (index: number) => {
     if (!visited[index] && isStudioWhite(index)) {
