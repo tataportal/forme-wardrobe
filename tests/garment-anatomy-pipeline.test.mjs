@@ -217,7 +217,15 @@ test("two failed measurements stop automatically and retain the approved master"
   assert.equal(state.row().status, "failed");
   assert.equal(state.row().layout_json, null);
   assert.ok(state.objects.has(state.row().generated_image_key));
-  assert.deepEqual(state.requests, ["generate", "garment_quality_gate", "garment_anatomy"]);
+  assert.deepEqual(state.requests, ["generate", "garment_quality_gate", "garment_anatomy", "garment_anatomy"]);
+});
+
+test("mask repair waits for valid anatomy instead of failing the approved master", async t => {
+  const state = await runPipeline(t, { outerwear: true, badFirst: true, badRetry: true });
+  assert.equal(state.row().status, "failed");
+  assert.ok(state.objects.has(state.row().generated_image_key));
+  assert.deepEqual(state.requests, ["generate", "garment_quality_gate", "garment_anatomy", "garment_anatomy"]);
+  assert.ok(!state.requests.includes("layering_mask_repair"));
 });
 
 test("percentage confidence is explicit; 9 is never silently promoted to 90", () => {

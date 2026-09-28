@@ -1485,7 +1485,7 @@ async function reviewGeneratedGarment(
   }
 }
 
-async function reviewAnatomyOnly(env: WardrobeEnv, db: D1Database, garment: GarmentRow, jobId: string, generated: Uint8Array, reason: string, contourGuide = "", candidates: AnatomyCandidate[] = []): Promise<unknown> {
+async function reviewAnatomyOnly(env: WardrobeEnv, db: D1Database, garment: GarmentRow, jobId: string, generated: Uint8Array, reason: string, contourGuide = "", candidates: AnatomyCandidate[] = [], retryAttempt = 1): Promise<unknown> {
   if (!candidates.length) throw new InvalidAnatomyError("No hay puntos de contorno suficientes para repetir la medición.");
   const { coordinateGuidePng } = await import("./coordinate-guide");
   const guide = await coordinateGuidePng(generated);
@@ -1508,7 +1508,8 @@ async function reviewAnatomyOnly(env: WardrobeEnv, db: D1Database, garment: Garm
   const result = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string }; usage?: ResponsesUsage };
   if (!response.ok) throw new InvalidAnatomyError(result.error?.message || `No se pudo repetir la medición (${response.status}).`);
   await recordAiUsage(db, { ownerId: garment.owner_id, garmentId: garment.id, jobId, operation: "anatomy_retry", model,
-    requestId: response.headers.get("x-request-id"), usage: result.usage, idempotencyKey: `anatomy-retry:${jobId}` });
+    requestId: response.headers.get("x-request-id"), usage: result.usage, attempt: retryAttempt,
+    idempotencyKey: `anatomy-retry:${jobId}:${retryAttempt}` });
   const raw = result.output_text || result.output?.flatMap(item => item.content || []).map(item => item.text || "").join("") || "";
   try { return resolveAnatomySelection(JSON.parse(raw), candidates); } catch { throw new InvalidAnatomyError("La segunda medición no eligió puntos válidos del contorno."); }
 }
@@ -1834,9 +1835,8 @@ async function finalizeGeneratedGarment(
   const cachedObject = await env.WARDROBE_MEDIA?.get(reviewKey);
   const cached = cachedObject ? await cachedObject.json<GeneratedReview>().catch(() => null) : null;
   const approved = cached?.passed === true && cached.score >= 85 ? cached : null;
-  const visualQa = approved
-    ? maskAttempt > 0 && needsLayeringCutout(garment) ? await reviewLayeringMaskOnly(env, db, garment, jobId, generated, approved) : approved
-    : await reviewGeneratedGarment(env, db, jobId, garment, sourceBytes, sourceContentType, generated, maskAttempt);
+  let visualQa = approved
+    ?? await reviewGeneratedGarment(env, db, jobId, garment, sourceBytes, sourceContentType, generated, maskAttempt);
   if (!visualQa.passed) {
     if (visualQa.retryable) throw new RetryableProcessingError(visualQa.notes);
     if (approved) {
@@ -1865,13 +1865,33 @@ async function finalizeGeneratedGarment(
 
   let cutouts: StoredCutouts;
   try {
+    // A mask retry may arrive with an approved master whose anatomical
+    // landmarks were the original failure. Repair those landmarks before the
+    // mask code asks for shoulder/hem geometry.
+    if (approved && maskAttempt > 0 && needsLayeringCutout(garment)) {
+      try {
+        const { contourCutoutPng } = await import("./contour-cutout");
+        const measured = await contourCutoutPng(generated, [], visualQa.anatomy);
+        if (!measured.layout) throw new InvalidAnatomyError("La prenda no tiene medidas verificadas.");
+      } catch (error) {
+        if (!(error instanceof InvalidAnatomyError)) throw error;
+        visualQa.anatomy = await reviewAnatomyOnly(
+          env, db, garment, jobId, generated, error.message, error.contourGuide, error.candidates, maskAttempt + 1,
+        );
+        await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+      }
+      visualQa = await reviewLayeringMaskOnly(env, db, garment, jobId, generated, visualQa);
+      await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+    }
     try {
       cutouts = await storeGeneratedCutouts(env, db, jobId, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
     } catch (error) {
       if (!(error instanceof InvalidAnatomyError)) throw error;
       // One bounded measurement-only retry. No second generation, no human gate.
       try {
-        visualQa.anatomy = await reviewAnatomyOnly(env, db, garment, jobId, generated, error.message, error.contourGuide, error.candidates);
+        visualQa.anatomy = await reviewAnatomyOnly(
+          env, db, garment, jobId, generated, error.message, error.contourGuide, error.candidates, maskAttempt + 1,
+        );
       } catch (retryError) {
         throw new InvalidAnatomyError(retryError instanceof Error ? retryError.message : "No se pudo repetir la medición.");
       }
@@ -1889,7 +1909,7 @@ async function finalizeGeneratedGarment(
       quality,
       presentation,
       outputVariant,
-      error instanceof InvalidAnatomyError ? 1 : maskAttempt,
+      maskAttempt,
       error instanceof Error ? error.message : "El control automático del calado falló.",
     );
     return;
