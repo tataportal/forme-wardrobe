@@ -42,7 +42,6 @@ function TourVisual({ step }: { step: number }) {
     <GarmentImage id="demo-w-003" />
     <GarmentImage id="top-basic-white-tee" />
     <GarmentImage id="bottom-blue-jeans" />
-    <span>10</span><small>créditos para empezar</small>
   </div>;
 
   if (step === 1) return <div className="product-tour-photo" aria-hidden="true">
@@ -122,6 +121,7 @@ export function ProductOnboarding({
   };
 
   const current = steps[step];
+  const currentTitle = step === 0 && authenticated && alreadyCompleted ? "Tu closet, en movimiento." : current.title;
   return <div className="product-tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-tour-title">
     <section className="product-tour-shell">
       <header className="product-tour-header">
@@ -145,7 +145,7 @@ export function ProductOnboarding({
 
         <div className="product-tour-copy">
           <span>{current.label}</span>
-          <h1 id="product-tour-title">{current.title}</h1>
+          <h1 id="product-tour-title">{currentTitle}</h1>
           <p>{current.body}</p>
           {step === 0 && <small>{authenticated ? alreadyCompleted ? "Tu saldo está activo y puedes volver a este tutorial cuando quieras." : "Ya estás dentro. Tus 10 créditos están activos." : "Al registrarte recibes 10 créditos."}</small>}
           {step === 3 && !reward && <small>Completa este recorrido y recibe 5 créditos adicionales.</small>}

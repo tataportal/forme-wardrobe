@@ -194,7 +194,7 @@ async function generations(env: WardrobeEnv): Promise<Response> {
     mode: "live-d1-r2",
     syncedAt: new Date().toISOString(),
     itemCount: items.length,
-    measuredCostItems: measuredCosts.length,
+    measuredCostItems: measuredCosts.reduce((total, item) => total + item.generationCost.generationCount, 0),
     measuredCostUsd: measuredCosts.reduce((total, item) => total + (item.generationCost.usd ?? 0), 0),
     accounts: [...accountMap.values()],
     items,
