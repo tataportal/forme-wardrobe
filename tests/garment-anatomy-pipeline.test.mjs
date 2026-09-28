@@ -381,13 +381,18 @@ test("mask-only repair preserves approved fidelity and anatomical measurements",
   const state = await runPipeline(t, { outerwear: true });
   const row = state.row(), master = state.objects.get(row.generated_image_key).bytes;
   const priorLayout = JSON.parse(row.layout_json).closed.measurement;
+  const reviewKey = `${row.generated_image_key}.qa-anatomy-v1.json`;
+  const cachedReview = JSON.parse(new TextDecoder().decode(state.objects.get(reviewKey).bytes));
+  cachedReview.layeringPolygon = cachedReview.layeringPolygon.map(point => ({ ...point, y: Math.min(point.y, 650) }));
+  state.objects.set(reviewKey, { bytes: new TextEncoder().encode(JSON.stringify(cachedReview)).buffer,
+    httpMetadata: { contentType: "application/json" } });
   const repairs = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     assert.equal(url, "https://api.openai.com/v1/responses");
     const body = JSON.parse(options.body), name = body.text.format.name;
     repairs.push(name);
     if (name === "layering_mask_repair") {
-      assert.equal(body.input[0].content.filter(part => part.type === "input_image").length, 3);
+      assert.equal(body.input[0].content.filter(part => part.type === "input_image").length, 2);
       return Response.json({ output_text: JSON.stringify({ confidence: 96, sections: Array.from({ length: 12 }, () => ({ left_x: 445, right_x: 555 })) }) });
     }
     assert.equal(name, "layering_cutout_quality_gate");
@@ -402,6 +407,23 @@ test("mask-only repair preserves approved fidelity and anatomical measurements",
   assert.deepEqual(repairs, ["layering_mask_repair", "layering_cutout_quality_gate"]);
 });
 
+test("a valid cached mask goes straight to cutout QA without another mask repair", async t => {
+  const state = await runPipeline(t, { outerwear: true });
+  const row = state.row(), master = state.objects.get(row.generated_image_key).bytes;
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    assert.equal(url, "https://api.openai.com/v1/responses");
+    const body = JSON.parse(options.body), name = body.text.format.name;
+    requests.push(name);
+    assert.equal(name, "layering_cutout_quality_gate");
+    return Response.json({ output_text: JSON.stringify({ passed: true, score: 96, summary: "Bordes conservados", issues: [] }) });
+  });
+  await app.finalizeGeneratedGarment(state.env, state.db, row, "job", "low", "auto", "closed", row.generated_image_key,
+    new Uint8Array(master), master, "image/png", 1);
+  assert.equal(state.row().status, "ready", state.row().qa_notes);
+  assert.deepEqual(requests, ["layering_cutout_quality_gate"]);
+});
+
 test("interrupted postprocess releases its lease and retries immediately without regenerating", async t => {
   const state = await runPipeline(t, { outerwear: true });
   const key = state.row().generated_image_key;
@@ -414,7 +436,7 @@ test("interrupted postprocess releases its lease and retries immediately without
   assert.equal(job.status, "queued");
   assert.equal(delay, 10);
   assert.equal(job.generated_key, key);
-  assert.match(job.error, /interrumpió la corrección/);
+  assert.match(job.error, /control visual del calado|interrumpió la corrección/);
   assert.ok(state.objects.has(key));
 });
 

@@ -1869,10 +1869,12 @@ async function finalizeGeneratedGarment(
     // landmarks were the original failure. Repair those landmarks before the
     // mask code asks for shoulder/hem geometry.
     if (approved && maskAttempt > 0 && needsLayeringCutout(garment)) {
+      let currentMaskPassed = false;
       try {
         const { contourCutoutPng } = await import("./contour-cutout");
-        const measured = await contourCutoutPng(generated, [], visualQa.anatomy);
+        const measured = await contourCutoutPng(generated, visualQa.layeringPolygon, visualQa.anatomy);
         if (!measured.layout) throw new InvalidAnatomyError("La prenda no tiene medidas verificadas.");
+        currentMaskPassed = measured.canvasPassed && Boolean(measured.canvasPng) && Boolean(measured.canvasQaPng);
       } catch (error) {
         if (!(error instanceof InvalidAnatomyError)) throw error;
         visualQa.anatomy = await reviewAnatomyOnly(
@@ -1880,8 +1882,12 @@ async function finalizeGeneratedGarment(
         );
         await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
       }
-      visualQa = await reviewLayeringMaskOnly(env, db, garment, jobId, generated, visualQa);
-      await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+      // A human- or worker-repaired cached mask may already be valid. Keep it
+      // immutable instead of sending it through another AI repair pass.
+      if (!currentMaskPassed) {
+        visualQa = await reviewLayeringMaskOnly(env, db, garment, jobId, generated, visualQa);
+        await env.WARDROBE_MEDIA?.put(reviewKey, JSON.stringify(visualQa), { httpMetadata: { contentType: "application/json" } });
+      }
     }
     try {
       cutouts = await storeGeneratedCutouts(env, db, jobId, garment, generated, quality, visualQa.layeringPolygon, visualQa.anatomy);
