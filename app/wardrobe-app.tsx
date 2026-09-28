@@ -135,6 +135,7 @@ type WardrobeProfile = {
   joinedAt?: string;
   isTester?: boolean;
   credits?: number;
+  creditsUsed?: number;
   referralCode?: string | null;
   referralCount?: number;
   referralCredits?: number;
@@ -1477,9 +1478,9 @@ async function createInstagramStoryBlob(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
 
-  context.fillStyle = "#f3f3ef";
+  context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = "rgba(17,17,15,.13)";
+  context.fillStyle = "#000000";
   for (let x = 46; x < width; x += 28) {
     for (let y = 46; y < height; y += 28) {
       context.beginPath();
@@ -1488,7 +1489,7 @@ async function createInstagramStoryBlob(
     }
   }
 
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
   context.fillText("FORMÉ®", 72, 92);
@@ -1499,9 +1500,9 @@ async function createInstagramStoryBlob(
   }
 
   const artboard = { x: 92, y: 266, width: 896, height: 1344 };
-  context.fillStyle = "#f3f3ef";
+  context.fillStyle = "#ffffff";
   context.fillRect(artboard.x, artboard.y, artboard.width, artboard.height);
-  context.strokeStyle = "rgba(17,17,15,.10)";
+  context.strokeStyle = "#000000";
   context.lineWidth = 2;
   context.strokeRect(artboard.x, artboard.y, artboard.width, artboard.height);
 
@@ -1532,7 +1533,7 @@ async function createInstagramStoryBlob(
     loaded.forEach(({ image }) => image.close());
   }
 
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.font = "400 36px Helvetica, Arial, sans-serif";
   context.letterSpacing = "-1px";
   const lookGarments = shareLookGarments(look, garmentById);
@@ -1551,11 +1552,11 @@ async function createInstagramStoryBlob(
       const row = Math.floor(index / columns);
       const x = 72 + column * (columnWidth + gap);
       const y = 1692 + row * rowHeight;
-      context.fillStyle = "rgba(17,17,15,.42)";
+      context.fillStyle = "#000000";
       context.font = "500 12px Arial, sans-serif";
       context.letterSpacing = "1px";
       context.fillText(String(index + 1).padStart(2, "0"), x, y);
-      context.fillStyle = "#11110f";
+      context.fillStyle = "#000000";
       context.font = `${columns === 3 ? 15 : 17}px Helvetica, Arial, sans-serif`;
       context.letterSpacing = "0px";
       const brand = garment.brand?.trim();
@@ -1563,12 +1564,12 @@ async function createInstagramStoryBlob(
       context.fillText(fitCanvasText(context, label, columnWidth - 30), x + 30, y);
     });
     if (lookGarments.length > visible.length) {
-      context.fillStyle = "rgba(17,17,15,.55)";
+      context.fillStyle = "#000000";
       context.font = "500 13px Arial, sans-serif";
       context.fillText(`+${lookGarments.length - visible.length} PRENDAS`, width - 230, 1842);
     }
   } else {
-    context.fillStyle = "#11110f";
+    context.fillStyle = "#000000";
     context.font = "400 36px Helvetica, Arial, sans-serif";
     context.letterSpacing = "-1px";
     context.fillText("Vístete con lo que ya tienes.", 72, 1738);
@@ -1579,7 +1580,7 @@ async function createInstagramStoryBlob(
     `${look.items.length} ${look.items.length === 1 ? "PIEZA" : "PIEZAS"}`,
     options.includeHandle ? shareHandle(handle) : "FORME.GALLERY",
   ].join("  /  ");
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.fillText(footer, 72, options.includeGarmentList && lookGarments.length ? 1880 : 1793);
   context.fillStyle = "#e83b25";
   context.fillRect(72, options.includeGarmentList && lookGarments.length ? 1902 : 1840, 128, 8);
@@ -1601,13 +1602,13 @@ async function createGarmentStoryBlob(
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
-  context.fillStyle = "#f3f3ef";
+  context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = "rgba(17,17,15,.12)";
+  context.fillStyle = "#000000";
   for (let x = 48; x < width; x += 28) for (let y = 48; y < height; y += 28) {
     context.beginPath(); context.arc(x, y, 1.2, 0, Math.PI * 2); context.fill();
   }
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
   context.fillText("FORMÉ®", 72, 92);
@@ -1624,7 +1625,7 @@ async function createGarmentStoryBlob(
     context.shadowColor = "transparent";
   } finally { image.close(); }
   if (options.labelMode !== "none") {
-    context.fillStyle = "#11110f";
+    context.fillStyle = "#000000";
     context.font = "500 58px Helvetica, Arial, sans-serif";
     context.letterSpacing = "-2px";
     context.fillText(translateGarmentName(garment.name), 72, 1662, width - 144);
@@ -1656,9 +1657,9 @@ async function createClosetStoryBlob(
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Este dispositivo no pudo crear la historia.");
-  context.fillStyle = "#f3f3ef";
+  context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.font = "600 24px Arial, sans-serif";
   context.letterSpacing = "5px";
   context.fillText("MI CLOSET EN FORMÉ", 64, 84);
@@ -1674,7 +1675,7 @@ async function createClosetStoryBlob(
       const row = Math.floor(index / columns);
       const x = 64 + column * (cellWidth + gap);
       const y = 136 + row * (cellHeight + gap);
-      context.fillStyle = "#e9e9e4";
+      context.fillStyle = "#ffffff";
       context.fillRect(x, y, cellWidth, cellHeight);
       const labelSpace = options.labelMode === "none" ? 24 : 70;
       const contain = Math.min((cellWidth - 24) / image.width, (cellHeight - labelSpace) / image.height);
@@ -1682,20 +1683,20 @@ async function createClosetStoryBlob(
       const drawHeight = image.height * contain;
       context.drawImage(image.source, x + (cellWidth - drawWidth) / 2, y + 12 + (cellHeight - labelSpace - drawHeight) / 2, drawWidth, drawHeight);
       if (options.labelMode !== "none") {
-        context.fillStyle = "#11110f";
+        context.fillStyle = "#000000";
         context.font = "500 17px Arial, sans-serif";
         context.letterSpacing = "0";
         const name = translateGarmentName(garment.name);
         context.fillText(name.length > 25 ? `${name.slice(0, 23)}…` : name, x + 12, y + cellHeight - 35, cellWidth - 24);
         if (options.labelMode === "name-brand" && garment.brand?.trim()) {
-          context.fillStyle = "#676760";
+          context.fillStyle = "#000000";
           context.font = "500 12px Arial, sans-serif";
           context.fillText(garment.brand.toLocaleUpperCase().slice(0, 28), x + 12, y + cellHeight - 15, cellWidth - 24);
         }
       }
     });
   } finally { loaded.forEach(({ image }) => image.close()); }
-  context.fillStyle = "#11110f";
+  context.fillStyle = "#000000";
   context.font = "600 19px Arial, sans-serif";
   context.letterSpacing = "4px";
   context.fillText(options.includeHandle ? shareHandle(handle) : "FORME.GALLERY", 64, 1830);
@@ -2563,7 +2564,7 @@ export function WardrobeApp({
   }, [profileOpen]);
 
   useEffect(() => {
-    if (!profileOpen || sessionStatus !== "authenticated") return;
+    if (sessionStatus !== "authenticated") return;
     let active = true;
     const refreshProfile = async () => {
       try {
@@ -2576,6 +2577,7 @@ export function WardrobeApp({
           joinedAt: user.joinedAt,
           isTester: user.isTester,
           credits: user.credits,
+          creditsUsed: user.creditsUsed,
           referralCode: user.referralCode,
           referralCount: user.referralCount,
           referralCredits: user.referralCredits,
@@ -2584,9 +2586,11 @@ export function WardrobeApp({
       } catch { /* Keep the last confirmed balance when offline. */ }
     };
     void refreshProfile();
+    const balanceTimer = window.setInterval(() => { if (!document.hidden) void refreshProfile(); }, 30000);
     window.addEventListener("focus", refreshProfile);
     return () => {
       active = false;
+      window.clearInterval(balanceTimer);
       window.removeEventListener("focus", refreshProfile);
     };
   }, [profileOpen, sessionStatus]);
@@ -4186,6 +4190,9 @@ export function WardrobeApp({
         demoMode={demoMode}
         profileImage={profileImage}
         profileImageClass={profileImageClass}
+        credits={profile.credits}
+        creditsUsed={profile.creditsUsed}
+        onTutorial={openProductOnboarding}
         onNavigate={navigateWardrobeRoute}
         onOpenCanvas={() => openStudio(wardrobePanel)}
         onSignIn={beginGoogleSignIn}
@@ -4835,6 +4842,8 @@ export function WardrobeApp({
               </div>
             </aside>
 
+            </div>
+
             {savedLooksOpen && <aside className={`saved-looks-panel ${savedLooksOpen ? "panel-open" : "panel-closed"}`} id="canvas-saved-looks" aria-label="Looks">
               <h2>Looks guardados</h2>
               <button type="button" className="canvas-panel-close" onClick={() => setSavedLooksOpen(false)} aria-label="Cerrar looks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button>
@@ -4859,8 +4868,6 @@ export function WardrobeApp({
               </li>; })}</ol>
               {!canvasPieces.length && <p>Añade prendas para ordenarlas aquí.</p>}
             </aside>}
-
-            </div>
 
             {wardrobeError && <div className="canvas-status-message" role="status">{wardrobeError}<button type="button" onClick={() => setWardrobeError("")} aria-label="Cerrar mensaje">×</button></div>}
           </div>

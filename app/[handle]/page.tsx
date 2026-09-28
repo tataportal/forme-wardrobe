@@ -129,7 +129,7 @@ export default function PublicProfilePage() {
           {data.profile.bio && <span>{data.profile.bio}</span>}
           <div className="profile-page-links"><button type="button" onClick={() => void shareProfile()}>Compartir</button></div>
         </div>
-        <dl className="profile-page-stats">
+        <dl className="public-profile-stats">
           <div><dt>Prendas</dt><dd>{data.garments.length}</dd></div>
           <div><dt>Looks</dt><dd>{data.outfits.length}</dd></div>
         </dl>

@@ -224,6 +224,7 @@ type UserProfileRow = {
   created_at: string;
   is_tester: number;
   credits: number;
+  credits_used: number;
   profile_public: number;
   discoverable: number;
   show_closet: number;
@@ -699,6 +700,7 @@ function accountProfileJson(row: UserProfileRow, isOwner = false) {
     joinedAt: `${row.created_at.replace(" ", "T")}Z`,
     isTester: Boolean(row.is_tester),
     credits: Number(row.credits || 0),
+    creditsUsed: Number(row.credits_used || 0),
     profilePublic: Boolean(row.profile_public),
     discoverable: Boolean(row.discoverable),
     showCloset: Boolean(row.show_closet),
@@ -721,6 +723,7 @@ async function readAccountProfile(db: D1Database, ownerId: string): Promise<User
       (SELECT COUNT(*) FROM referrals WHERE referrer_owner_id = users.id) AS referral_count,
       (SELECT COALESCE(SUM(reward_amount), 0) FROM referrals WHERE referrer_owner_id = users.id) AS referral_credits,
       (SELECT COALESCE(SUM(amount), 0) FROM digitization_credit_events WHERE owner_id = users.id) AS credits,
+      (SELECT COALESCE(SUM(-amount), 0) FROM digitization_credit_events WHERE owner_id = users.id AND amount < 0) AS credits_used,
       EXISTS(SELECT 1 FROM digitization_credit_events
         WHERE owner_id = users.id AND idempotency_key IN ('onboarding-complete:' || users.id, 'trial-launch-topup:' || users.id)) AS onboarding_completed
     FROM users WHERE id = ? LIMIT 1
