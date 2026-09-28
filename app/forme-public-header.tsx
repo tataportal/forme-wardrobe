@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { productFeatures } from "./product-features";
-import { PublicAccount } from "./public-account";
 
 export function FormePublicHeader({
   tone = "light",
@@ -18,7 +17,7 @@ export function FormePublicHeader({
         <Link href="/looks">Looks</Link>
         {productFeatures.assistant && <Link href="/asistente">Asistente</Link>}
       </nav>
-      <PublicAccount />
+      <Link className="public-account-entry" href="/perfil">Mi cuenta</Link>
     </header>
   );
 }

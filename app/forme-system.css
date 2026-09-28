@@ -2,12 +2,12 @@
 /* Legacy foundations; the product system in forme-pilot.css takes precedence. */
 @layer forme-legacy {
 :root {
-  --forme-bg: #ffffff;
-  --forme-surface: #ffffff;
-  --forme-surface-strong: #ffffff;
-  --forme-ink: #000000;
-  --forme-muted: #000000;
-  --forme-line: #000000;
+  --forme-bg: #f1f1ec;
+  --forme-surface: #e7e8e3;
+  --forme-surface-strong: #f8f8f4;
+  --forme-ink: #111310;
+  --forme-muted: rgba(17, 19, 16, 0.58);
+  --forme-line: rgba(17, 19, 16, 0.14);
   --forme-signal: #f0442f;
   --forme-radius-control: 9px;
   --forme-radius-card: 16px;
@@ -53,13 +53,13 @@ textarea:focus-visible {
   align-items: center;
   gap: 24px;
   border-bottom: 1px solid var(--forme-line);
-  background: #ffffff;
+  background: rgba(241, 241, 236, 0.88);
   color: var(--forme-ink);
   backdrop-filter: blur(22px) saturate(110%);
 }
 
 .public-header-coral {
-  border-color: #000000;
+  border-color: rgba(17, 19, 16, 0.22);
   background: rgba(240, 68, 47, 0.9);
 }
 
@@ -141,7 +141,7 @@ textarea:focus-visible {
 .forme-app .topbar {
   height: 72px;
   border-bottom: 1px solid var(--forme-line);
-  background: #ffffff;
+  background: rgba(241, 241, 236, 0.9);
   box-shadow: none;
   backdrop-filter: blur(22px) saturate(108%);
 }
@@ -184,7 +184,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: #ffffff;
+  background: rgba(17, 19, 16, 0.055);
 }
 
 .forme-app .zone-nav button {
@@ -209,7 +209,7 @@ textarea:focus-visible {
 .forme-app .zone-nav button.active {
   background: var(--forme-surface-strong);
   color: var(--forme-ink);
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 12px rgba(17, 19, 16, 0.08);
 }
 
 .forme-app .topbar-actions,
@@ -403,7 +403,7 @@ textarea:focus-visible {
 .forme-app .closet-scanner::before,
 .forme-app .looks-showcase::before,
 .forme-app .assistant-showcase::before {
-  background: radial-gradient(circle at 50% 44%, #ffffff, transparent 62%);
+  background: radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.82), transparent 62%);
 }
 
 .forme-app .closet-scanner figcaption,
@@ -500,7 +500,7 @@ textarea:focus-visible {
 }
 
 .forme-app .image-wrap::after {
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px rgba(17, 19, 16, 0.06);
 }
 
 .forme-app .card-meta {
@@ -680,7 +680,7 @@ textarea:focus-visible {
   height: 20px;
   max-width: 540px;
   border-radius: 6px;
-  background: #ffffff;
+  background: rgba(17, 19, 16, 0.08);
   animation: session-pulse 1s ease-in-out infinite alternate;
 }
 
@@ -894,7 +894,7 @@ textarea:focus-visible {
   min-height: 72px;
   padding: 0 32px;
   border-bottom: 1px solid var(--forme-line);
-  background: #ffffff;
+  background: rgba(241, 241, 236, 0.92);
   box-shadow: none;
   backdrop-filter: blur(22px) saturate(108%);
 }
@@ -945,7 +945,7 @@ textarea:focus-visible {
   inset: 0 auto 0 0;
   width: 20%;
   height: auto;
-  background: linear-gradient(90deg, var(--forme-bg), #ffffff);
+  background: linear-gradient(90deg, var(--forme-bg), rgba(241, 241, 236, 0));
 }
 
 .forme-app .style-intro-visual img {
@@ -1051,7 +1051,7 @@ textarea:focus-visible {
 }
 
 .forme-app .style-audience-options button.active small {
-  color: #ffffff;
+  color: rgba(241, 241, 236, 0.64);
 }
 
 .forme-app .style-audience-options strong {
@@ -1278,7 +1278,7 @@ textarea:focus-visible {
 .forme-landing .landing-hero-copy > p {
   margin: 0 0 28px;
   position: static;
-  color: #000000;
+  color: rgba(17, 19, 16, 0.74);
   font: 600 11px/1.2 var(--forme-font);
   letter-spacing: 0.07em;
 }
@@ -1306,7 +1306,7 @@ textarea:focus-visible {
   width: min(520px, 72%);
   margin: 32px 0 0;
   position: static;
-  color: #000000;
+  color: rgba(17, 19, 16, 0.78);
   font-size: 18px;
   line-height: 1.4;
 }
@@ -1315,7 +1315,7 @@ textarea:focus-visible {
   width: min(56vw, 780px);
   top: 54%;
   left: 78%;
-  opacity: 1;
+  opacity: 0.9;
 }
 
 .forme-landing .landing-garment-main {
@@ -1549,7 +1549,7 @@ textarea:focus-visible {
     width: 118vw;
     top: 72%;
     left: 68%;
-    opacity: 1;
+    opacity: 0.72;
   }
 
   .forme-app .mobile-nav {
@@ -1557,7 +1557,7 @@ textarea:focus-visible {
     padding: 0 8px env(safe-area-inset-bottom);
     border-top: 1px solid var(--forme-line);
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    background: #ffffff;
+    background: rgba(248, 248, 244, 0.94);
     backdrop-filter: blur(18px);
   }
 
@@ -1606,7 +1606,7 @@ textarea:focus-visible {
     inset: auto 0 0;
     width: auto;
     height: 24%;
-    background: linear-gradient(180deg, #ffffff, var(--forme-bg));
+    background: linear-gradient(180deg, rgba(241, 241, 236, 0), var(--forme-bg));
   }
 
   .forme-app .style-intro-copy {
