@@ -282,6 +282,14 @@ test("Canvas moves touch actions into the toolbar instead of covering the select
   assert.match(styles, /\[data-piece-selected="true"\] \.selected-piece-actions \{ display: flex; \}/);
 });
 
+test("Canvas gallery replaces the selected garment and adds only when nothing is selected", async () => {
+  const page = await readFile(new URL("../app/wardrobe-app.tsx", import.meta.url), "utf8");
+  assert.match(page, /const replacementId = replacingId \?\? selectedId;/);
+  assert.match(page, /const galleryWillReplace = Boolean\(replacingId \?\? selectedId\);/);
+  assert.match(page, /setSelectedId\(""\);\s*setSelectedGroupIds\(\[\]\);\s*setReplacingId\(null\);/);
+  assert.match(page, /select: instanceId => \{ setSelectedId\(instanceId\); setSelectedGroupIds\(\[\]\); setMarqueeRect\(null\); setReplacingId\(null\); \}/);
+});
+
 test("Looks has its own primary navigation state and creates a new document", async () => {
   const html = await (await render("/looks")).text();
   assert.match(html, /aria-current="page"[^>]*>Looks<\/button>/);

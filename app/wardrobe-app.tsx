@@ -2085,7 +2085,7 @@ export function WardrobeApp({
   const keyboardSizes = useRef(new Map<string, number>());
   const canvasGestures = useRef<CanvasGestures | null>(null);
   if (!canvasGestures.current) canvasGestures.current = new CanvasGestures({
-    select: instanceId => { setSelectedId(instanceId); setSelectedGroupIds([]); setMarqueeRect(null); },
+    select: instanceId => { setSelectedId(instanceId); setSelectedGroupIds([]); setMarqueeRect(null); setReplacingId(null); },
     checkpoint,
     change: (instanceId, geometry) => {
       autoPlacedIds.current.delete(instanceId);
@@ -2190,6 +2190,7 @@ export function WardrobeApp({
   const orderedLayers = [...canvasPieces].sort((a, b) => b.z - a.z);
   const selectedCanvasPiece = canvasPieces.find((item) => item.instanceId === selectedId);
   const selectedCanvasGarment = selectedCanvasPiece ? garmentById.get(selectedCanvasPiece.garmentId) : undefined;
+  const galleryWillReplace = Boolean(replacingId ?? selectedId);
   const selectedLayerOrder = [...canvasPieces].sort((a, b) => a.z - b.z);
   const selectedLayerIndex = selectedCanvasPiece
     ? selectedLayerOrder.findIndex((item) => item.instanceId === selectedCanvasPiece.instanceId)
@@ -3196,7 +3197,7 @@ export function WardrobeApp({
   async function addToCanvas(garmentId: string) {
     const garment = garmentById.get(garmentId);
     if (!garment || savingOutfit) return;
-    const replacementId = replacingId;
+    const replacementId = replacingId ?? selectedId;
     const generationAtStart = documentGeneration.current;
     try { await prepareCanvasGarment(garment); }
     catch { setWardrobeError("No se pudo medir esta prenda. Vuelve a intentarlo."); return; }
@@ -3311,6 +3312,7 @@ export function WardrobeApp({
     if (event.button !== 0) return;
     setSelectedId("");
     setSelectedGroupIds([]);
+    setReplacingId(null);
     if (event.pointerType === "touch" || window.innerWidth <= 900) return;
     const canvasRect = event.currentTarget.getBoundingClientRect();
     event.preventDefault();
@@ -4701,7 +4703,7 @@ export function WardrobeApp({
                 {!showingLibraryBasics && studioPersonalGarments.length > 0 && <section className="sticker-tray-section" aria-label="Mis prendas">
                   <div className="sticker-tray">{studioPersonalGarments.map((item) => {
                       const photo = garmentPhotoFor(item, "complete");
-                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${replacingId ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${replacingId ? "" : " al canvas"}`}>
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${galleryWillReplace ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${galleryWillReplace ? "" : " al canvas"}`}>
                         <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
                         <span className="canvas-thumbnail-label">{translateGarmentName(item.name)}</span>
                       </button>;
@@ -4710,7 +4712,7 @@ export function WardrobeApp({
                 {showingLibraryBasics && studioBasicGarments.length > 0 && <section className="sticker-tray-section forme-basics-section" aria-label="Básicos Formé">
                   <div className="sticker-tray">{studioBasicGarments.map((item) => {
                       const photo = garmentPhotoFor(item, "complete");
-                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${replacingId ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${replacingId ? "" : " al canvas"}`}>
+                      return <button key={item.id} onClick={() => addToCanvas(item.id)} aria-label={`${galleryWillReplace ? "Reemplazar con" : "Añadir"} ${translateGarmentName(item.name)}${galleryWillReplace ? "" : " al canvas"}`}>
                         <img src={imageSrc(photo.image)} alt="" loading="lazy" data-photo-role={photo.role} />
                         <span className="canvas-thumbnail-label">{translateGarmentName(item.name)}</span>
                       </button>;
